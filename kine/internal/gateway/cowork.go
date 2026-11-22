@@ -674,7 +674,7 @@ type coworkProbe struct {
 }
 
 func coworkProbeMCP(ctx context.Context, url string) coworkProbe {
-	client := &http.Client{Timeout: 8 * time.Second}
+	client := netguard.Client(8 * time.Second)
 	headers := map[string]string{
 		"Content-Type":         "application/json",
 		"Accept":               "application/json, text/event-stream",

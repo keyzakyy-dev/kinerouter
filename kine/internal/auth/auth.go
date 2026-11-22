@@ -7,6 +7,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -153,7 +154,12 @@ func VerifyPassword(storedHash, password, initialPassword string) bool {
 	if initialPassword == "" {
 		initialPassword = DEFAULT_PASSWORD
 	}
-	return password == initialPassword
+	// Constant time: this fallback compares the operator-supplied password
+	// directly, so a length-then-bytes comparison would leak it byte by byte.
+	if len(password) != len(initialPassword) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(password), []byte(initialPassword)) == 1
 }
 
 func HashPassword(password string) (string, error) {

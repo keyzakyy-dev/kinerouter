@@ -24,13 +24,16 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/keyzakyy-dev/kinerouter/internal/auth"
+	"github.com/keyzakyy-dev/kinerouter/internal/netguard"
 	"golang.org/x/oauth2"
 )
 
@@ -153,7 +156,18 @@ func loginRedirect(w http.ResponseWriter, r *http.Request, origin, errCode strin
 	http.Redirect(w, r, origin+"/login?error="+url.QueryEscape(errCode), http.StatusFound)
 }
 
-func oidcHTTPClient() *http.Client { return &http.Client{Timeout: 20 * time.Second} }
+// oidcHTTPClient is the client for discovery and the token endpoint. Both URLs
+// originate from a request body or from settings, so the dial itself refuses
+// private, loopback and link-local addresses — CheckURL alone resolves once and
+// a rebinding answer would get through on the second lookup. An on-prem IdP on a
+// private network is the one legitimate case; OIDC_ALLOW_PRIVATE=1 restores the
+// unguarded client for it.
+func oidcHTTPClient() *http.Client {
+	if os.Getenv("OIDC_ALLOW_PRIVATE") != "" {
+		return &http.Client{Timeout: 20 * time.Second}
+	}
+	return netguard.Client(20 * time.Second)
+}
 
 // ---------------------------------------------------------------- start
 
@@ -332,6 +346,11 @@ type oidcDiscovery struct {
 
 func fetchOIDCDiscovery(ctx context.Context, issuerURL string) (*oidcDiscovery, error) {
 	u := trimSlashes(issuerURL) + "/.well-known/openid-configuration"
+	// The issuer comes from the request body or settings; refuse internal hosts
+	// so this cannot be pointed at metadata or a loopback service.
+	if err := netguard.CheckURL(ctx, u); err != nil {
+		return nil, errors.New("Issuer URL is not reachable: it must be a public http(s) address")
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -369,6 +388,11 @@ func probeOIDCClientSecret(ctx context.Context, tokenEndpoint, clientID, clientS
 		"code":          {"__oidc_test_invalid_code__"},
 		"redirect_uri":  {redirectURI},
 		"code_verifier": {"__oidc_test_invalid_verifier__"},
+	}
+	// tokenEndpoint comes from the issuer's discovery document, so it is only as
+	// trustworthy as a URL from the request body. Refuse internal hosts.
+	if err := netguard.CheckURL(ctx, tokenEndpoint); err != nil {
+		return secretProbe{tested: true, message: "Token endpoint is not a public http(s) address."}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenEndpoint, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -458,7 +482,12 @@ func (g *Gateway) handleOIDCTest(w http.ResponseWriter, r *http.Request) {
 	}
 	disc, err := fetchOIDCDiscovery(r.Context(), issuerURL)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		// Fixed text: a dial/resolve error names the internal host or address the
+		// probe reached, which is exactly what an SSRF probe is hunting for.
+		log.Printf("oidc test: discovery failed for issuer %q: %v", issuerURL, err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"error": "Could not load the OIDC discovery document for that issuer.",
+		})
 		return
 	}
 	redirectURI := g.publicOrigin(r, settings, false) + "/api/auth/oidc/callback"

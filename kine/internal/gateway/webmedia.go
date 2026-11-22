@@ -254,10 +254,26 @@ func veoAspect(size, prefix string) string {
 
 var errArtifactNotReady = errors.New("artifact not available yet")
 
+// guardedClient returns a copy of c that refuses to dial a blocked address.
+// CheckURL resolves once and the dial resolves again, so without the dialer hook
+// a rebinding DNS answer still reaches loopback. Proxy settings survive.
+func guardedClient(c *http.Client) *http.Client {
+	out := *c
+	if t, ok := c.Transport.(*http.Transport); ok {
+		cl := t.Clone()
+		cl.DialContext = netguard.Dialer.DialContext
+		out.Transport = cl
+	} else if c.Transport == nil {
+		out.Transport = netguard.NewTransport(http.ProxyFromEnvironment)
+	}
+	return &out
+}
+
 // downloadGuarded fetches a remote artifact with SSRF checks on the initial URL
 // and every redirect hop. The body is capped at 100MB.
 func downloadGuarded(ctx context.Context, c *http.Client, target string, maxRedirects int,
 	validate func(*http.Response, []byte) error) ([]byte, error) {
+	c = guardedClient(c)
 	for hop := 0; hop <= maxRedirects; hop++ {
 		if err := netguard.CheckURL(ctx, target); err != nil {
 			return nil, err
@@ -628,7 +644,7 @@ func decodeImageRef(ctx context.Context, c *http.Client, ref string) ([]byte, er
 		if err := netguard.CheckURL(ctx, ref); err != nil {
 			return nil, err
 		}
-		resp, data, err := webFetch(ctx, c, newJar(""), http.MethodGet, ref, "", nil, map[string]string{"Accept": "image/*"})
+		resp, data, err := webFetch(ctx, guardedClient(c), newJar(""), http.MethodGet, ref, "", nil, map[string]string{"Accept": "image/*"})
 		if err != nil {
 			return nil, err
 		}

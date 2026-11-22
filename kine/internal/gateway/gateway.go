@@ -219,6 +219,13 @@ func (g *Gateway) withPeerTrust(next http.Handler) http.Handler {
 			r.Header.Del("X-Forwarded-For")
 			r.Header.Del("X-Real-IP")
 			r.Header.Del("X-Kine-Real-IP")
+			// Proto/Host decide the session cookie's Secure flag and the OAuth
+			// redirect_uri scheme. A remote client must not be able to send
+			// "http" and get a session cookie that also travels in the clear.
+			r.Header.Del("X-Forwarded-Proto")
+			r.Header.Del("X-Forwarded-Host")
+			r.Header.Del("X-Forwarded-Ssl")
+			r.Header.Del("Front-End-Https")
 		}
 		next.ServeHTTP(w, r)
 	})

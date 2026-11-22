@@ -9,9 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/netip"
 	"net/url"
 	"syscall"
+	"time"
 )
 
 // ErrBlocked is returned for private, loopback, link-local and metadata targets.
@@ -45,6 +47,39 @@ func BlockedIP(ip netip.Addr) bool {
 		}
 	}
 	return false
+}
+
+// Dialer is a net.Dialer whose Control hook rejects blocked addresses at connect
+// time. CheckURL alone leaves a gap: it resolves once, and the dial that follows
+// resolves again, so a rebinding DNS answer can swap in 127.0.0.1 between the
+// two. Every client that fetches an untrusted URL must dial through this.
+var Dialer = &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Control: Control}
+
+// NewTransport returns a transport that refuses to connect to a blocked address,
+// whatever DNS answered. proxy, when non-nil, is used as the transport proxy.
+func NewTransport(proxy func(*http.Request) (*url.URL, error)) *http.Transport {
+	return &http.Transport{
+		Proxy:                 proxy,
+		DialContext:           Dialer.DialContext,
+		ForceAttemptHTTP2:     true,
+		TLSHandshakeTimeout:   15 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+}
+
+// Client returns an http.Client that dials only public addresses. Redirects are
+// checked too, so a public URL cannot bounce into a private one.
+func Client(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: NewTransport(nil),
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return errors.New("stopped after 10 redirects")
+			}
+			return CheckURL(req.Context(), req.URL.String())
+		},
+	}
 }
 
 // CheckURL validates scheme and, for hostnames, every resolved address.

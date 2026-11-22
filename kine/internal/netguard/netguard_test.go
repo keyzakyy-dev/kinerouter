@@ -1,8 +1,11 @@
 package netguard
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"testing"
+	"time"
 )
 
 // Loopback, RFC1918, link-local metadata and IPv6 unique-local must all be
@@ -36,6 +39,41 @@ func TestCheckURLRejectsNonPublicTargets(t *testing.T) {
 			t.Fatalf("%s should be rejected", u)
 		}
 	}
+}
+
+// The dial itself must refuse a blocked address: CheckURL resolves once and the
+// dial resolves again, so a client whose only defence is CheckURL is rebindable.
+// A live loopback server stands in for the rebinding answer.
+func TestClientRefusesBlockedDial(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("reached"))
+	}))
+	defer ts.Close()
+
+	if _, err := Client(2 * time.Second).Get(ts.URL); err == nil {
+		t.Fatal("Client dialed a loopback address; the Control hook is not wired")
+	}
+	if _, err := NewTransport(nil).RoundTrip(mustReq(t, ts.URL)); err == nil {
+		t.Fatal("NewTransport dialed a loopback address")
+	}
+}
+
+// Redirects are re-validated, so a public URL cannot bounce into a private one.
+func TestClientRejectsRedirectToBlockedHost(t *testing.T) {
+	c := Client(time.Second)
+	req := mustReq(t, "http://127.0.0.1:8080/secret")
+	if err := c.CheckRedirect(req, []*http.Request{req}); err == nil {
+		t.Fatal("redirect to loopback was accepted")
+	}
+}
+
+func mustReq(t *testing.T, raw string) *http.Request {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, raw, nil)
+	if err != nil {
+		t.Fatalf("build request %s: %v", raw, err)
+	}
+	return req
 }
 
 func mustAddr(t *testing.T, s string) netip.Addr {
