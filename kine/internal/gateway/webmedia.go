@@ -623,7 +623,7 @@ func ucUploadImage(ctx context.Context, c *http.Client, jar *cookieJar, headers 
 	if err := netguard.CheckURL(ctx, signed); err != nil {
 		return "", err
 	}
-	put, _, err := webFetch(ctx, c, newJar(""), http.MethodPut, signed, "image/png", strings.NewReader(string(bytes)), nil)
+	put, _, err := webFetch(ctx, guardedClient(c), newJar(""), http.MethodPut, signed, "image/png", strings.NewReader(string(bytes)), nil)
 	if err != nil {
 		return "", err
 	}
