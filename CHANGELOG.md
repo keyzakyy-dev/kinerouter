@@ -3,6 +3,34 @@
 All notable changes to KineRouter. Format based on Keep a Changelog;
 versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
+## Unreleased
+
+### Security
+
+- **DNS rebinding defence is now actually wired.** `netguard.Control` existed but
+  had no call site, so every client that fetches an untrusted URL resolved the
+  host twice — once in `CheckURL`, once at dial — and a rebinding answer could
+  swap in `127.0.0.1` between the two. New `netguard.Dialer`, `NewTransport` and
+  `Client` put the check inside the dial, and they now back the OIDC discovery
+  and token-endpoint client, the MCP probe, `downloadGuarded`, `decodeImageRef`
+  and the UC signed-URL upload.
+- OIDC discovery and token-endpoint URLs are checked with `netguard.CheckURL`
+  before any request, and the test route no longer echoes a dial error (which
+  named the internal host or address the probe reached) back to the caller.
+- A remote peer can no longer spoof `X-Forwarded-Proto`, `X-Forwarded-Host`,
+  `X-Forwarded-Ssl` or `Front-End-Https`. Those headers were stripped only for
+  `X-Forwarded-For`, `X-Real-IP` and `X-Kine-Real-IP`; the leftovers let a remote
+  client claim `http` and get a session cookie without the `Secure` flag, and
+  steer the OIDC/SAML redirect scheme. Loopback proxies are still trusted; a
+  proxy on another host should set `BASE_URL` and `AUTH_COOKIE_SECURE=true`
+  instead of forwarding those headers.
+- The `INITIAL_PASSWORD` fallback comparison is constant-time.
+
+### Notes
+
+- On-prem OIDC providers on a private network are refused by default; set
+  `OIDC_ALLOW_PRIVATE=1` to restore the unguarded client for them.
+
 ## [0.1.0] — 2026-11-23
 
 First standalone release. KineRouter is a Go rewrite of 9Router: one static
@@ -71,31 +99,3 @@ Nothing migrates automatically — a 9Router install will start empty.
 - Release assets are checksum-verified by every installer, but the installer
   scripts themselves are fetched over TLS without signature verification when
   piped from a URL. Pin a tag ref if that matters to you.
-
-## Unreleased
-
-### Security
-
-- **DNS rebinding defence is now actually wired.** `netguard.Control` existed but
-  had no call site, so every client that fetches an untrusted URL resolved the
-  host twice — once in `CheckURL`, once at dial — and a rebinding answer could
-  swap in `127.0.0.1` between the two. New `netguard.Dialer`, `NewTransport` and
-  `Client` put the check inside the dial, and they now back the OIDC discovery
-  and token-endpoint client, the MCP probe, `downloadGuarded` and
-  `decodeImageRef`.
-- OIDC discovery and token-endpoint URLs are checked with `netguard.CheckURL`
-  before any request, and the test route no longer echoes a dial error (which
-  named the internal host or address the probe reached) back to the caller.
-- A remote peer can no longer spoof `X-Forwarded-Proto`, `X-Forwarded-Host`,
-  `X-Forwarded-Ssl` or `Front-End-Https`. Those headers were stripped only for
-  `X-Forwarded-For`, `X-Real-IP` and `X-Kine-Real-IP`; the leftovers let a remote
-  client claim `http` and get a session cookie without the `Secure` flag, and
-  steer the OIDC/SAML redirect scheme. Loopback proxies are still trusted; a
-  proxy on another host should set `BASE_URL` and `AUTH_COOKIE_SECURE=true`
-  instead of forwarding those headers.
-- The `INITIAL_PASSWORD` fallback comparison is constant-time.
-
-### Notes
-
-- On-prem OIDC providers on a private network are refused by default; set
-  `OIDC_ALLOW_PRIVATE=1` to restore the unguarded client for them.
