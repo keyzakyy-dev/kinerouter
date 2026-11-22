@@ -90,7 +90,9 @@ Nothing migrates automatically — a 9Router install will start empty.
   `X-Forwarded-Ssl` or `Front-End-Https`. Those headers were stripped only for
   `X-Forwarded-For`, `X-Real-IP` and `X-Kine-Real-IP`; the leftovers let a remote
   client claim `http` and get a session cookie without the `Secure` flag, and
-  steer the OIDC/SAML redirect scheme. Loopback proxies are still trusted.
+  steer the OIDC/SAML redirect scheme. Loopback proxies are still trusted; a
+  proxy on another host should set `BASE_URL` and `AUTH_COOKIE_SECURE=true`
+  instead of forwarding those headers.
 - The `INITIAL_PASSWORD` fallback comparison is constant-time.
 
 ### Notes
