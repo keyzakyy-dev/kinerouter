@@ -5,6 +5,30 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+### Added
+
+- **Desktop tray icon.** `kinerouter tray` starts the companion
+  `kinerouter-tray` binary (shipped beside the gateway on Windows). The menu
+  shows the gateway state, starts/stops the gateway, opens the dashboard, and
+  quits the icon. Quitting the tray does not stop a running gateway.
+  On Linux and macOS build it yourself: `go build -tags tray ./cmd/kinerouter-tray`
+  (systray needs cgo plus GTK3 / libayatana-appindicator3; that is exactly why it
+  lives in a separate binary and the gateway stays `CGO_ENABLED=0`).
+- `kinerouter version` / `--version` / `-v` prints the build version. The npm
+  shim used to run `--version` as "start the server", which silently served on
+  `:20128` instead of answering.
+- An unknown flag now exits 2 with the help text instead of being ignored and
+  starting the server — `kinerouter --port 3000` served on `:20128` anyway.
+
+### Fixed
+
+- `npm i -g kinerouter` with `KINEROUTER_VERSION` pinned wrote one asset filename
+  while `cli.js` looked for another, so the command reported "binary not found"
+  after a successful install. Both now read the same override.
+- The npm postinstall download now has a socket timeout; a stalled connection
+  left `npm i -g` hung indefinitely.
+- `kinerouter --help` said "remote KineRouter/KineRouter server".
+
 ### Security
 
 - **DNS rebinding defence is now actually wired.** `netguard.Control` existed but

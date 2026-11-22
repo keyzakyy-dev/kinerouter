@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -9,6 +10,15 @@ import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 /** KineRouter is not on npm; the update command installs the Go binary. */
 const INSTALL_CMD = 'go install github.com/keyzakyy-dev/kinerouter/cmd/kinerouter@latest'
 const SHUTDOWN_COUNTDOWN_SEC = 3
+
+/** Collapsed/expanded state survives reloads; local only, nothing is sent to the gateway. */
+const COLLAPSE_KEY = 'kinerouter.sidebar'
+
+/** Label + trailing chrome in a row: they fold away when the rail is collapsed. */
+const HIDES = 'group-data-[collapsed=true]/sidebar:hidden'
+/** The row itself re-centers its lone icon when collapsed. */
+const ROW_COLLAPSED =
+  'group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:px-0'
 
 /** Sidebar structure mirrors KineRouter's src/shared/components/Sidebar.js. */
 type NavItem = { href: string; label: string; icon: string }
@@ -41,15 +51,69 @@ const MEDIA_PROVIDER_KINDS = [
   { id: 'stt', label: 'Speech to Text', icon: 'mic' },
   { id: 'systemone', label: 'System One', icon: 'route' },
 ]
-const COMBINED_WEB_ITEM = {
-  id: 'web',
-  label: 'Web Fetch & Search',
-  icon: 'travel_explore',
-  href: '/dashboard/media-providers/web',
+const MEDIA_ITEMS: NavItem[] = [
+  ...MEDIA_PROVIDER_KINDS.map((k) => ({
+    href: `/dashboard/media-providers/${k.id}`,
+    label: k.label,
+    icon: k.icon,
+  })),
+  { href: '/dashboard/media-providers/web', label: 'Web Fetch & Search', icon: 'travel_explore' },
+]
+
+/** Left edge of the bubble: the 72px rail plus a small gap. */
+const TIP_LEFT = 84
+
+/**
+ * Hover bubble for the collapsed rail. Native `title` waits ~1s and can't be
+ * styled, so this draws its own. Portalled to <body>: the <aside> clips with
+ * overflow-hidden and the <nav> scrolls with overflow-y-auto, either of which
+ * would cut an absolutely-positioned child off.
+ */
+function RailTip({ label, children }: { label?: string; children: React.ReactNode }) {
+  const [top, setTop] = useState<number | null>(null)
+  // Expanding mid-hover unmounts nothing, so the bubble would linger over a
+  // now-labelled row; clear it whenever the rail stops being collapsed.
+  useEffect(() => {
+    if (!label) setTop(null)
+  }, [label])
+  if (!label) return <>{children}</>
+  return (
+    <span
+      className="contents"
+      onMouseEnter={(e) => {
+        // display:contents gives the span no box of its own; measure the row.
+        const r = e.currentTarget.firstElementChild?.getBoundingClientRect()
+        if (r) setTop(r.top + r.height / 2)
+      }}
+      onMouseLeave={() => setTop(null)}
+    >
+      {children}
+      {top !== null &&
+        createPortal(
+          <div
+            role="tooltip"
+            style={{ top, left: TIP_LEFT }}
+            className="pointer-events-none fixed z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-surface-3 px-2.5 py-1 text-xs font-medium text-text-main shadow-lg ring-1 ring-border before:absolute before:top-1/2 before:-left-1 before:h-2 before:w-2 before:-translate-y-1/2 before:rotate-45 before:rounded-sm before:bg-surface-3"
+          >
+            {label}
+          </div>,
+          document.body,
+        )}
+    </span>
+  )
 }
 
-function NavRow({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
+function NavRow({
+  item,
+  collapsed,
+  onNavigate,
+}: {
+  item: NavItem
+  collapsed: boolean
+  onNavigate?: () => void
+}) {
   return (
+    <RailTip label={collapsed ? item.label : undefined}>
     <NavLink
       to={item.href}
       end={item.href === '/dashboard/endpoint'}
@@ -57,6 +121,7 @@ function NavRow({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }
       className={({ isActive }) =>
         cn(
           'flex items-center gap-3 rounded-lg px-3 py-1 transition-all group',
+          ROW_COLLAPSED,
           isActive
             ? 'bg-primary/10 text-primary'
             : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
@@ -67,16 +132,17 @@ function NavRow({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }
         <>
           <span
             className={cn(
-              'material-symbols-outlined text-[18px]',
+              'material-symbols-outlined text-[18px] shrink-0',
               isActive ? 'fill-1' : 'group-hover:text-primary transition-colors',
             )}
           >
             {item.icon}
           </span>
-          <span className="text-[13px] font-medium">{item.label}</span>
+          <span className={cn('text-[13px] font-medium whitespace-nowrap', HIDES)}>{item.label}</span>
         </>
       )}
     </NavLink>
+    </RailTip>
   )
 }
 
@@ -90,6 +156,7 @@ export function AppShell() {
   const [showUpdate, setShowUpdate] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const [disconnected, setDisconnected] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === 'closed')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { copied, copy } = useCopyToClipboard()
 
@@ -108,6 +175,23 @@ export function AppShell() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(COLLAPSE_KEY, collapsed ? 'closed' : 'open')
+  }, [collapsed])
+
+  // Cmd/Ctrl+B. Skipped while typing so it never eats a keystroke.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'b') return
+      const t = e.target as HTMLElement | null
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
+      e.preventDefault()
+      setCollapsed((v) => !v)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   // Copy the install command, count down, then stop the server so the user can
@@ -136,27 +220,51 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex min-h-full w-72 flex-col border-r border-border-subtle bg-vibrancy backdrop-blur-xl transition-colors duration-300">
-        {/* Traffic lights */}
-        <div className="flex items-center gap-2 px-6 pt-5 pb-2">
+      <aside
+        data-collapsed={collapsed}
+        className="group/sidebar flex min-h-full w-72 flex-col overflow-hidden border-r border-border-subtle bg-vibrancy backdrop-blur-xl transition-[width] duration-[280ms] ease-[cubic-bezier(0.77,0,0.175,1)] data-[collapsed=true]:w-[72px] motion-reduce:transition-none"
+      >
+        {/* Traffic lights — decoration only, so the rail drops them when collapsed. */}
+        <div className="flex items-center gap-2 px-6 pt-5 pb-2 group-data-[collapsed=true]/sidebar:hidden">
           <div className="h-3 w-3 rounded-full bg-[#FF5F56]" />
           <div className="h-3 w-3 rounded-full bg-[#FFBD2E]" />
           <div className="h-3 w-3 rounded-full bg-[#27C93F]" />
         </div>
 
         {/* Logo */}
-        <div className="flex flex-col gap-2 px-6 py-4">
-          <NavLink to="/dashboard" className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-[10px] bg-gradient-to-br from-brand-500 to-brand-700 shadow-[var(--shadow-warm)]">
-              <span className="material-symbols-outlined text-[20px] text-white">hub</span>
-            </div>
-            <div className="flex flex-col">
-              <h1 className="text-lg font-semibold tracking-tight text-text-main">KineRouter</h1>
-              <span className="text-xs text-text-muted">{version ? `v${version}` : 'local gateway'}</span>
-            </div>
-          </NavLink>
+        {/* px-4 lines the mark up with the nav rows' left edge below it. */}
+        <div className="flex flex-col gap-2 px-4 py-4 group-data-[collapsed=true]/sidebar:px-2">
+          {/* Collapsed: logo stacks over the toggle so the brand mark survives the rail. */}
+          <div className="flex items-center gap-3 group-data-[collapsed=true]/sidebar:flex-col group-data-[collapsed=true]/sidebar:gap-2">
+            <NavLink to="/dashboard" className="flex min-w-0 items-center gap-3">
+              {/* Height matches the two-line title/version block beside it; the
+                  viewBox is cropped to the glyph, so w-auto keeps it undistorted. */}
+              <img
+                src="/favicon.svg"
+                alt=""
+                className="h-9 w-auto shrink-0 group-data-[collapsed=true]/sidebar:h-6"
+              />
+              <div className="flex flex-col whitespace-nowrap group-data-[collapsed=true]/sidebar:hidden">
+                <h1 className="text-lg font-semibold tracking-tight text-text-main">KineRouter</h1>
+                <span className="text-xs text-text-muted">{version ? `v${version}` : 'local gateway'}</span>
+              </div>
+            </NavLink>
+            <button
+              onClick={() => setCollapsed((v) => !v)}
+              title={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-expanded={!collapsed}
+              className="ml-auto inline-flex cursor-pointer items-center justify-center rounded p-1 text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main group-data-[collapsed=true]/sidebar:mx-auto"
+            >
+              {/* leading-none: the icon font's line box is taller than its glyph and
+                  leaves it 4px high / 10px low inside the padded button. */}
+              <span className="material-symbols-outlined block text-[18px] leading-none">
+                {collapsed ? 'left_panel_open' : 'left_panel_close'}
+              </span>
+            </button>
+          </div>
           {latestVersion && (
-            <div className="-m-1 flex flex-col gap-1.5 rounded p-1">
+            <div className="-m-1 flex flex-col gap-1.5 rounded p-1 group-data-[collapsed=true]/sidebar:hidden">
               <span className="text-xs font-semibold text-success">↑ New version available: v{latestVersion}</span>
               <div className="flex items-center gap-2">
                 <button
@@ -180,25 +288,27 @@ export function AppShell() {
         </div>
 
         {/* Navigation */}
-        <nav className="custom-scrollbar flex-1 space-y-0.5 overflow-y-auto px-4 py-2">
+        {/* RailTip wraps rows in display:contents, which `space-y-*` can't space,
+            so the gaps come from flex `gap` on each list instead. */}
+        <nav className="custom-scrollbar flex flex-1 flex-col gap-1.5 overflow-y-auto px-4 py-2 group-data-[collapsed=true]/sidebar:px-2">
           {navItems.map((item) => (
-            <NavRow key={item.href} item={item} />
+            <NavRow key={item.href} item={item} collapsed={collapsed} />
           ))}
 
-          <div className="mt-2 space-y-0.5 pt-3">
-            <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-text-muted/60">
+          <div className="mt-2 flex flex-col gap-1.5 pt-3">
+            <p className={cn('mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-text-muted/60', HIDES)}>
               System
             </p>
+            <div className="mx-2 mb-2 hidden border-t border-border-subtle group-data-[collapsed=true]/sidebar:block" />
 
-            {/* Media Providers accordion */}
+            {/* Media Providers accordion — collapsed rail lists its icons directly,
+                so the header would be a control with nothing left to toggle. */}
             <button
               onClick={() => setMediaOpen((v) => !v)}
-              className={cn(
-                'flex w-full items-center gap-3 rounded-lg px-3 py-1 transition-all group',
-                'text-text-muted hover:bg-surface-2 hover:text-text-main',
-              )}
+              aria-expanded={mediaOpen}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-1 transition-all group text-text-muted hover:bg-surface-2 hover:text-text-main group-data-[collapsed=true]/sidebar:hidden"
             >
-              <span className="material-symbols-outlined text-[18px]">perm_media</span>
+              <span className="material-symbols-outlined text-[18px] shrink-0">perm_media</span>
               <span className="flex-1 text-left text-[13px] font-medium">Media Providers</span>
               <span
                 className="material-symbols-outlined text-[14px] transition-transform"
@@ -207,91 +317,71 @@ export function AppShell() {
                 expand_more
               </span>
             </button>
-            {mediaOpen && (
-              <div className="pl-4">
-                {MEDIA_PROVIDER_KINDS.map((kind) => (
-                  <NavLink
-                    key={kind.id}
-                    to={`/dashboard/media-providers/${kind.id}`}
-                    className={({ isActive }) =>
-                      cn(
-                        'flex items-center gap-3 rounded-lg px-4 py-1 transition-all group',
-                        isActive
-                          ? 'bg-primary/10 text-primary'
-                          : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
-                      )
-                    }
-                  >
-                    <span className="material-symbols-outlined text-[16px]">{kind.icon}</span>
-                    <span className="text-sm">{kind.label}</span>
-                  </NavLink>
+            {/* Collapsed rail drops the accordion and always shows the icons, so the
+                sub-nav stays reachable instead of needing a click to open. */}
+            {(mediaOpen || collapsed) && (
+              <div className="flex flex-col gap-1.5 pl-4 group-data-[collapsed=true]/sidebar:pl-0">
+                {MEDIA_ITEMS.map((item) => (
+                  <NavRow key={item.href} item={item} collapsed={collapsed} />
                 ))}
-                <NavLink
-                  to={COMBINED_WEB_ITEM.href}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-3 rounded-lg px-4 py-1 transition-all group',
-                      isActive
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
-                    )
-                  }
-                >
-                  <span className="material-symbols-outlined text-[16px]">
-                    {COMBINED_WEB_ITEM.icon}
-                  </span>
-                  <span className="text-sm">{COMBINED_WEB_ITEM.label}</span>
-                </NavLink>
               </div>
             )}
 
             {systemItems.map((item) => (
-              <NavRow key={item.href} item={item} />
+              <NavRow key={item.href} item={item} collapsed={collapsed} />
             ))}
 
             {debugItems
               .filter((item) => item.href !== '/dashboard/translator' || enableTranslator)
               .map((item) => (
-                <NavRow key={item.href} item={item} />
+                <NavRow key={item.href} item={item} collapsed={collapsed} />
               ))}
 
             {/* Settings */}
-            <NavLink
-              to="/dashboard/settings"
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-1 transition-all group',
-                  isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span
-                    className={cn(
-                      'material-symbols-outlined text-[18px]',
-                      isActive ? 'fill-1' : 'group-hover:text-primary transition-colors',
-                    )}
-                  >
-                    settings
-                  </span>
-                  <span className="text-[13px] font-medium">Settings</span>
-                </>
-              )}
-            </NavLink>
+            <RailTip label={collapsed ? 'Settings' : undefined}>
+              <NavLink
+                to="/dashboard/settings"
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-1 transition-all group',
+                    ROW_COLLAPSED,
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <span
+                      className={cn(
+                        'material-symbols-outlined text-[18px] shrink-0',
+                        isActive ? 'fill-1' : 'group-hover:text-primary transition-colors',
+                      )}
+                    >
+                      settings
+                    </span>
+                    <span className={cn('text-[13px] font-medium whitespace-nowrap', HIDES)}>Settings</span>
+                  </>
+                )}
+              </NavLink>
+            </RailTip>
           </div>
         </nav>
 
-        <div className="p-3">
-          <button
-            onClick={handleLogout}
-            className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-1 text-[13px] font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main"
-          >
-            <span className="material-symbols-outlined text-[18px]">logout</span>
-            Log out
-          </button>
+        <div className="p-3 group-data-[collapsed=true]/sidebar:px-2">
+          <RailTip label={collapsed ? 'Log out' : undefined}>
+            <button
+              onClick={handleLogout}
+              className={cn(
+                'flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-1 text-[13px] font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main',
+                ROW_COLLAPSED,
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px] shrink-0">logout</span>
+              <span className={cn('whitespace-nowrap', HIDES)}>Log out</span>
+            </button>
+          </RailTip>
         </div>
       </aside>
 

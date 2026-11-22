@@ -8,7 +8,9 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const VERSION = require("./package.json").version;
+// Must match install.js exactly, including the KINEROUTER_VERSION override:
+// otherwise a pinned install lands one filename and this looks for another.
+const VERSION = (process.env.KINEROUTER_VERSION || require("./package.json").version).replace(/^v/, "");
 const ext = process.platform === "win32" ? ".exe" : "";
 const BIN = path.join(
   __dirname,

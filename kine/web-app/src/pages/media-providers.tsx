@@ -1344,6 +1344,7 @@ export function MediaComboDetailPage() {
   const navigate = useNavigate()
   const notify = useNotify()
   const [combo, setCombo] = useState<Combo | null>(null)
+  const [notFound, setNotFound] = useState(false)
   const [name, setName] = useState('')
   const [models, setModels] = useState<string[]>([])
   const [strategies, setStrategies] = useState<Record<string, { fallbackStrategy?: string }>>({})
@@ -1362,6 +1363,7 @@ export function MediaComboDetailPage() {
   const { copied, copy } = useCopyToClipboard()
 
   const load = useCallback(async () => {
+    setNotFound(false)
     try {
       const [c, s, p, a, k] = await Promise.all([api.combo(id), api.settings(), api.providers(), api.aliases(), api.keys()])
       setCombo(c)
@@ -1373,6 +1375,7 @@ export function MediaComboDetailPage() {
       setApiKey((k.keys.find((x) => x.isActive !== false) ?? k.keys[0])?.key ?? '')
       api.usageRequestLogs().then(setLogs).catch(() => setLogs([]))
     } catch {
+      setNotFound(true)
       notify.error('Combo not found')
     }
   }, [id, notify])
@@ -1380,6 +1383,7 @@ export function MediaComboDetailPage() {
     void load()
   }, [load])
 
+  if (notFound) return <p className="py-12 text-center text-sm text-text-muted">Combo not found.</p>
   if (!combo) return <p className="py-12 text-center text-sm text-text-muted">Loading…</p>
 
   const kind = combo.kind ?? 'llm'

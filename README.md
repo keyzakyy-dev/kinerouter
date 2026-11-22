@@ -1,4 +1,4 @@
-# KineRouter
+# <img src="kine/web-app/public/favicon.svg" width="32" alt=""> KineRouter
 
 A single local AI routing gateway: one OpenAI-compatible endpoint (`/v1/*`) fans
 out to 40+ upstream providers with format translation, model-combo fallback,

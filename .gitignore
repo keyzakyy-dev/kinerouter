@@ -9,3 +9,7 @@
 
 # Local agent scratch (launch configs, session settings)
 .claude/
+
+# Compiled gateway binary produced by `go build -o ../kinerouter`
+/kinerouter
+/kinerouter.exe

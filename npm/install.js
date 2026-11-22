@@ -38,8 +38,10 @@ function skip(reason) {
 function get(url, redirects = 0) {
   return new Promise((resolve, reject) => {
     if (redirects > 5) return reject(new Error("too many redirects"));
-    https
-      .get(url, { headers: { "User-Agent": `kinerouter-npm/${VERSION}` } }, (res) => {
+    const req = https.get(
+      url,
+      { headers: { "User-Agent": `kinerouter-npm/${VERSION}` }, timeout: 120000 },
+      (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
           return resolve(get(res.headers.location, redirects + 1));
@@ -50,9 +52,13 @@ function get(url, redirects = 0) {
         }
         const chunks = [];
         res.on("data", (c) => chunks.push(c));
+        res.on("error", reject);
         res.on("end", () => resolve(Buffer.concat(chunks)));
-      })
-      .on("error", reject);
+      },
+    );
+    // Without this a stalled socket leaves `npm i -g` hung with no output.
+    req.on("timeout", () => req.destroy(new Error(`${url} -> timed out`)));
+    req.on("error", reject);
   });
 }
 
@@ -89,6 +95,28 @@ async function main() {
   const dest = path.join(BIN_DIR, name);
   fs.writeFileSync(dest, buf, { mode: 0o755 });
   console.log(`[kinerouter] installed ${name} (sha256 verified)`);
+
+  // `kinerouter tray` execs a sibling tray binary. Only the Windows one is
+  // published (systray is pure Go there); elsewhere the user builds it with
+  // `-tags tray`. A missing asset is not an install failure — older releases
+  // predate the tray.
+  if (process.platform === "win32") {
+    const trayName = `kinerouter-tray_${VERSION}_windows_${ARCH}.exe`;
+    const traySha = expectedSha(checksums, trayName);
+    if (!traySha) {
+      console.warn(`[kinerouter] no ${trayName} in checksums.txt; the tray is unavailable`);
+      return;
+    }
+    try {
+      const trayBuf = await get(`${base}/${trayName}`);
+      const trayGot = crypto.createHash("sha256").update(trayBuf).digest("hex");
+      if (trayGot !== traySha) throw new Error(`sha256 mismatch for ${trayName}`);
+      fs.writeFileSync(path.join(BIN_DIR, "kinerouter-tray.exe"), trayBuf, { mode: 0o755 });
+      console.log(`[kinerouter] installed ${trayName} (sha256 verified)`);
+    } catch (err) {
+      console.warn(`[kinerouter] tray not installed: ${err.message}`);
+    }
+  }
 }
 
 main().catch((err) => {

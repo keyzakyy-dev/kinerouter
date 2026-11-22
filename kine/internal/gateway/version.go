@@ -2,7 +2,8 @@ package gateway
 
 // Version reporting + update check. Ported from src/app/api/version/route.js,
 // adapted for a Go binary: the "latest" version comes from GitHub Releases
-// (KineRouter is not on npm) instead of registry.npmjs.org/kinerouter/latest.
+// The npm package `kinerouter` is only a shim around these same binaries, so
+// the Go binary's own update check must follow the release tag, not the registry.
 //
 // Fail-open: an offline host, a proxy, or a 404 all yield "no update", never an
 // error on the route — a gateway must start and serve regardless.

@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Boxes } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useAuth, FullPageSpinner, peerAllowed } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
@@ -37,9 +36,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
-            <Boxes className="size-5" />
-          </div>
+          <img src="/favicon.svg" alt="" className="h-9 w-auto" />
           <div>
             <h1 className="text-lg font-semibold tracking-tight">KineRouter</h1>
             <p className="mt-1 text-xs text-muted-foreground">

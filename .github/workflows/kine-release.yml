@@ -96,6 +96,18 @@ jobs:
               -o "dist/$out" ./cmd/kinerouter
             (cd dist && sha256sum "$out" >> checksums.txt)
           done
+
+          # The tray icon is a second binary: a GUI toolkit cannot be linked into
+          # the gateway without cgo, which would break the static cross-build.
+          # Only Windows is built here (systray is pure Go there, so CGO_ENABLED=0
+          # still works); Linux/macOS users build it natively with `-tags tray`.
+          for arch in amd64 arm64; do
+            out="kinerouter-tray_${version}_windows_${arch}.exe"
+            CGO_ENABLED=0 GOOS=windows GOARCH="$arch" \
+              go build -trimpath -ldflags "-s -w -H=windowsgui" \
+              -o "dist/$out" ./cmd/kinerouter-tray
+            (cd dist && sha256sum "$out" >> checksums.txt)
+          done
           cp LICENSE NOTICE dist/
           cat dist/checksums.txt
 
@@ -108,6 +120,7 @@ jobs:
           prerelease: ${{ contains(env.version, '-') }}
           files: |
             kine/dist/kinerouter_*
+            kine/dist/kinerouter-tray_*
             kine/dist/checksums.txt
             kine/dist/LICENSE
             kine/dist/NOTICE

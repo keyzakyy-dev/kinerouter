@@ -91,6 +91,9 @@ jobs:
       - name: Build binary with embedded dashboard
         run: CGO_ENABLED=0 go build -trimpath -o /tmp/kinerouter ./cmd/kinerouter
 
+      - name: Build tray (stub on Linux, no GTK needed)
+        run: CGO_ENABLED=0 go build -trimpath -o /tmp/kinerouter-tray ./cmd/kinerouter-tray
+
       - name: Smoke test
         run: |
           DATA_DIR="$(mktemp -d)" PORT=20128 /tmp/kinerouter &

@@ -21,13 +21,16 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/keyzakyy-dev/kinerouter/internal/config"
+	"github.com/keyzakyy-dev/kinerouter/internal/gateway"
 
 	toml "github.com/pelletier/go-toml/v2"
 	"golang.org/x/term"
@@ -38,8 +41,9 @@ Usage:
   kinerouter connect <server-url> [options]
   kinerouter show [tool...] [--json]
   kinerouter mitm-server        (internal: privileged MITM proxy)
+  kinerouter tray               Start the desktop tray icon (needs kinerouter-tray)
 
-connect points THIS machine's CLI tools at a remote KineRouter/KineRouter server.
+connect points THIS machine's CLI tools at a remote KineRouter server.
 show prints the router settings each local tool currently holds (read-only).
 
   kinerouter connect http://10.0.0.5:20128 --tools claude,codex
@@ -90,9 +94,22 @@ func runCLI(args []string) (handled bool, code int) {
 		return true, runShow(args[1:])
 	case "mitm-server":
 		return true, runMitmServer()
+	case "tray":
+		// Hands off to the companion binary: a GUI toolkit cannot be linked into
+		// this one without breaking the CGO_ENABLED=0 cross-build.
+		return true, runTray(args[1:])
+	case "version", "-v", "--version":
+		fmt.Printf("kinerouter %s\n", gateway.Version)
+		return true, 0
 	case "help", "-h", "--help":
 		fmt.Print(cliHelp)
 		return true, 0
+	}
+	if strings.HasPrefix(args[0], "-") {
+		// No server flags exist: every setting is an env var. Silently starting the
+		// server here would swallow `kinerouter --port 3000` and serve on 20128 anyway.
+		fmt.Fprintf(os.Stderr, "unknown flag %q\n\n%s", args[0], cliHelp)
+		return true, 2
 	}
 	return false, 0
 }
@@ -1602,4 +1619,38 @@ func sortedKeys(m map[string]string) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// runTray execs the companion `kinerouter-tray` binary that sits next to this
+// one. It is a separate program because linking a GUI toolkit here would force
+// cgo into every release target; see cmd/kinerouter-tray/main.go.
+func runTray(args []string) int {
+	self, err := os.Executable()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tray: %v\n", err)
+		return 1
+	}
+	name := "kinerouter-tray"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	bin := filepath.Join(filepath.Dir(self), name)
+	if _, err := os.Stat(bin); err != nil {
+		fmt.Fprintf(os.Stderr,
+			"tray: %s not found.\n"+
+				"Get the release archive that contains both binaries, or build it:\n"+
+				"  go build -tags tray -o kinerouter-tray ./cmd/kinerouter-tray\n", bin)
+		return 1
+	}
+	cmd := exec.Command(bin, args...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return ee.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "tray: %v\n", err)
+		return 1
+	}
+	return 0
 }

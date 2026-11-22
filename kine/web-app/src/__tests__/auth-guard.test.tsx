@@ -48,7 +48,7 @@ describe('auth guard', () => {
     // The keys fetch settles after the heading renders, so wait on it too.
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Endpoint & Keys' })).toBeTruthy()
-      expect(screen.getByText('No API keys yet.')).toBeTruthy()
+      expect(screen.getByText('No keys yet')).toBeTruthy()
     })
     expect(screen.queryByLabelText(/dashboard password/i)).toBeNull()
   })

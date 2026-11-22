@@ -242,6 +242,16 @@ select {
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
 }
 
+/* Sidebar glyphs render at 18px, where the default 400 weight reads as a thick
+   outline. 350 keeps the stroke proportionate at that size. Scoped to the rail:
+   body icons stay at the default weight. */
+aside .material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 350, "GRAD" 0, "opsz" 24;
+}
+aside .material-symbols-outlined.fill-1 {
+  font-variation-settings: "FILL" 1, "wght" 350, "GRAD" 0, "opsz" 24;
+}
+
 /* Cursor: Tailwind v4 dropped the default button pointer */
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]),
