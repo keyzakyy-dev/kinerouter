@@ -1,0 +1,21 @@
+# Build output
+/kinerouter
+/kinerouter.exe
+
+# Frontend deps + Vite build (rebuilt by `npm run build`, embedded by go:embed)
+web-app/node_modules/
+web-app/dist/
+# Tracked: `npm ci` in the Dockerfile and CI both need the lockfile.
+!web-app/package-lock.json
+
+# Vite build target: the tracked .gitkeep keeps `go:embed all:dist` compiling
+# on a fresh clone. `emptyOutDir` wipes it on every build, so vite copies
+# web-app/public/.gitkeep back in (see that file).
+web/dist/*
+!web/dist/.gitkeep
+
+# Local runtime state
+/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

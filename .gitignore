@@ -1,0 +1,8 @@
+# Per-directory rules live in kine/.gitignore and npm/.gitignore. This covers
+# the repo root only.
+/node_modules/
+/.env
+/.env.*
+!.env.example
+*.log
+.DS_Store

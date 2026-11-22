@@ -1,0 +1,39 @@
+KineRouter
+==========
+
+KineRouter is a Go rewrite of 9Router (https://github.com/decolua/9router),
+originally written in Node.js/Next.js and distributed under the MIT License:
+
+    MIT License
+    Copyright (c) 2024-2026 decolua and contributors
+
+This repository's LICENSE file (MIT, same terms) governs KineRouter as a whole.
+
+Derived material in this tree
+-----------------------------
+
+Portions of KineRouter are direct ports of 9Router source files, translated to
+Go but preserving behaviour, wire formats, database schema, file layout and
+provider quirks:
+
+  - provider registry and model catalogue      <- open-sse/providers/registry/, config/providerModels.js
+  - request/response translators               <- open-sse/translator/
+  - executors and provider quirks              <- open-sse/executors/
+  - RTK / Headroom / PXpipe token savers       <- open-sse/rtk/, src/lib/headroom/, src/lib/pxpipe/
+  - OAuth flows and token refresh              <- src/lib/oauth/, src/app/api/oauth/
+  - MiniMax Code auth-lease protocol           <- open-sse/services/minimaxCodeLease.js
+  - dashboard UI, routes and copy              <- src/app/, src/shared/, src/components/
+
+Third-party assets
+------------------
+
+  - Provider logos and brand marks in web-app/src/assets/providers/ are the
+    trademarks of their respective owners and are used only to identify the
+    service a connection talks to. They are not covered by the MIT grant.
+  - Go module dependencies and their licences are listed in go.sum; run
+    `go list -m -json all` for the full set.
+  - The dashboard's npm dependencies and their licences are listed in
+    web-app/package-lock.json.
+
+If you redistribute KineRouter, keep this NOTICE and the MIT copyright line
+above with the binaries and source.

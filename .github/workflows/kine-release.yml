@@ -1,0 +1,147 @@
+name: KineRouter Release
+
+# Every release tag in this repo is kine-vX.Y.Z, so every asset glob here is
+# kine-*.
+#
+# Publishing creates: a GitHub Release with cross-compiled binaries, and a
+# multi-arch image on GHCR. internal/gateway/version.go's update check reads
+# this release, which is what the dashboard's "Update now" button offers.
+
+on:
+  push:
+    tags:
+      - "kine-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing kine-vX.Y.Z tag to publish"
+        required: true
+        type: string
+
+concurrency:
+  group: kine-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.27.4"
+  NODE_VERSION: "24"
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository_owner }}/kinerouter
+
+jobs:
+  test:
+    name: Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: kine
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: kine/go.sum
+      - run: go vet ./...
+      - run: go test ./...
+
+  binaries:
+    name: Binaries
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: kine/web-app/package-lock.json
+
+      - name: Build dashboard
+        working-directory: kine/web-app
+        run: npm ci && npm run build
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: kine/go.sum
+
+      - name: Cross-compile
+        working-directory: kine
+        env:
+          VERSION: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          version="${VERSION#kine-v}"
+          echo "version=$version" >> "$GITHUB_ENV"
+          mkdir -p dist
+          rm -f dist/*
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            os="${target%/*}"; arch="${target#*/}"
+            suffix=""; [ "$os" = windows ] && suffix=".exe"
+            out="kinerouter_${version}_${os}_${arch}${suffix}"
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
+              go build -trimpath -ldflags "-s -w -X github.com/keyzakyy-dev/kinerouter/internal/gateway.Version=$version" \
+              -o "dist/$out" ./cmd/kinerouter
+            (cd dist && sha256sum "$out" >> checksums.txt)
+          done
+          cp LICENSE NOTICE dist/
+          cat dist/checksums.txt
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: KineRouter ${{ env.version }}
+          generate_release_notes: true
+          prerelease: ${{ contains(env.version, '-') }}
+          files: |
+            kine/dist/kinerouter_*
+            kine/dist/checksums.txt
+            kine/dist/LICENSE
+            kine/dist/NOTICE
+
+  image:
+    name: Image
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          tags: |
+            type=match,pattern=kine-v(.*),group=1
+            type=match,pattern=kine-v(\d+\.\d+),group=1
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./kine
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

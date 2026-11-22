@@ -1,0 +1,20 @@
+services:
+  kinerouter:
+    build: .
+    image: kinerouter:latest
+    container_name: kinerouter
+    restart: unless-stopped
+    ports:
+      - "20128:20128"
+    environment:
+      # Required: there is no usable default. Set it before the first start.
+      # A container's TCP peer is never loopback, so an unset value locks the
+      # dashboard until the DB volume is wiped.
+      INITIAL_PASSWORD: ${INITIAL_PASSWORD:?set INITIAL_PASSWORD, e.g. in .env}
+      # Uncomment to pin secrets instead of auto-generating on first boot:
+      # JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - kinerouter-data:/data
+
+volumes:
+  kinerouter-data:

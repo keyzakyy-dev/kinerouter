@@ -1,0 +1,49 @@
+{
+  "name": "kinerouter",
+  "version": "0.1.0",
+  "description": "Single-binary AI gateway: one OpenAI-compatible endpoint routing to many providers",
+  "bin": {
+    "kinerouter": "./cli.js"
+  },
+  "files": [
+    "cli.js",
+    "install.js",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "keywords": [
+    "ai",
+    "gateway",
+    "router",
+    "openai",
+    "anthropic",
+    "claude",
+    "llm",
+    "proxy"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/keyzakyy-dev/kinerouter.git"
+  },
+  "homepage": "https://github.com/keyzakyy-dev/kinerouter#readme",
+  "bugs": {
+    "url": "https://github.com/keyzakyy-dev/kinerouter/issues"
+  }
+}
