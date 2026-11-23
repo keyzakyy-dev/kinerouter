@@ -124,13 +124,17 @@ kill $pid
 ### Prebuilt binary
 
 ```bash
-curl -fLO https://github.com/keyzakyy-dev/kinerouter/releases/latest/download/checksums.txt
-# pick the artifact for your OS/arch from the releases page, then:
+VERSION=0.1.1   # newest kine-vX.Y.Z from the releases page
+base=https://github.com/keyzakyy-dev/kinerouter/releases/download/kine-v$VERSION
+curl -fLO "$base/kinerouter_${VERSION}_linux_amd64"
+curl -fLO "$base/checksums.txt"
 sha256sum -c --ignore-missing checksums.txt
-chmod +x kinerouter_*_linux_amd64
-sudo mv kinerouter_*_linux_amd64 /usr/local/bin/kinerouter
+chmod +x "kinerouter_${VERSION}_linux_amd64"
+sudo mv "kinerouter_${VERSION}_linux_amd64" /usr/local/bin/kinerouter
 INITIAL_PASSWORD='choose-something' kinerouter
 ```
+
+Swap `linux_amd64` for `linux_arm64`, `darwin_amd64` or `darwin_arm64`.
 
 ### Install script
 
@@ -144,11 +148,26 @@ Windows:
 irm https://raw.githubusercontent.com/keyzakyy-dev/kinerouter/main/kine/install.ps1 | iex
 ```
 
+The Windows installer, npm shim and `.exe` archive also place
+`kinerouter-tray.exe` beside the gateway. Linux/macOS releases do not ship the
+tray (it needs cgo + GTK); build it locally:
+
+```bash
+cd kine && go build -tags tray -o kinerouter-tray ./cmd/kinerouter-tray
+```
+
 ### npm
 
 ```bash
 npm i -g kinerouter
 INITIAL_PASSWORD='choose-something' kinerouter
+```
+
+npm 11+ blocks postinstall scripts by default; if the binary download is
+skipped, allow it once:
+
+```bash
+npm i -g --allow-scripts=kinerouter kinerouter
 ```
 
 ### Docker
@@ -157,8 +176,11 @@ INITIAL_PASSWORD='choose-something' kinerouter
 docker run -d --name kinerouter -p 20128:20128 \
   -e INITIAL_PASSWORD='choose-something' \
   -v kinerouter-data:/data \
-  ghcr.io/keyzakyy-dev/kinerouter:latest
+  ghcr.io/keyzakyy-dev/kinerouter:0.1.1
 ```
+
+The release workflow publishes `X.Y.Z` and `X.Y` tags; pull the version you
+want explicitly.
 
 ### From source
 

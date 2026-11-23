@@ -104,6 +104,29 @@ try {
 
     Write-Say "installed $dest ($tag, sha256 verified)"
 
+    # The tray is a second binary that `kinerouter tray` execs from the same
+    # directory. Older releases predate it, so a missing asset is not fatal.
+    $trayAsset = "kinerouter-tray_${version}_windows_${arch}.exe"
+    $trayWant = $null
+    foreach ($line in Get-Content (Join-Path $tmp 'checksums.txt')) {
+        $parts = $line.Trim() -split '\s+'
+        if ($parts.Count -ge 2 -and ($parts[1] -eq $trayAsset -or $parts[1] -eq "./$trayAsset")) { $trayWant = $parts[0]; break }
+    }
+    if ($trayWant) {
+        try {
+            $trayPath = Join-Path $tmp $trayAsset
+            Invoke-WebRequest -Uri "$base/$trayAsset" -OutFile $trayPath -UseBasicParsing
+            $trayGot = (Get-FileHash -Path $trayPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($trayGot -ne $trayWant.ToLowerInvariant()) { throw "sha256 mismatch" }
+            Move-Item -Path $trayPath -Destination (Join-Path $dir 'kinerouter-tray.exe') -Force
+            Write-Say "installed tray ($trayAsset, sha256 verified)"
+        } catch {
+            Write-Say "tray not installed: $($_.Exception.Message)"
+        }
+    } else {
+        Write-Say "note: $tag has no Windows tray binary"
+    }
+
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     $parts = @()
     if ($userPath) { $parts = $userPath -split ';' | Where-Object { $_ -ne '' } }

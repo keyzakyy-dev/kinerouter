@@ -99,7 +99,7 @@ say "downloading $asset ($tag)"
 fetch "$base/checksums.txt" "$tmp/checksums.txt" || die "no checksums.txt for $tag"
 fetch "$base/$asset" "$tmp/$asset" || die "download failed: $base/$asset"
 
-want=$(grep "[[:space:]]\(\./\)\{0,1\}${asset}\$" "$tmp/checksums.txt" | head -n 1 | cut -d' ' -f1)
+want=$(grep "[[:space:]]\(\./\)\{0,1\}${asset}\$" "$tmp/checksums.txt" | head -n 1 | cut -d' ' -f1 || true)
 [ -n "$want" ] || die "checksums.txt for $tag has no entry for $asset"
 got=$(sha256 "$tmp/$asset")
 [ "$want" = "$got" ] || die "sha256 mismatch for $asset (got $got, want $want)"
@@ -121,6 +121,22 @@ mv "$tmp/$asset" "$dir/kinerouter"
 chmod 0755 "$dir/kinerouter"
 
 say "installed $dir/kinerouter ($tag, sha256 verified)"
+
+# Optional companion. Releases publish it for Windows only today; if a unix
+# tray asset ever appears, install it beside the gateway so `kinerouter tray`
+# finds it. Missing asset is not an install failure.
+tray="kinerouter-tray_${version}_${os}_${arch}"
+traywant=$(grep "[[:space:]]\(\./\)\{0,1\}${tray}\$" "$tmp/checksums.txt" | head -n 1 | cut -d' ' -f1 || true)
+if [ -n "$traywant" ] && fetch "$base/$tray" "$tmp/$tray" 2>/dev/null; then
+	traygot=$(sha256 "$tmp/$tray")
+	if [ "$traywant" = "$traygot" ]; then
+		mv "$tmp/$tray" "$dir/kinerouter-tray"
+		chmod 0755 "$dir/kinerouter-tray"
+		say "installed $dir/kinerouter-tray (sha256 verified)"
+	else
+		say "warning: tray sha256 mismatch, tray not installed"
+	fi
+fi
 case ":$PATH:" in
 	*":$dir:"*) ;;
 	*) say "note: $dir is not on PATH; add it, e.g. export PATH=\"$dir:\$PATH\"" ;;

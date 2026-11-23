@@ -1638,7 +1638,7 @@ func runTray(args []string) int {
 	if _, err := os.Stat(bin); err != nil {
 		fmt.Fprintf(os.Stderr,
 			"tray: %s not found.\n"+
-				"Get the release archive that contains both binaries, or build it:\n"+
+				"The tray ships with Windows releases only; elsewhere build it beside this binary:\n"+
 				"  go build -tags tray -o kinerouter-tray ./cmd/kinerouter-tray\n", bin)
 		return 1
 	}

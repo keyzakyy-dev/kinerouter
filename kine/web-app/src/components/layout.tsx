@@ -8,7 +8,8 @@ import { Modal } from '@/components/modal'
 import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 
 /** KineRouter is not on npm; the update command installs the Go binary. */
-const INSTALL_CMD = 'go install github.com/keyzakyy-dev/kinerouter/cmd/kinerouter@latest'
+const INSTALL_CMD =
+  'curl -fsSL https://raw.githubusercontent.com/keyzakyy-dev/kinerouter/main/kine/install.sh | sh'
 const SHUTDOWN_COUNTDOWN_SEC = 3
 
 /** Collapsed/expanded state survives reloads; local only, nothing is sent to the gateway. */

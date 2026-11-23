@@ -151,11 +151,16 @@ jobs:
           tags: |
             type=match,pattern=kine-v(.*),group=1
             type=match,pattern=kine-v(\d+\.\d+),group=1
+      - name: Version
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: echo "version=${TAG#kine-v}" >> "$GITHUB_ENV"
       - uses: docker/build-push-action@v6
         with:
           context: ./kine
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: VERSION=${{ env.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 

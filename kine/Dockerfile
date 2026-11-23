@@ -10,12 +10,16 @@ RUN npm run build
 
 # ---- go: static binary with the dashboard embedded ----
 FROM golang:1.27-alpine AS build
+# Stamped by the release workflow so /api/version matches the image tag.
+ARG VERSION=dev
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /src/web/dist ./web/dist
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /kinerouter ./cmd/kinerouter
+RUN CGO_ENABLED=0 go build -trimpath \
+    -ldflags="-s -w -X github.com/keyzakyy-dev/kinerouter/internal/gateway.Version=${VERSION}" \
+    -o /kinerouter ./cmd/kinerouter
 
 # ---- runtime ----
 FROM gcr.io/distroless/static-debian12:nonroot

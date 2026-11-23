@@ -5,6 +5,26 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+## [0.1.2] — 2026-11-23
+
+### Fixed
+
+- **Install paths now match what ships.** The dashboard's update command and
+  the README no longer point at `go install`, which cannot work with
+  `kine-v*` tags and would install no dashboard. The dashboard copies the
+  `install.sh` one-liner instead.
+- **Windows installer places the tray.** `install.ps1` downloads and verifies
+  `kinerouter-tray.exe` beside the gateway when the release carries it, so
+  `kinerouter tray` works after a script install. `install.sh` does the same for
+  any future unix tray asset.
+- **Docker images report their real version.** The image build stamps
+  `gateway.Version` from the release tag instead of leaving the compiled-in
+  default, so `/api/version` and the update banner are correct in containers.
+- **Prebuilt-binary instructions actually download a binary.** The README block
+  now fetches the versioned asset, checks it against `checksums.txt`, and
+  documents the npm 11 `--allow-scripts` case. GHCR examples pin a version
+  instead of an unpublished `latest` tag.
+
 ## [0.1.1] — 2026-11-23
 
 ### Added

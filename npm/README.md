@@ -7,6 +7,13 @@ single-binary AI gateway with an embedded dashboard.
 npm i -g kinerouter
 ```
 
+npm 11+ blocks postinstall scripts by default. If the binary download is
+skipped, allow it once:
+
+```bash
+npm i -g --allow-scripts=kinerouter kinerouter
+```
+
 The postinstall step downloads the release binary for your platform
 (darwin/linux/windows, amd64/arm64) from GitHub Releases, verifies it against
 the release's `checksums.txt`, and drops it in this package's `bin/`. The

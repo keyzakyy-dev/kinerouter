@@ -79,7 +79,7 @@ docker build -t kinerouter ./kine          # or use the published image below
 docker run -d --name kinerouter -p 20128:20128 \
   -e INITIAL_PASSWORD='choose-something' \
   -v kinerouter-data:/data \
-  ghcr.io/keyzakyy-dev/kinerouter:latest
+  ghcr.io/keyzakyy-dev/kinerouter:0.1.1
 ```
 
 `docker compose up -d` in `kine/` works the same way; `INITIAL_PASSWORD` is
@@ -305,8 +305,10 @@ multi-arch image to `ghcr.io/<owner>/kinerouter`. `/api/version` reads the
 `kine-*` GitHub release, which is what the dashboard's "Update now" button
 offers; the version is stamped into the binary at link time.
 
-`go install github.com/keyzakyy-dev/kinerouter/cmd/kinerouter@latest` works but has
-no dashboard assets (the SPA is embedded from `web/dist` in the release build).
+`go install` is not a supported install path: release tags are `kine-vX.Y.Z`,
+which Go does not accept as module versions, and `web/dist` holds only a
+placeholder in git, so a module build would serve no dashboard. Use a release
+binary, `install.sh`, npm or Docker.
 
 ## License
 
