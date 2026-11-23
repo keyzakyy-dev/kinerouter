@@ -6,7 +6,7 @@
  */
 
 const REPO = 'keyzakyy-dev/kinerouter'
-const BRANCH = 'master'
+const BRANCH = 'main'
 const SKILL_PATH = 'skills'
 
 export const SKILLS_REPO_URL = `https://github.com/${REPO}`
