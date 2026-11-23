@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { PageHeader } from '@/components/layout'
 import { Icon } from '@/components/icon'
-import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
 import {
   SKILLS,
+  SKILLS_BLOB_BASE,
   SKILLS_REPO_URL,
   getSkillBlobUrl,
   getSkillRawUrl,
@@ -12,7 +11,7 @@ import {
 } from '@/lib/skills'
 import { cn } from '@/lib/utils'
 
-function CopyLinkButton({ value, label = 'Copy link' }: { value: string; label?: string }) {
+function CopyButton({ value, label = 'Copy', title }: { value: string; label?: string; title?: string }) {
   const [copied, setCopied] = useState(false)
 
   const copy = async () => {
@@ -33,100 +32,89 @@ function CopyLinkButton({ value, label = 'Copy link' }: { value: string; label?:
   return (
     <button
       onClick={copy}
-      title={value}
-      className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-primary/90"
+      title={title ?? value}
+      className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-text-main transition-colors hover:bg-card"
     >
-      <Icon name={copied ? 'check' : 'content_copy'} className="text-[12px]" />
-      {copied ? 'Copied!' : label}
+      <Icon name={copied ? 'check' : 'content_copy'} className="text-[13px]" />
+      {copied ? 'Copied' : label}
     </button>
   )
 }
 
-function SkillRow({ skill }: { skill: Skill }) {
-  const url = getSkillRawUrl(skill.id)
+function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className={cn(
-        'flex items-start gap-3 rounded-[14px] border p-4 shadow-[var(--shadow-soft)] transition-colors',
-        skill.isEntry
-          ? 'border-brand-500/40 bg-brand-500/5'
-          : 'border-border-subtle bg-surface hover:bg-surface-2',
-      )}
-    >
-      <div
-        className={cn(
-          'flex size-9 shrink-0 items-center justify-center rounded-lg',
-          skill.isEntry ? 'bg-primary text-white' : 'bg-primary/10 text-primary',
-        )}
-      >
-        <Icon name={skill.icon} className="text-[18px]" />
-      </div>
+    <span className="inline-flex items-center rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-text-muted">
+      {children}
+    </span>
+  )
+}
+
+function SkillRow({ skill, first }: { skill: Skill; first: boolean }) {
+  const url = getSkillRawUrl(skill.id)
+
+  return (
+    <div className={cn('flex items-start gap-3 px-5 py-4', !first && 'border-t border-border', skill.isEntry && 'bg-surface-2/40')}>
+      <Icon name={skill.icon} className="text-[18px] text-text-muted" />
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-text-main">{skill.name}</h3>
-          {skill.isEntry && <Badge>START HERE</Badge>}
-          {skill.endpoint && (
-            <Badge variant="outline">
-              <code className="text-[10px]">{skill.endpoint}</code>
-            </Badge>
-          )}
+          {skill.isEntry && <Chip>start here</Chip>}
+          {skill.endpoint && <Chip>{skill.endpoint}</Chip>}
         </div>
-        <p className="mt-0.5 text-xs text-text-muted">{skill.description}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{skill.description}</p>
         <a
           href={getSkillBlobUrl(skill.id)}
           target="_blank"
           rel="noreferrer"
-          className="mt-1 inline-flex items-center gap-1 break-all text-[11px] text-text-muted hover:text-primary"
+          className="mt-1 inline-flex items-center gap-1 break-all font-mono text-[11px] text-text-muted hover:text-text-main"
         >
           {url}
-          <Icon name="open_in_new" className="text-[12px]" />
+          <Icon name="open_in_new" className="shrink-0 text-[12px]" />
         </a>
       </div>
 
-      <CopyLinkButton value={url} />
+      <CopyButton value={url} />
     </div>
   )
 }
 
 export default function SkillsPage() {
+  const prompt = `Read this skill and use it: ${getSkillRawUrl('kinerouter')}`
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-5">
       <PageHeader
         title="Skills"
         description="Agent skills you can hand to any AI tool. Copy a link and paste it into the chat."
       />
 
-      <Card className="p-4">
-        <div className="mb-2 text-xs text-text-muted">Paste this to your AI:</div>
-        <div className="rounded bg-surface-2 px-3 py-2 font-mono text-[12px] text-text-main">
-          Read this skill and use it: {getSkillRawUrl('kinerouter')}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Paste this to your AI</p>
+          <p className="mt-1 break-all font-mono text-xs text-text-main">{prompt}</p>
         </div>
-      </Card>
-
-      <div className="space-y-2">
-        {SKILLS.map((skill) => (
-          <SkillRow key={skill.id} skill={skill} />
-        ))}
+        <CopyButton value={prompt} label="Copy prompt" title="Copy the prompt above" />
       </div>
 
-      <Card className="p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-text-main">More on GitHub</h2>
-            <p className="mt-0.5 text-xs text-text-muted">Browse source, README, and examples.</p>
-          </div>
-          <a
-            href={`${SKILLS_REPO_URL}/tree/master/skills`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-          >
-            <Icon name="open_in_new" className="text-[16px]" />
-            View on GitHub
-          </a>
-        </div>
-      </Card>
+      <section className="overflow-hidden rounded-xl bg-surface">
+        {SKILLS.map((skill, i) => (
+          <SkillRow key={skill.id} skill={skill} first={i === 0} />
+        ))}
+      </section>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1 text-xs text-text-muted">
+        <p>Browse source, README, and examples in the repo.</p>
+        <a
+          href={`${SKILLS_BLOB_BASE}`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 font-medium text-text-main hover:underline"
+        >
+          <Icon name="open_in_new" className="text-[14px]" />
+          View on GitHub
+        </a>
+      </div>
     </div>
   )
 }
