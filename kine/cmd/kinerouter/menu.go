@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -24,24 +25,45 @@ func chooseMenu(title, subtitle string, items []string) (int, error) {
 	defer term.Restore(fd, state)
 
 	sel := 0
+	// Raw mode turns off output post-processing, so every line ends \r\n;
+	// with a bare \n the menu walks down the screen as a staircase.
+	width := 40
+	if w, _, err := term.GetSize(fd); err == nil && w > 0 && w < width {
+		width = w
+	}
+	const (
+		reset      = "\x1b[0m"
+		bright     = "\x1b[1m"
+		dim        = "\x1b[2m"
+		reverse    = "\x1b[7m"
+		terracotta = "\x1b[38;2;217;119;87m"
+	)
+	rule := terracotta + strings.Repeat("=", width) + reset
 	draw := func() {
 		var b strings.Builder
 		b.WriteString("\x1b[2J\x1b[H")
-		width := 40
-		b.WriteString("\n" + strings.Repeat("=", width) + "\n")
-		b.WriteString("  " + title + "\n")
+		b.WriteString("\r\n" + rule + "\r\n")
+		b.WriteString("  " + bright + terracotta + title + reset + "\r\n")
 		if subtitle != "" {
-			b.WriteString("  " + subtitle + "\n")
+			b.WriteString("  " + dim + subtitle + reset + "\r\n")
 		}
-		b.WriteString(strings.Repeat("=", width) + "\n\n")
+		b.WriteString(rule + "\r\n\r\n")
+		win := runtime.GOOS == "windows"
 		for i, it := range items {
+			icon := "☆"
+			if win {
+				icon = " "
+			}
 			if i == sel {
-				b.WriteString(" \x1b[7m\x1b[1m> " + it + "\x1b[0m\n")
+				icon = "★"
+				if win {
+					icon = ">"
+				}
+				b.WriteString(" " + reverse + bright + icon + " " + it + reset + "\r\n")
 			} else {
-				b.WriteString("   " + it + "\n")
+				b.WriteString("  " + icon + " " + it + "\r\n")
 			}
 		}
-		b.WriteString("\n  ↑/↓ select · Enter confirm · Esc exit\n")
 		fmt.Print(b.String())
 	}
 
