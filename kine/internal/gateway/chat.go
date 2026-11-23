@@ -134,15 +134,34 @@ func (g *Gateway) dispatchDone(w http.ResponseWriter, r *http.Request, targets [
 	writeErr(w, status, firstNonEmpty(upstreamMessage(res.body), "No available credentials for this model"))
 }
 
+// targetFor resolves a provider token to the provider that serves it and the
+// model id to send upstream. A custom node prefix wins over a registry alias of
+// the same name, matching resolvePrefixProvider running first.
+func (g *Gateway) targetFor(provider, model string) (target, bool) {
+	if n := g.nodeByPrefix(provider); n != nil {
+		return target{Provider: n.ID, Model: g.nodeWireModel(n.ID, model)}, true
+	}
+	if id := g.reg.ResolveAlias(provider); g.reg.IsKnownProvider(id) {
+		return target{Provider: id, Model: g.reg.UpstreamModelID(id, model)}, true
+	}
+	return target{}, false
+}
+
+// splitProviderModel splits "provider/model" without resolving the provider
+// alias, so a custom node prefix can be checked before the alias table.
+func splitProviderModel(model string) (provider, rest string, ok bool) {
+	i := strings.IndexByte(model, '/')
+	if i <= 0 {
+		return "", model, false
+	}
+	return model[:i], model[i+1:], true
+}
+
 // resolveTargets maps a requested model to ordered provider/model targets.
 func (g *Gateway) resolveTargets(modelStr string) ([]target, error) {
-	if provider, model, ok := g.reg.ProviderIDFromModel(modelStr); ok {
-		if g.reg.IsKnownProvider(provider) {
-			return []target{{Provider: provider, Model: g.reg.UpstreamModelID(provider, model)}}, nil
-		}
-		// A custom node's user prefix ("myprefix/gpt-4o") routes to the node.
-		if n := g.nodeByPrefix(provider); n != nil {
-			return []target{{Provider: n.ID, Model: model}}, nil
+	if provider, model, ok := splitProviderModel(modelStr); ok {
+		if t, ok := g.targetFor(provider, model); ok {
+			return []target{t}, nil
 		}
 		return nil, fmt.Errorf("unknown provider %q", provider)
 	}
@@ -150,12 +169,14 @@ func (g *Gateway) resolveTargets(modelStr string) ([]target, error) {
 	aliases, err := g.store.GetModelAliases()
 	if err == nil {
 		if resolved, ok := aliases[modelStr]; ok {
-			if provider, model, ok := g.reg.ProviderIDFromModel(resolved); ok {
-				return []target{{Provider: provider, Model: g.reg.UpstreamModelID(provider, model)}}, nil
+			if provider, model, ok := splitProviderModel(resolved); ok {
+				if t, ok := g.targetFor(provider, model); ok {
+					return []target{t}, nil
+				}
 			}
 		}
 	}
-	provider := inferProvider(modelStr)
+	provider := g.inferProvider(modelStr)
 	if provider == "" {
 		return nil, fmt.Errorf("cannot resolve provider for model %q; use provider/model", modelStr)
 	}
@@ -174,6 +195,25 @@ func (g *Gateway) forceStream(provider string) bool {
 	return ok && t.Transport != nil && t.Transport.ForceStream
 }
 
+// flattenComboModels replaces a nested combo member with its leaves so
+// rotation covers every reachable model; cycles stop at the visited set.
+func (g *Gateway) flattenComboModels(name string, models []string) []string {
+	out := []string{}
+	var walk func([]string, map[string]bool)
+	walk = func(list []string, seen map[string]bool) {
+		for _, member := range list {
+			if nested, err := g.store.GetComboByName(member); err == nil && nested != nil && len(nested.Models) > 0 && !seen[nested.Name] {
+				seen[nested.Name] = true
+				walk(nested.Models, seen)
+				continue
+			}
+			out = append(out, member)
+		}
+	}
+	walk(models, map[string]bool{name: true})
+	return out
+}
+
 func (g *Gateway) handleCombo(w http.ResponseWriter, r *http.Request, combo *store.Combo, raw map[string]any, apiKey, clientFormat string, stream bool) {
 	strategy, sticky := g.comboConfig(combo)
 	// Fusion fans out to every panel member and judges the answers; it runs on
@@ -184,7 +224,7 @@ func (g *Gateway) handleCombo(w http.ResponseWriter, r *http.Request, combo *sto
 	}
 	// Capacity adapter: a member set that covers no requested modality is
 	// prefixed with the adapter pool (combo.js augmentModelsWithCapacityAdapter).
-	members := combo.Models
+	members := g.flattenComboModels(combo.Name, combo.Models)
 	if required := detectRequiredCapabilities(raw); len(required) > 0 {
 		if augmented := g.augmentWithCapacity(members, required); len(augmented) > len(members) {
 			members = augmented
@@ -239,6 +279,10 @@ func (g *Gateway) dispatch(w http.ResponseWriter, r *http.Request, targets []tar
 	var last dispatchResult
 	for _, t := range targets {
 		conns, err := g.store.ListConnections(t.Provider, true)
+		if err == nil {
+			conns = filterByEnabledModels(t.Provider, conns, t.Model)
+			conns = g.filterByStrictAssignment(t.Provider, conns, t.Model)
+		}
 		if err != nil || len(conns) == 0 {
 			// Free / no-auth provider: one virtual account, no stored credential.
 			if g.exec.IsNoAuth(t.Provider) {
@@ -257,7 +301,10 @@ func (g *Gateway) dispatch(w http.ResponseWriter, r *http.Request, targets []tar
 		}
 		tried := map[string]bool{}
 		for attempt := 0; attempt <= len(conns); attempt++ {
-			conn := g.pickConnection(conns, t.Model, tried)
+			conn := pinnedConnection(conns, r.Header.Get("x-connection-id"), tried)
+			if conn == nil {
+				conn = g.pickConnection(conns, t.Model, tried)
+			}
 			if conn == nil {
 				break
 			}
@@ -583,13 +630,14 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 		return dispatchResult{ok: true, status: http.StatusOK}, nil
 	}
 
-	// Streaming: forward translated SSE.
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no")
-	w.WriteHeader(http.StatusOK)
-	flusher, _ := w.(http.Flusher)
+	// Streaming: forward translated SSE. The peeker holds the response until
+	// the stream proves it carries content, so a silent 200 can still fail over.
+	peek := newStreamPeeker(w)
+	peek.Header().Set("Content-Type", "text/event-stream")
+	peek.Header().Set("Cache-Control", "no-cache")
+	peek.Header().Set("Connection", "keep-alive")
+	peek.Header().Set("X-Accel-Buffering", "no")
+	peek.WriteHeader(http.StatusOK)
 
 	var u translate.Usage
 	if wire == "cursor" {
@@ -597,20 +645,133 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 		// and no live GetUsableModels resolution for the Auto alias. Add the retry
 		// when a long Cursor replay is seen wedging; add model resolution when
 		// Auto must report the concrete upstream model.
-		u, err = streamCursor(resp.Body, agentSession, clientFormat, t.Model, w, flusher)
+		u, err = streamCursor(resp.Body, agentSession, clientFormat, t.Model, peek, peek)
 	} else if wire == "kiro" {
-		u = streamKiro(resp.Body, clientFormat, t.Model, kiroRestore, w, flusher)
+		u = streamKiro(resp.Body, clientFormat, t.Model, kiroRestore, peek, peek)
 		err = nil
 	} else {
-		u, err = streamTranslate(resp.Body, providerFormat, clientFormat, w, flusher)
+		u, err = streamTranslate(resp.Body, providerFormat, clientFormat, peek, peek)
 	}
 	if err != nil {
+		if !peek.committed {
+			return dispatchResult{}, err
+		}
 		// Headers already sent; report what we have.
+		g.recordUsage(conn, t, apiKey, clientFormat, u, start)
+		return dispatchResult{ok: true, status: http.StatusOK}, nil
+	}
+	if ferr := peek.Finish(); ferr != nil {
+		if errors.Is(ferr, errStreamingZeroContent) {
+			return dispatchResult{}, ferr
+		}
+		// In-band provider error was already committed for the client.
 		g.recordUsage(conn, t, apiKey, clientFormat, u, start)
 		return dispatchResult{ok: true, status: http.StatusOK}, nil
 	}
 	g.recordUsage(conn, t, apiKey, clientFormat, u, start)
 	return dispatchResult{ok: true, status: http.StatusOK}, nil
+}
+
+// pinnedConnection honours a client's x-connection-id request, but only when
+// the id names a connection of the provider being tried and it has not already
+// failed in this request.
+func pinnedConnection(conns []*store.Connection, id string, tried map[string]bool) *store.Connection {
+	if id == "" {
+		return nil
+	}
+	for _, c := range conns {
+		if c.ID == id && !tried[c.ID] {
+			return c
+		}
+	}
+	return nil
+}
+
+// connectionEnabledModels reads providerSpecificData.enabledModels first, then
+// the top-level field: both writers are in the wild.
+func connectionEnabledModels(c *store.Connection) []string {
+	for _, raw := range []any{c.Specific()["enabledModels"], c.Get("enabledModels")} {
+		list, ok := raw.([]any)
+		if !ok {
+			continue
+		}
+		out := make([]string, 0, len(list))
+		for _, v := range list {
+			if s, ok := v.(string); ok && s != "" {
+				out = append(out, s)
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	return nil
+}
+
+// assignedModel reads the model an account was pinned to (assignedModel, or
+// freebuffModel for Freebuff seats), from the top level or providerSpecificData.
+func assignedModel(c *store.Connection) string {
+	keys := []string{"assignedModel", "freebuffModel"}
+	for _, key := range keys {
+		if v, ok := c.Get(key).(string); ok && v != "" {
+			return v
+		}
+	}
+	for _, key := range keys {
+		if v, ok := c.Specific()[key].(string); ok && v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// filterByStrictAssignment honours providerStrategies[provider]
+// .strictModelAssignment: only accounts pinned to the requested model are
+// eligible. Off by default and a no-op for every other provider.
+func (g *Gateway) filterByStrictAssignment(provider string, conns []*store.Connection, model string) []*store.Connection {
+	if model == "" || len(conns) == 0 {
+		return conns
+	}
+	settings, err := g.store.GetSettings()
+	if err != nil {
+		return conns
+	}
+	byProvider, _ := settings["providerStrategies"].(map[string]any)
+	entry, _ := byProvider[provider].(map[string]any)
+	strict, _ := entry["strictModelAssignment"].(bool)
+	if !strict {
+		return conns
+	}
+	kept := make([]*store.Connection, 0, len(conns))
+	for _, c := range conns {
+		if assignedModel(c) == model {
+			kept = append(kept, c)
+		}
+	}
+	return kept
+}
+
+// filterByEnabledModels drops codex accounts whose enabledModels pin excludes
+// the requested model; every other provider is untouched.
+func filterByEnabledModels(provider string, conns []*store.Connection, model string) []*store.Connection {
+	if provider != "codex" || model == "" {
+		return conns
+	}
+	kept := make([]*store.Connection, 0, len(conns))
+	for _, c := range conns {
+		enabled := connectionEnabledModels(c)
+		if len(enabled) == 0 {
+			kept = append(kept, c)
+			continue
+		}
+		for _, m := range enabled {
+			if m == model {
+				kept = append(kept, c)
+				break
+			}
+		}
+	}
+	return kept
 }
 
 func (g *Gateway) pickConnection(conns []*store.Connection, model string, tried map[string]bool) *store.Connection {
@@ -873,9 +1034,10 @@ func extractAPIKey(r *http.Request) string {
 }
 
 // stripContextMarker removes Claude Code's `<model>[1m]` capability marker.
+// Only that marker is stripped: a real model id may end in another bracket.
 func stripContextMarker(s string) string {
-	if i := strings.LastIndex(s, "["); i > 0 && strings.HasSuffix(s, "]") {
-		return s[:i]
+	if len(s) > 4 && strings.EqualFold(s[len(s)-4:], "[1m]") {
+		return s[:len(s)-4]
 	}
 	return s
 }
@@ -1404,16 +1566,57 @@ func cloneMap(m map[string]any) map[string]any {
 
 // inferProvider mirrors the config-driven prefix rules in
 // open-sse/services/model.js (subset used by the four milestone providers).
-func inferProvider(model string) string {
-	switch {
-	case strings.HasPrefix(model, "claude-"):
-		return "anthropic"
-	case strings.HasPrefix(model, "gpt-") && !strings.HasPrefix(model, "gpt-image"):
+func (g *Gateway) hasActiveConnection(provider string) bool {
+	conns, err := g.store.ListConnections(provider, true)
+	return err == nil && len(conns) > 0
+}
+
+// codexOnlyModelSlug reports whether a bare id exists only on the Codex
+// backend, not the OpenAI API (upstream codexOnlyModelSlug).
+func codexOnlyModelSlug(model string) bool {
+	lower := strings.ToLower(strings.TrimSpace(model))
+	if lower == "codex-auto-review" {
+		return true
+	}
+	if len(lower) > 7 && (strings.HasPrefix(lower, "gpt-5.") || strings.HasPrefix(lower, "gpt-6.")) {
+		return true
+	}
+	return strings.HasPrefix(lower, "gpt-6-") || strings.HasPrefix(lower, "gpt-daybreak-") ||
+		strings.HasPrefix(lower, "gpt-reserve")
+}
+
+// inferProvider resolves a bare model id to the provider that most likely
+// serves it, preferring a provider the user actually connected.
+func (g *Gateway) inferProvider(model string) string {
+	lower := strings.ToLower(strings.TrimSpace(model))
+	if codexOnlyModelSlug(lower) {
 		return "codex"
-	case strings.HasPrefix(model, "gemini-"):
+	}
+	switch {
+	case strings.HasPrefix(lower, "claude-"):
+		// A Claude OAuth account alone serves bare Claude ids (upstream
+		// fallbackToClaudeOAuth).
+		if !g.hasActiveConnection("anthropic") && g.hasActiveConnection("claude") {
+			return "claude"
+		}
+		return "anthropic"
+	case strings.HasPrefix(lower, "gpt-") && !strings.HasPrefix(lower, "gpt-image"):
+		if g.hasActiveConnection("codex") {
+			return "codex"
+		}
+		if g.hasActiveConnection("openai") {
+			return "openai"
+		}
+		return "codex"
+	case strings.HasPrefix(lower, "gemini-"):
 		return "gemini"
-	case strings.HasPrefix(model, "grok-"):
+	case strings.HasPrefix(lower, "grok-"):
 		return "xai"
+	}
+	for _, p := range []string{"openai", "anthropic", "deepseek"} {
+		if g.hasActiveConnection(p) {
+			return p
+		}
 	}
 	return ""
 }
