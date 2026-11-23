@@ -5,6 +5,19 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+## [0.1.6] — 2026-11-23
+
+### Fixed
+
+- **"Hide to tray" now survives closing the terminal.** The old flow only
+  ignored SIGHUP in the process that owned the terminal; closing it still killed
+  the gateway and the tray. The option now re-executes the binary as
+  `kinerouter --tray` in a new session with null stdio (9Router's detached
+  `--tray` launch), waits for the foreground listener to release the port, then
+  serves and starts the tray there. macOS keeps the current process instead,
+  because a fully detached status item does not render outside the login
+  session.
+
 ## [0.1.5] — 2026-11-23
 
 ### Fixed

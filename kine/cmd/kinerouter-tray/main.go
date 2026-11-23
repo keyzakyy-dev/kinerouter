@@ -25,6 +25,7 @@ import (
 )
 
 func main() {
+	ignoreHangup()
 	if err := runGUI(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

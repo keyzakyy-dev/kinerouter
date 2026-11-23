@@ -80,12 +80,29 @@ func runLauncher(port int, ownsServer bool) {
 			if !ownsServer {
 				continue
 			}
-			if startTray() {
+			if runtime.GOOS == "darwin" {
+				// A detached child on macOS sits outside the login session and
+				// NSStatusItem silently fails there, so this process stays and
+				// only drops the terminal (9Router does the same).
+				if !startTray() {
+					pause(in)
+					continue
+				}
 				ignoreHangup()
-				fmt.Printf("\nTray started. Gateway: %s\nClose this terminal anytime; Ctrl+C stops the gateway.\n", base)
+				fmt.Printf("\nKineRouter is running in the tray (PID %d)\n  Server: %s\nClose this terminal anytime; quit from the tray icon.\n", os.Getpid(), base)
 				return
 			}
-			pause(in)
+			// Linux/Windows: hand the gateway to a detached copy in a new
+			// session, then stop this one so the child can claim the port. The
+			// child starts its own tray, exactly like `9router --tray`.
+			fmt.Printf("\nStarting background process... (tray icon will appear shortly)\n")
+			if !hideToTray(port) {
+				pause(in)
+				continue
+			}
+			fmt.Printf("KineRouter is now running in the background\n  Server: %s\nClose this terminal anytime; quit from the tray icon.\n", base)
+			stopSelf()
+			return
 		case "5":
 			if !hasUpdate {
 				continue
@@ -178,6 +195,46 @@ func runCLISetup(base string, in *bufio.Reader) {
 		fmt.Printf("connect: %v\n", err)
 	}
 	pause(in)
+}
+
+// hideToTray starts a detached copy of this binary in tray mode. That copy
+// waits for this process to release the port, serves the gateway and starts the
+// tray, so closing the terminal no longer touches either. Ported from 9Router's
+// `spawn(..., { detached: true })` + `cleanup()` + `process.exit()` flow.
+func hideToTray(port int) bool {
+	self, err := os.Executable()
+	if err != nil {
+		fmt.Printf("background: %v\n", err)
+		return false
+	}
+	cmd := exec.Command(self, "--tray")
+	cmd.Env = append(os.Environ(), "PORT="+strconv.Itoa(port))
+	// nil stdio gives the child the null device; with a new session it has no
+	// controlling terminal to receive SIGHUP from.
+	cmd.SysProcAttr = detachProcAttr()
+	if err := cmd.Start(); err != nil {
+		fmt.Printf("background: %v\n", err)
+		return false
+	}
+	return cmd.Process.Release() == nil
+}
+
+// waitPortFree blocks until nothing answers on the port, so a handoff child
+// starts serving only after the parent's listener is closed.
+func waitPortFree(port int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+	for {
+		conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
+		if err != nil {
+			return true
+		}
+		conn.Close()
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 // startTray launches the companion tray binary that sits next to this one.

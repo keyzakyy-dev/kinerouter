@@ -105,7 +105,9 @@ in the binary) but required for the dashboard.
 
 Defaults: listen `0.0.0.0:20128`, data dir `~/.kinerouter`. In a terminal, a
 launcher menu offers the web dashboard, CLI setup, tray mode or a plain start;
-non-TTY runs skip it.
+non-TTY runs skip it. "Hide to tray" re-executes the binary detached
+(`kinerouter --tray`, new session, null stdio) and stops the foreground copy, so
+closing the terminal does not take the gateway with it.
 
 Open http://localhost:20128/ and log in with `INITIAL_PASSWORD` (default
 `123456`, local sign-in only — set `INITIAL_PASSWORD` or change it in Settings before remote access works).

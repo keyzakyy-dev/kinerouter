@@ -201,6 +201,13 @@ Starting `kinerouter` with no arguments from a terminal opens a launcher menu:
   5) Update to vX.Y.Z (current vA.B.C)   # only when a newer release exists
 ```
 
+Option 3 hands the gateway to a detached process in a new session (same flow as
+9Router's `--tray` mode), then stops the foreground copy so the child can claim
+the port. Closing the terminal leaves the gateway and the tray icon running;
+only the tray's Quit stops the gateway it started. macOS keeps the process in
+the login session instead, because a fully detached status item does not render
+there.
+
 Option 5 prints the update command for **the way this copy was installed**
 (`npm i -g kinerouter@latest --prefer-online` or the install script) and stops
 the server first, because Windows locks a running `.exe` and every platform
