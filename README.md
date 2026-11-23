@@ -194,12 +194,18 @@ go build -tags tray -o kinerouter-tray ./cmd/kinerouter-tray
 Starting `kinerouter` with no arguments from a terminal opens a launcher menu:
 
 ```
-  1) Update to vX.Y.Z (current vA.B.C)   # only when a newer release exists
-  2) Web UI (Open in Browser)
-  3) Terminal UI (Interactive CLI)
-  4) Hide to Tray (Background)
-  5) Exit
+Choose Interface (vX.Y.Z)
+  > Update to vX.Y.Z (current vA.B.C)   # only when a newer release exists
+    Web UI (Open in Browser)
+    Terminal UI (Interactive CLI)
+    Hide to Tray (Background)
+    Exit
+
+  ↑/↓ select · Enter confirm · Esc exit
 ```
+
+The menu is the same arrow-key selector 9Router uses (selected row highlighted;
+digits also work). Esc cancels and exits.
 
 Update prints the command for **the way this copy was installed**
 (`npm i -g kinerouter@latest --prefer-online` or the install script) and stops

@@ -5,6 +5,13 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+### Changed
+
+- **Launcher menu is an arrow-key selector.** ↑/↓ move, Enter confirms, Esc
+  exits; the selected row is highlighted, and digits still pick an entry
+  directly. Same interaction as 9Router's `selectMenu` instead of typing a
+  number and pressing Enter.
+
 ## [0.1.7] — 2026-11-23
 
 ### Changed

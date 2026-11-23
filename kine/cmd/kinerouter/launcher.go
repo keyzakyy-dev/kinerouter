@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -60,27 +59,25 @@ func runLauncher(port int, ownsServer bool) {
 	}
 	opts = append(opts, item{"Exit", "exit"})
 
-	for {
-		if ownsServer {
-			fmt.Printf("\nKineRouter %s\n  Server: %s\n", gateway.Version, base)
-		} else {
-			fmt.Printf("\nKineRouter %s\n  Server: %s (started outside this terminal)\n", gateway.Version, base)
-		}
-		for i, o := range opts {
-			fmt.Printf("  %d) %s\n", i+1, o.label)
-		}
-		fmt.Printf("\nChoose Interface [1-%d]: ", len(opts))
+	labels := make([]string, len(opts))
+	for i, o := range opts {
+		labels[i] = o.label
+	}
+	subtitle := "Server: " + base
+	if !ownsServer {
+		subtitle += " (started outside this terminal)"
+	}
 
-		line, err := in.ReadString('\n')
+	for {
+		n, err := chooseMenu("Choose Interface (v"+gateway.Version+")", subtitle, labels)
 		if err != nil {
-			fmt.Println()
 			return
 		}
-		n, convErr := strconv.Atoi(strings.TrimSpace(line))
-		if convErr != nil || n < 1 || n > len(opts) {
-			return
+		if n < 0 {
+			// Esc cancels the menu; 9Router treats that as Exit.
+			n = len(opts) - 1
 		}
-		switch opts[n-1].action {
+		switch opts[n].action {
 		case "update":
 			showUpdate(latest, ownsServer, in)
 		case "web":
