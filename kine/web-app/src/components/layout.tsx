@@ -16,9 +16,9 @@ const COLLAPSE_KEY = 'kinerouter.sidebar'
 
 /** Label + trailing chrome in a row: they fold away when the rail is collapsed. */
 const HIDES = 'group-data-[collapsed=true]/sidebar:hidden'
-/** The row itself re-centers its lone icon when collapsed. */
+/** The row becomes a 36×34 icon tile in the slim rail. */
 const ROW_COLLAPSED =
-  'group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:px-0'
+  'group-data-[collapsed=true]/sidebar:mx-auto group-data-[collapsed=true]/sidebar:size-9 group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:rounded-[10px] group-data-[collapsed=true]/sidebar:px-0'
 
 /** Sidebar structure mirrors KineRouter's src/shared/components/Sidebar.js. */
 type NavItem = { href: string; label: string; icon: string }
@@ -39,7 +39,7 @@ const systemItems: NavItem[] = [
 ]
 
 const debugItems: NavItem[] = [
-  { href: '/dashboard/console-log', label: 'Console Log', icon: 'terminal' },
+  { href: '/dashboard/console-log', label: 'Console Log', icon: 'receipt_long' },
   { href: '/dashboard/translator', label: 'Translator', icon: 'translate' },
 ]
 
@@ -60,8 +60,8 @@ const MEDIA_ITEMS: NavItem[] = [
   { href: '/dashboard/media-providers/web', label: 'Web Fetch & Search', icon: 'travel_explore' },
 ]
 
-/** Left edge of the bubble: the 72px rail plus a small gap. */
-const TIP_LEFT = 84
+/** Left edge of the bubble: the 64px slim rail plus a small gap. */
+const TIP_LEFT = 72
 
 /**
  * Hover bubble for the collapsed rail. Native `title` waits ~1s and can't be
@@ -123,7 +123,7 @@ function NavRow({
           'flex items-center gap-3 rounded-lg px-3 py-1 transition-all group',
           ROW_COLLAPSED,
           isActive
-            ? 'bg-primary/10 text-primary'
+            ? 'bg-primary/10 text-primary group-data-[collapsed=true]/sidebar:bg-primary group-data-[collapsed=true]/sidebar:text-white group-data-[collapsed=true]/sidebar:shadow-[0_4px_14px_-4px_rgba(229,106,74,0.7)]'
             : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
         )
       }
@@ -157,7 +157,7 @@ export function AppShell() {
   const [showUpdate, setShowUpdate] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const [disconnected, setDisconnected] = useState(false)
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === 'closed')
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) !== 'open')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { copied, copy } = useCopyToClipboard()
 
@@ -224,87 +224,105 @@ export function AppShell() {
     <div className="flex min-h-screen">
       <aside
         data-collapsed={collapsed}
-        className="group/sidebar flex min-h-full w-72 flex-col overflow-hidden border-r border-border-subtle bg-vibrancy backdrop-blur-xl transition-[width] duration-[280ms] ease-[cubic-bezier(0.77,0,0.175,1)] data-[collapsed=true]:w-[72px] motion-reduce:transition-none"
+        className="group/sidebar sticky top-0 flex h-screen w-72 flex-col overflow-hidden border-r border-border-subtle bg-vibrancy backdrop-blur-xl transition-[width] duration-[280ms] ease-[cubic-bezier(0.77,0,0.175,1)] data-[collapsed=true]:w-16 motion-reduce:transition-none"
       >
-        {/* Traffic lights — decoration only, so the rail drops them when collapsed. */}
-        <div className="flex items-center gap-2 px-6 pt-5 pb-2 group-data-[collapsed=true]/sidebar:hidden">
-          <div className="h-3 w-3 rounded-full bg-[#FF5F56]" />
-          <div className="h-3 w-3 rounded-full bg-[#FFBD2E]" />
-          <div className="h-3 w-3 rounded-full bg-[#27C93F]" />
-        </div>
-
-        {/* Logo */}
-        {/* px-4 lines the mark up with the nav rows' left edge below it. */}
-        <div className="flex flex-col gap-2 px-4 py-4 group-data-[collapsed=true]/sidebar:px-2">
-          {/* Collapsed: logo stacks over the toggle so the brand mark survives the rail. */}
-          <div className="flex items-center gap-3 group-data-[collapsed=true]/sidebar:flex-col group-data-[collapsed=true]/sidebar:gap-2">
-            <NavLink to="/dashboard" className="flex min-w-0 items-center gap-3">
-              {/* Height matches the two-line title/version block beside it; the
-                  viewBox is cropped to the glyph, so w-auto keeps it undistorted. */}
-              <img
-                src="/favicon.svg"
-                alt=""
-                className="h-9 w-auto shrink-0 group-data-[collapsed=true]/sidebar:h-6"
-              />
-              <div className="flex flex-col whitespace-nowrap group-data-[collapsed=true]/sidebar:hidden">
-                <h1 className="text-lg font-semibold tracking-tight text-text-main">KineRouter</h1>
-                <span className="text-xs text-text-muted">{version ? `v${version}` : 'local gateway'}</span>
-              </div>
+        {/* Brand rail: mark, name and the collapse toggle. */}
+        <div className="flex flex-col gap-2 px-3 pt-4 pb-3 group-data-[collapsed=true]/sidebar:px-2 group-data-[collapsed=true]/sidebar:pt-4">
+          <div className="flex items-center gap-2.5 group-data-[collapsed=true]/sidebar:flex-col group-data-[collapsed=true]/sidebar:gap-2">
+            <NavLink to="/dashboard" className="flex min-w-0 items-center gap-2.5" title={collapsed ? `KineRouter${version ? ` v${version}` : ''}` : undefined}>
+              <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-warm group-data-[collapsed=true]/sidebar:size-8 group-data-[collapsed=true]/sidebar:rounded-[10px]">
+                <img src="/favicon.svg" alt="" className="size-5 w-auto" />
+              </span>
+              <span className="flex min-w-0 flex-col whitespace-nowrap group-data-[collapsed=true]/sidebar:hidden">
+                <span className="text-[15px] font-semibold leading-tight tracking-tight text-text-main">KineRouter</span>
+                <span className="flex items-center gap-1.5 text-[11px] leading-tight text-text-muted">
+                  <span className="size-1.5 rounded-full bg-success" />
+                  {version ? `v${version}` : 'local gateway'}
+                </span>
+              </span>
             </NavLink>
             <button
               onClick={() => setCollapsed((v) => !v)}
               title={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               aria-expanded={!collapsed}
-              className="ml-auto inline-flex cursor-pointer items-center justify-center rounded p-1 text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main group-data-[collapsed=true]/sidebar:mx-auto"
+              className="ml-auto inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main group-data-[collapsed=true]/sidebar:mx-auto"
             >
-              {/* leading-none: the icon font's line box is taller than its glyph and
-                  leaves it 4px high / 10px low inside the padded button. */}
-              <span className="material-symbols-outlined block text-[18px] leading-none">
+              <span className="material-symbols-outlined block text-[17px] leading-none">
                 {collapsed ? 'left_panel_open' : 'left_panel_close'}
               </span>
             </button>
           </div>
           {latestVersion && (
-            <div className="-m-1 flex flex-col gap-1.5 rounded p-1 group-data-[collapsed=true]/sidebar:hidden">
-              <span className="text-xs font-semibold text-success">↑ New version available: v{latestVersion}</span>
-              <div className="flex items-center gap-2">
+            <>
+              <div className="-m-1 hidden flex-col gap-1.5 rounded p-1 group-data-[collapsed=true]/sidebar:flex">
                 <button
                   onClick={() => setShowUpdate(true)}
-                  className="cursor-pointer rounded bg-success px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:opacity-90"
+                  title={`Update to v${latestVersion}`}
+                  className="mx-auto grid size-7 cursor-pointer place-items-center rounded-md border border-success/40 text-[13px] font-semibold text-success transition-colors hover:bg-success/10"
                 >
-                  Update now
-                </button>
-                <button
-                  onClick={() => copy(installCmd)}
-                  title="Copy install command"
-                  className="min-w-0 flex-1 cursor-pointer text-left transition-opacity hover:opacity-80"
-                >
-                  <code className="block truncate font-mono text-[10px] text-success/80">
-                    {copied ? '✓ copied!' : installCmd}
-                  </code>
+                  ↑
                 </button>
               </div>
-            </div>
+              <div className="-m-1 flex flex-col gap-1.5 rounded p-1 group-data-[collapsed=true]/sidebar:hidden">
+                <span className="text-xs font-semibold text-success">↑ New version available: v{latestVersion}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowUpdate(true)}
+                    className="cursor-pointer rounded bg-success px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:opacity-90"
+                  >
+                    Update now
+                  </button>
+                  <button
+                    onClick={() => copy(installCmd)}
+                    title="Copy install command"
+                    className="min-w-0 flex-1 cursor-pointer text-left transition-opacity hover:opacity-80"
+                  >
+                    <code className="block truncate font-mono text-[10px] text-success/80">
+                      {copied ? '✓ copied!' : installCmd}
+                    </code>
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
 
         {/* Navigation */}
         {/* RailTip wraps rows in display:contents, which `space-y-*` can't space,
             so the gaps come from flex `gap` on each list instead. */}
-        <nav className="custom-scrollbar flex flex-1 flex-col gap-1.5 overflow-y-auto px-4 py-2 group-data-[collapsed=true]/sidebar:px-2">
-          {navItems.map((item) => (
+        <nav className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-2 group-data-[collapsed=true]/sidebar:px-2">
+          <p className={cn('mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-text-muted/60', HIDES)}>
+            Gateway
+          </p>
+          {navItems.slice(0, 3).map((item) => (
             <NavRow key={item.href} item={item} collapsed={collapsed} />
           ))}
 
-          <div className="mt-2 flex flex-col gap-1.5 pt-3">
-            <p className={cn('mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-text-muted/60', HIDES)}>
+          <div className="mx-auto my-2 h-px w-6 bg-border-subtle group-data-[collapsed=false]/sidebar:hidden" />
+          <p className={cn('mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-text-muted/60', HIDES)}>
+            Insight
+          </p>
+          {navItems.slice(3, 6).map((item) => (
+            <NavRow key={item.href} item={item} collapsed={collapsed} />
+          ))}
+
+          <div className="mx-auto my-2 h-px w-6 bg-border-subtle group-data-[collapsed=false]/sidebar:hidden" />
+          <p className={cn('mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-text-muted/60', HIDES)}>
+            Tools
+          </p>
+          {navItems.slice(6).map((item) => (
+            <NavRow key={item.href} item={item} collapsed={collapsed} />
+          ))}
+
+          <div className="mt-1 flex flex-col gap-1 pt-2">
+            <div className="mx-auto mb-2 h-px w-6 bg-border-subtle group-data-[collapsed=false]/sidebar:hidden" />
+            <p className={cn('mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.09em] text-text-muted/60', HIDES)}>
               System
             </p>
-            <div className="mx-2 mb-2 hidden border-t border-border-subtle group-data-[collapsed=true]/sidebar:block" />
 
-            {/* Media Providers accordion — collapsed rail lists its icons directly,
-                so the header would be a control with nothing left to toggle. */}
+            {/* Media Providers accordion. The slim rail keeps one icon instead of
+                the whole sub-nav, and it lands on the first media page directly. */}
             <button
               onClick={() => setMediaOpen((v) => !v)}
               aria-expanded={mediaOpen}
@@ -319,10 +337,39 @@ export function AppShell() {
                 expand_more
               </span>
             </button>
-            {/* Collapsed rail drops the accordion and always shows the icons, so the
-                sub-nav stays reachable instead of needing a click to open. */}
-            {(mediaOpen || collapsed) && (
-              <div className="flex flex-col gap-1.5 pl-4 group-data-[collapsed=true]/sidebar:pl-0">
+            <RailTip label={collapsed ? 'Media Providers' : undefined}>
+              <NavLink
+                to={MEDIA_ITEMS[0].href}
+                className={({ isActive }) =>
+                  cn(
+                    'hidden items-center gap-3 rounded-lg px-3 py-1 transition-all group',
+                    ROW_COLLAPSED,
+                    'group-data-[collapsed=true]/sidebar:flex',
+                    isActive
+                      ? 'bg-primary/10 text-primary group-data-[collapsed=true]/sidebar:bg-primary group-data-[collapsed=true]/sidebar:text-white group-data-[collapsed=true]/sidebar:shadow-[0_4px_14px_-4px_rgba(229,106,74,0.7)]'
+                      : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <span
+                      className={cn(
+                        'material-symbols-outlined text-[18px] shrink-0',
+                        isActive ? 'fill-1' : 'group-hover:text-primary transition-colors',
+                      )}
+                    >
+                      perm_media
+                    </span>
+                    <span className={cn('text-[13px] font-medium whitespace-nowrap', HIDES)}>
+                      Media Providers
+                    </span>
+                  </>
+                )}
+              </NavLink>
+            </RailTip>
+            {mediaOpen && !collapsed && (
+              <div className="flex flex-col gap-1.5 pl-4">
                 {MEDIA_ITEMS.map((item) => (
                   <NavRow key={item.href} item={item} collapsed={collapsed} />
                 ))}
@@ -348,7 +395,7 @@ export function AppShell() {
                     'flex items-center gap-3 rounded-lg px-3 py-1 transition-all group',
                     ROW_COLLAPSED,
                     isActive
-                      ? 'bg-primary/10 text-primary'
+                      ? 'bg-primary/10 text-primary group-data-[collapsed=true]/sidebar:bg-primary group-data-[collapsed=true]/sidebar:text-white group-data-[collapsed=true]/sidebar:shadow-[0_4px_14px_-4px_rgba(229,106,74,0.7)]'
                       : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
                   )
                 }
@@ -371,7 +418,13 @@ export function AppShell() {
           </div>
         </nav>
 
-        <div className="p-3 group-data-[collapsed=true]/sidebar:px-2">
+        <div className="flex flex-col gap-1.5 px-3 pb-3 pt-1 group-data-[collapsed=true]/sidebar:items-center group-data-[collapsed=true]/sidebar:px-2">
+          <RailTip label={collapsed ? 'Gateway online' : undefined}>
+            <div className="flex items-center gap-2 py-1 group-data-[collapsed=true]/sidebar:mx-auto">
+              <span className="size-1.5 shrink-0 rounded-full bg-success shadow-[0_0_0_3px_rgba(34,197,94,0.12)]" />
+              <span className={cn('text-[11px] text-text-muted', HIDES)}>online</span>
+            </div>
+          </RailTip>
           <RailTip label={collapsed ? 'Log out' : undefined}>
             <button
               onClick={handleLogout}
