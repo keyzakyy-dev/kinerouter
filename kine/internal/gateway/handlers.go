@@ -594,6 +594,15 @@ func (g *Gateway) handleListModels(w http.ResponseWriter, r *http.Request) {
 	aliases, _ := g.store.GetModelAliases()
 	combos, _ := g.store.ListCombos()
 
+	disabled, _ := g.store.DisabledModels()
+	disabledOf := func(alias, id string) bool {
+		for _, d := range disabled[alias] {
+			if d == id || d == "*" {
+				return true
+			}
+		}
+		return false
+	}
 	data := []map[string]any{}
 	for _, e := range g.reg.Entries {
 		if !have[e.ID] {
@@ -601,6 +610,9 @@ func (g *Gateway) handleListModels(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, m := range e.Models {
 			if m.Kind != "" && m.Kind != "llm" {
+				continue
+			}
+			if disabledOf(e.Alias, m.ID) || disabledOf(e.ID, m.ID) {
 				continue
 			}
 			c := providerdata.CapabilitiesFor(e.ID, m.ID)
@@ -621,6 +633,7 @@ func (g *Gateway) handleListModels(w http.ResponseWriter, r *http.Request) {
 	for _, c := range combos {
 		data = append(data, map[string]any{"id": c.Name, "object": "model", "owned_by": "combo"})
 	}
+	data = g.appendCustomModels(data, have, disabledOf)
 	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": data})
 }
 

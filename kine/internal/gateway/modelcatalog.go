@@ -15,6 +15,7 @@ import (
 
 // kindSlug maps a /v1/models/{kind} slug to the kinds it exposes.
 var kindSlug = map[string][]string{
+	"llm":           {"llm"},
 	"image":         {"image"},
 	"tts":           {"tts"},
 	"stt":           {"stt"},
@@ -170,7 +171,7 @@ func (g *Gateway) appendCustomModels(data []map[string]any, have map[string]bool
 
 // handleModelsByPath serves /v1/models/{kind} and /v1/models/{provider}/{model}.
 func (g *Gateway) handleModelsByPath(w http.ResponseWriter, r *http.Request) {
-	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api"), "/")
+	id := strings.TrimPrefix(r.URL.Path, "/api")
 	id = strings.TrimPrefix(id, "/v1/models/")
 	if id == "" || id == "models" {
 		g.handleListModels(w, r)

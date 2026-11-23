@@ -1,6 +1,9 @@
 package gateway
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/keyzakyy-dev/kinerouter/internal/providerdata"
@@ -61,5 +64,54 @@ func TestBuildModelsListSkipsOrphanCustomModel(t *testing.T) {
 		if m["id"] == "gone/ghost" {
 			t.Fatalf("orphan custom model listed")
 		}
+	}
+}
+
+// /v1/models/{kind} (the SDK form without /api) must resolve the kind slug
+// instead of treating the whole path as a model id.
+func TestModelsByPathKindSlugWithoutAPIPrefix(t *testing.T) {
+	g := testGateway(t)
+	g.reg = providerdata.Get()
+	if err := g.store.UpsertConnection(&store.Connection{
+		ID: "c1", Provider: "codex", AuthType: "oauth", IsActive: true,
+		Data: map[string]any{"accessToken": "t"},
+	}); err != nil {
+		t.Fatalf("conn: %v", err)
+	}
+	for _, path := range []string{"/v1/models/llm", "/api/v1/models/llm"} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.SetPathValue("path", strings.TrimPrefix(strings.TrimPrefix(path, "/api"), "/v1/models/"))
+		g.handleModelsByPath(rec, req)
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"object":"list"`) {
+			t.Errorf("%s: status %d body %q", path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// The composer's /api/models list also publishes custom node models.
+func TestHandleListModelsIncludesCustomModels(t *testing.T) {
+	g := testGateway(t)
+	g.reg = providerdata.Get()
+	id := "openai-compatible-chat-test"
+	if err := g.store.SaveProviderNode(&store.ProviderNode{
+		ID: id, Type: "openai-compatible", Name: "Test",
+		Data: map[string]any{"prefix": "tst", "baseUrl": "https://example.com"},
+	}); err != nil {
+		t.Fatalf("node: %v", err)
+	}
+	if err := g.store.UpsertConnection(&store.Connection{
+		ID: "c1", Provider: id, AuthType: "apikey", IsActive: true,
+		Data: map[string]any{"apiKey": "k", "prefix": "tst"},
+	}); err != nil {
+		t.Fatalf("conn: %v", err)
+	}
+	if _, err := g.store.AddCustomModel(id, "custom-a", "llm", "custom-a", nil, ""); err != nil {
+		t.Fatalf("custom model: %v", err)
+	}
+	rec := httptest.NewRecorder()
+	g.handleListModels(rec, httptest.NewRequest(http.MethodGet, "/api/models", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"id":"tst/custom-a"`) {
+		t.Fatalf("status %d body %.400s", rec.Code, rec.Body.String())
 	}
 }
