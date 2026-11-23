@@ -227,6 +227,7 @@ func (g *Gateway) handleValidateProviderNode(w http.ResponseWriter, r *http.Requ
 		BaseURL string `json:"baseUrl"`
 		APIKey  string `json:"apiKey"`
 		Type    string `json:"type"`
+		APIType string `json:"apiType"`
 		ModelID string `json:"modelId"`
 	}
 	if decodeBody(r, &body) != nil {
@@ -258,7 +259,8 @@ func (g *Gateway) handleValidateProviderNode(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		payload, _ := jsonMarshal(map[string]any{"model": modelID, "input": "ping"})
-		status, raw, err := probeJSON(client, "POST", norm+"/embeddings",
+		embedURL := g.nodeEmbeddingURL("custom-embedding-x", map[string]any{"baseUrl": norm})
+		status, raw, err := probeJSON(client, "POST", embedURL,
 			map[string]string{"Authorization": "Bearer " + body.APIKey, "Content-Type": "application/json"}, payload)
 		if err != nil {
 			writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": probeErrorText(err)})
@@ -300,7 +302,7 @@ func (g *Gateway) handleValidateProviderNode(w http.ResponseWriter, r *http.Requ
 			"x-api-key": body.APIKey, "anthropic-version": "2023-06-01",
 			"Authorization": "Bearer " + body.APIKey,
 		}
-		status, _, err := probeJSON(client, "GET", norm+"/models", hdr, nil)
+		status, _, err := probeJSON(client, "GET", g.nodeModelsURL("anthropic-compatible-x", map[string]any{"baseUrl": norm}), hdr, nil)
 		if err != nil {
 			writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": probeErrorText(err)})
 			return
@@ -322,7 +324,8 @@ func (g *Gateway) handleValidateProviderNode(w http.ResponseWriter, r *http.Requ
 			for k, v := range hdr {
 				hs[k] = v
 			}
-			st2, _, err := probeJSON(client, "POST", norm+"/chat/completions", hs, payload)
+			chatURL, _ := g.nodeEndpoint("anthropic-compatible-x", map[string]any{"baseUrl": norm})
+			st2, _, err := probeJSON(client, "POST", chatURL, hs, payload)
 			if err != nil {
 				writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": probeErrorText(err), "method": "chat"})
 				return
@@ -338,36 +341,65 @@ func (g *Gateway) handleValidateProviderNode(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// OpenAI compatible (default).
-	status, _, err := probeJSON(client, "GET", norm+"/models", map[string]string{"Authorization": "Bearer " + body.APIKey}, nil)
+	// OpenAI compatible (default). A 200 from GET /models is not enough: some
+	// gateways expose /models publicly, so a chat probe with a real model
+	// verifies the key before the node is accepted.
+	sp := map[string]any{"baseUrl": norm}
+	if body.APIType != "" {
+		sp["apiType"] = body.APIType
+	}
+	provider := "openai-compatible-chat-x"
+	if body.APIType == "responses" {
+		provider = "openai-compatible-responses-x"
+	}
+	modelsURL := g.nodeModelsURL(provider, sp)
+	status, raw, err := probeJSON(client, "GET", modelsURL, map[string]string{"Authorization": "Bearer " + body.APIKey}, nil)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": probeErrorText(err)})
-		return
-	}
-	if status >= 200 && status < 300 {
-		writeJSON(w, http.StatusOK, map[string]any{"valid": true})
 		return
 	}
 	if status == 401 || status == 403 {
 		writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": "API key unauthorized"})
 		return
 	}
-	if modelID != "" {
+	effectiveModel := modelID
+	if effectiveModel == "" && status >= 200 && status < 300 {
+		var parsed struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		if jsonUnmarshalStr(string(raw), &parsed) == nil && len(parsed.Data) > 0 {
+			effectiveModel = parsed.Data[0].ID
+		}
+	}
+	if effectiveModel != "" {
 		payload, _ := jsonMarshal(map[string]any{
-			"model": modelID, "max_tokens": 1,
+			"model": effectiveModel, "max_tokens": 1,
 			"messages": []map[string]any{{"role": "user", "content": "ping"}},
 		})
-		st2, _, err := probeJSON(client, "POST", norm+"/chat/completions",
+		chatURL, _ := g.nodeEndpoint(provider, sp)
+		st2, _, err := probeJSON(client, "POST", chatURL,
 			map[string]string{"Authorization": "Bearer " + body.APIKey, "Content-Type": "application/json"}, payload)
-		if err != nil {
+		if err != nil && status != http.StatusOK {
 			writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": probeErrorText(err), "method": "chat"})
+			return
+		}
+		if st2 == 401 || st2 == 403 {
+			writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": "API key unauthorized"})
 			return
 		}
 		if st2 >= 200 && st2 < 300 {
 			writeJSON(w, http.StatusOK, map[string]any{"valid": true, "method": "chat"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": chatProbeError(st2), "method": "chat"})
+		if status != http.StatusOK {
+			writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": chatProbeError(st2), "method": "chat"})
+			return
+		}
+	}
+	if status >= 200 && status < 300 {
+		writeJSON(w, http.StatusOK, map[string]any{"valid": true})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": modelsProbeError(status)})
