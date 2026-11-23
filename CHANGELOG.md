@@ -5,6 +5,8 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+## [0.1.8] — 2026-11-23
+
 ### Changed
 
 - **Launcher menu is an arrow-key selector.** ↑/↓ move, Enter confirms, Esc
