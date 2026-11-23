@@ -5,6 +5,19 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+### Added
+
+- **Terminal UI now mirrors 9Router's.** `Terminal UI` opens the reference menu
+  tree instead of the local `connect` wizard: a header with Endpoint/Tunnel/Key,
+  then Providers (OAuth and API providers with connection count, custom nodes
+  and add/rename/test/delete flows), API Keys (create, copy, delete), Combos
+  (create/edit/delete with the grouped model picker), CLI Tools (Claude Code,
+  Codex CLI, Factory Droid, Open Claw, OpenCode CLI, Hermes Agent — quick setup
+  and reset) and Settings (Tunnel on/off, Token Saver RTK, Headroom, password
+  and auth-mode reset). Labels, breadcrumbs, ★/☆ rows, prompts and the
+  `← Back` row follow `cli/src/cli/*` in 9Router. `kinerouter connect` remains
+  available as a command.
+
 ### Changed
 
 - **Tray icon lives for the whole launcher session**, as in 9Router: it is

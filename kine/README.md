@@ -104,7 +104,9 @@ in the binary) but required for the dashboard.
 ```
 
 Defaults: listen `0.0.0.0:20128`, data dir `~/.kinerouter`. In a terminal, a
-launcher menu offers the web dashboard, CLI setup, tray mode or a plain start;
+launcher menu offers the web dashboard, the Terminal UI (Providers, API Keys,
+Combos, CLI Tools, Settings — same tree and labels as 9Router), tray mode or a
+plain start;
 non-TTY runs skip it. Menu entries follow 9Router: Update (when available), Web
 UI, Terminal UI, Hide to Tray, Exit — Exit stops the gateway this process owns.
 "Hide to Tray" adds the OS login entry, re-executes the binary detached

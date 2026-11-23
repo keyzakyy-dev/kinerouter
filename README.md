@@ -195,7 +195,7 @@ Starting `kinerouter` with no arguments from a terminal opens a launcher menu:
 
 ```
 Choose Interface (vX.Y.Z)
-  > Update to vX.Y.Z (current vA.B.C)   # only when a newer release exists
+  > Update to vX.Y.Z (current: vA.B.C)   # only when a newer release exists
     Web UI (Open in Browser)
     Terminal UI (Interactive CLI)
     Hide to Tray (Background)
@@ -206,6 +206,15 @@ Choose Interface (vX.Y.Z)
 
 The menu is the same arrow-key selector 9Router uses (selected row highlighted;
 digits also work). Esc cancels and exits.
+
+Terminal UI opens the same menu tree as 9Router's Terminal UI: a header with
+Endpoint, Tunnel and active API key(s), then Providers, API Keys, Combos, CLI
+Tools and Settings. Providers lists the 9Router set (OAuth first, then API key)
+plus custom providers, each with its connections; API Keys can be created,
+copied or deleted; Combos are edited with the grouped model picker; CLI Tools
+covers Claude Code, Codex, Droid, Open Claw, OpenCode and Hermes; Settings
+toggles the tunnel, Token Saver (RTK), Headroom, password reset and auth mode.
+Every submenu has a `← Back` row at the top, and Esc behaves the same way.
 
 Update prints the command for **the way this copy was installed**
 (`npm i -g kinerouter@latest --prefer-online` or the install script) and stops

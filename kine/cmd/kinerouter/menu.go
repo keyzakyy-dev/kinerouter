@@ -17,6 +17,13 @@ import (
 // the selected row is highlighted. Digits and j/k are accepted too, so a
 // keypad-only terminal still works. Returns -1 when the user cancels.
 func chooseMenu(title, subtitle string, items []string) (int, error) {
+	return selectMenu(title, subtitle, nil, "", items, 0)
+}
+
+// selectMenu is chooseMenu plus the pieces the Terminal UI needs: a dim
+// breadcrumb under the rule and a multi-line header block between the rule and
+// the rows, exactly where 9Router's selectMenu puts them.
+func selectMenu(title, subtitle string, breadcrumb []string, header string, items []string, def int) (int, error) {
 	fd := int(os.Stdin.Fd())
 	state, err := term.MakeRaw(fd)
 	if err != nil {
@@ -24,7 +31,10 @@ func chooseMenu(title, subtitle string, items []string) (int, error) {
 	}
 	defer term.Restore(fd, state)
 
-	sel := 0
+	sel := def
+	if sel < 0 || sel >= len(items) {
+		sel = 0
+	}
 	// Raw mode turns off output post-processing, so every line ends \r\n;
 	// with a bare \n the menu walks down the screen as a staircase.
 	width := 40
@@ -47,7 +57,14 @@ func chooseMenu(title, subtitle string, items []string) (int, error) {
 		if subtitle != "" {
 			b.WriteString("  " + dim + subtitle + reset + "\r\n")
 		}
-		b.WriteString(rule + "\r\n\r\n")
+		b.WriteString(rule + "\r\n")
+		if len(breadcrumb) > 0 {
+			b.WriteString("  " + dim + strings.Join(breadcrumb, " > ") + reset + "\r\n")
+		}
+		b.WriteString("\r\n")
+		if header != "" {
+			b.WriteString(strings.ReplaceAll(header, "\n", "\r\n") + "\r\n\r\n")
+		}
 		win := runtime.GOOS == "windows"
 		for i, it := range items {
 			icon := "☆"

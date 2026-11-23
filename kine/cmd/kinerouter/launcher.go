@@ -153,7 +153,7 @@ func runLauncher(port int, ownsServer bool) {
 			}
 			pause(in)
 		case "terminal":
-			runCLISetup(base, in)
+			runTUI(base, port, dataDirRef, in)
 		case "hide":
 			if runtime.GOOS == "darwin" {
 				// A detached child on macOS sits outside the login session and
@@ -268,22 +268,6 @@ func waitPort(port int, timeout time.Duration) bool {
 func pause(in *bufio.Reader) {
 	fmt.Print("\nPress Enter to return to the menu...")
 	_, _ = in.ReadString('\n')
-}
-
-// runCLISetup runs this same binary's own `connect` command, so the CLI path
-// never depends on PATH containing another kinerouter.
-func runCLISetup(base string, in *bufio.Reader) {
-	self, err := os.Executable()
-	if err != nil {
-		fmt.Printf("cannot locate this executable: %v\n", err)
-		return
-	}
-	cmd := exec.Command(self, "connect", base)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("connect: %v\n", err)
-	}
-	pause(in)
 }
 
 // hideToTray starts a detached copy of this binary in tray mode. That copy
