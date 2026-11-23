@@ -1,26 +1,72 @@
-import { Card } from '@/components/ui/card'
-import type { UsageStats } from '@/lib/api'
-import { fmt, fmtCost } from './helpers'
+import { useEffect, useState } from 'react'
+import ProgressMetricCard from '@/components/ui/progress-metric-card'
+import type { MetricAccent } from '@/components/ui/metric-chart'
+import { api, type UsageChartPoint, type UsageStats } from '@/lib/api'
+import { fmt, fmtTokens } from './helpers'
 
-/** Five period summary tiles, mirroring KineRouter's OverviewCards. */
-export function OverviewCards({ stats }: { stats: UsageStats }) {
-  const cells = [
-    { label: 'Total Requests', value: fmt(stats.totalRequests), cls: '' },
-    { label: 'Total Input Tokens', value: fmt(stats.totalPromptTokens), cls: 'text-primary' },
-    { label: 'Cached Tokens', value: fmt(stats.totalCachedTokens), cls: 'text-info' },
-    { label: 'Output Tokens', value: fmt(stats.totalCompletionTokens), cls: 'text-success' },
-    { label: 'Est. Cost', value: `~${fmtCost(stats.totalCost)}`, cls: 'text-warning', sub: 'Estimated, not actual billing' },
+/** Four period summary cards: count + trend, nothing else. */
+export function OverviewCards({ stats, period }: { stats: UsageStats; period: string }) {
+  const [points, setPoints] = useState<UsageChartPoint[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    api.usageChart(period)
+      .then((rows) => { if (!cancelled) setPoints(rows) })
+      .catch(() => { if (!cancelled) setPoints([]) })
+    return () => { cancelled = true }
+  }, [period])
+
+  const realSeries = (key: 'requests' | 'tokens' | 'cost') =>
+    points.map((p) => ({ date: p.label, value: p[key] || 0 }))
+
+  const cards: {
+    title: string
+    value: number
+    format: (n: number) => string
+    data: { date: string; value: number }[]
+    accent: MetricAccent
+  }[] = [
+    {
+      title: 'Total requests',
+      value: stats.totalRequests,
+      format: fmt,
+      data: realSeries('requests'),
+      accent: 'violet',
+    },
+    {
+      title: 'Input tokens',
+      value: stats.totalPromptTokens,
+      format: fmtTokens,
+      data: realSeries('tokens'),
+      accent: 'sky',
+    },
+    {
+      title: 'Output tokens',
+      value: stats.totalCompletionTokens,
+      format: fmtTokens,
+      data: realSeries('tokens'),
+      accent: 'emerald',
+    },
+    {
+      title: 'Est. cost',
+      value: stats.totalCost || 0,
+      format: (n) => `~$${n.toFixed(2)}`,
+      data: realSeries('cost'),
+      accent: 'amber',
+    },
   ]
+
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
-      {cells.map((c) => (
-        <Card key={c.label} className="flex min-w-0 flex-col items-center gap-1 px-3 py-3 text-center sm:px-4">
-          <span className="text-xs font-semibold uppercase text-text-muted sm:text-sm">{c.label}</span>
-          <span className={`w-full truncate text-lg font-bold xl:text-xl ${c.cls}`} title={c.value}>
-            {c.value}
-          </span>
-          {c.sub && <span className="text-[10px] text-text-muted">{c.sub}</span>}
-        </Card>
+    <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
+      {cards.map((c) => (
+        <ProgressMetricCard
+          key={c.title}
+          title={c.title}
+          value={c.value}
+          valueFormatter={c.format}
+          data={c.data}
+          accent={c.accent}
+        />
       ))}
     </div>
   )
