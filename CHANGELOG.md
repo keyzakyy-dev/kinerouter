@@ -3,7 +3,7 @@
 All notable changes to KineRouter. Format based on Keep a Changelog;
 versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
-## Unreleased
+## [0.1.9] — 2026-11-23
 
 ### Added
 
