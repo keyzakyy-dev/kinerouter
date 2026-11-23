@@ -5,6 +5,8 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+## [0.1.1] — 2026-11-23
+
 ### Added
 
 - **npm publish is part of the release.** Pushing `kine-vX.Y.Z` now builds the
