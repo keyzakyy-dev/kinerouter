@@ -13,9 +13,10 @@ import (
 	"github.com/keyzakyy-dev/kinerouter/internal/translate"
 )
 
-// nodeByPrefix matches "prefix/model" against the stored nodes' user prefixes.
-// A prefix that collides with a registry provider id/alias never wins, matching
-// RESERVED_PROVIDER_PREFIXES in src/sse/services/model.js.
+// nodeByPrefix matches "prefix/model" against the stored nodes' user prefixes,
+// or the node id itself (custom models and model tests store the id as the
+// provider alias). A prefix that collides with a registry provider id/alias
+// never wins, matching RESERVED_PROVIDER_PREFIXES in src/sse/services/model.js.
 func (g *Gateway) nodeByPrefix(prefix string) *store.ProviderNode {
 	if prefix == "" || g.reg.IsKnownProvider(g.reg.ResolveAlias(prefix)) {
 		return nil
@@ -23,6 +24,11 @@ func (g *Gateway) nodeByPrefix(prefix string) *store.ProviderNode {
 	nodes, err := g.store.ListProviderNodes()
 	if err != nil {
 		return nil
+	}
+	for _, n := range nodes {
+		if n.ID == prefix {
+			return n
+		}
 	}
 	for _, n := range nodes {
 		if p, _ := n.Data["prefix"].(string); p == prefix {
