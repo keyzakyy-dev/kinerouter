@@ -968,6 +968,17 @@ func (t *tui) pickModels(start int) []string {
 	}
 }
 
+func (t *tui) availableModelIDs() []string {
+	res, _ := t.do("GET", "/api/models", nil)
+	var out []string
+	for _, item := range asList(res["data"]) {
+		if id := asStr(asMap(item)["id"]); id != "" {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 func (t *tui) createCombo() {
 	clearScreen()
 	t.status("info", "Create New Combo")
@@ -979,16 +990,57 @@ func (t *tui) createCombo() {
 		return
 	}
 	t.status("info", "Loading available models...")
-	fmt.Println()
-	t.status("info", "Select models for the chain (minimum 2)")
-	models := t.pickModels(2)
-	if len(models) < 2 {
-		t.status("error", "Please select at least 2 models")
+	available := t.availableModelIDs()
+	if len(available) == 0 {
+		t.status("warning", "No models available. Please add providers first.")
 		t.pause()
 		return
 	}
+	fmt.Println()
+	t.status("info", "Select models for the chain (minimum 2)")
+
+	var selected []string
+	for {
+		clearScreen()
+		fmt.Printf("Creating combo: %s\nSelected models (%d):\n", name, len(selected))
+		if len(selected) == 0 {
+			fmt.Println("  (none)")
+		} else {
+			for i, m := range selected {
+				fmt.Printf("  %d. %s\n", i+1, m)
+			}
+		}
+		fmt.Println("\nAvailable models:")
+		for i, m := range available {
+			fmt.Printf("  %d. %s\n", i+1, m)
+		}
+		fmt.Print("\nActions:\n  - Enter number to add model\n  - Type 'done' to finish (min 2 models)\n  - Type 'cancel' to abort\n\n")
+		input := strings.ToLower(t.prompt("Action: "))
+		switch input {
+		case "cancel":
+			t.status("warning", "Cancelled")
+			t.pause()
+			return
+		case "done":
+			if len(selected) < 2 {
+				t.status("error", "Please select at least 2 models")
+				t.pause()
+				continue
+			}
+		default:
+			n := atoiSafe(input)
+			if n < 1 || n > len(available) {
+				t.status("error", "Invalid model number")
+				t.pause()
+				continue
+			}
+			selected = append(selected, available[n-1])
+			continue
+		}
+		break
+	}
 	t.status("info", "Creating combo...")
-	if _, err := t.do("POST", "/api/combos", map[string]any{"name": name, "models": models}); err != nil {
+	if _, err := t.do("POST", "/api/combos", map[string]any{"name": name, "models": selected}); err != nil {
 		t.status("error", "Failed to create combo: "+err.Error())
 		t.pause()
 		return
@@ -1000,20 +1052,17 @@ func (t *tui) createCombo() {
 func (t *tui) editCombo(combo map[string]any) {
 	clearScreen()
 	fmt.Printf("\n✏️  Edit Combo: %s\n\n", asStr(combo["name"]))
-	newName := t.prompt(fmt.Sprintf("New name (Enter to keep %q): ", asStr(combo["name"])))
 	name := asStr(combo["name"])
-	if newName != "" {
-		name = newName
+	if v := t.prompt(fmt.Sprintf("New name (Enter to keep %q): ", name)); v != "" {
+		name = v
 	}
 	fmt.Println("\nCurrent models: " + comboChain(combo))
-	fmt.Println("\nSelect models for this combo (add one by one):")
-	models := t.pickModels(2)
-	if len(models) == 0 {
-		models = nil
-	}
 	body := map[string]any{"name": name}
-	if len(models) > 0 {
-		body["models"] = models
+	if t.confirm("Edit model chain?") {
+		fmt.Println("\nSelect models for this combo (add one by one):")
+		if models := t.pickModels(2); len(models) > 0 {
+			body["models"] = models
+		}
 	}
 	if _, err := t.do("PUT", "/api/combos/"+asStr(combo["id"]), body); err != nil {
 		t.status("error", "Update failed: "+err.Error())
@@ -1185,16 +1234,16 @@ func atoiSafe(s string) int {
 // ---------------------------------------------------------------- cli tools
 
 type cliToolDef struct {
-	id, name, title, endpoint string
+	id, menu, name, title, endpoint string
 }
 
 var cliToolDefs = []cliToolDef{
-	{"claude", "Claude Code", "🔧 Claude Code Settings", "claude-settings"},
-	{"codex", "Codex CLI", "🤖 Codex CLI Settings", "codex-settings"},
-	{"droid", "Factory Droid", "🤖 Factory Droid Settings", "droid-settings"},
-	{"openclaw", "Open Claw", "🦞 Open Claw Settings", "openclaw-settings"},
-	{"opencode", "OpenCode CLI", "💻 OpenCode CLI Settings", "opencode-settings"},
-	{"hermes", "Hermes Agent", "⚡ Hermes Agent Settings", "hermes-settings"},
+	{"claude", "Claude Code", "Claude Code", "🔧 Claude Code Settings", "claude-settings"},
+	{"codex", "Codex CLI", "Codex CLI", "🤖 Codex CLI Settings", "codex-settings"},
+	{"droid", "Factory Droid", "Factory Droid", "🤖 Factory Droid Settings", "droid-settings"},
+	{"openclaw", "Open Claw", "Open Claw", "🦞 Open Claw Settings", "openclaw-settings"},
+	{"opencode", "OpenCode", "OpenCode CLI", "💻 OpenCode CLI Settings", "opencode-settings"},
+	{"hermes", "Hermes", "Hermes Agent", "⚡ Hermes Agent Settings", "hermes-settings"},
 }
 
 func (t *tui) cliToolsMenu(breadcrumb []string) {
@@ -1202,21 +1251,24 @@ func (t *tui) cliToolsMenu(breadcrumb []string) {
 	for _, def := range cliToolDefs {
 		d := def
 		items = append(items, tuiItem{
-			label: fixedLabel(d.name),
+			label: fixedLabel(d.menu),
 			action: func(any) bool {
 				switch d.id {
 				case "claude":
-					t.claudeMenu([]string{"KineRouter", "CLI Tools", d.name})
+					t.claudeMenu([]string{"KineRouter", "CLI Tools", d.menu})
 				case "hermes":
-					t.hermesMenu([]string{"KineRouter", "CLI Tools", d.name})
+					t.hermesMenu([]string{"KineRouter", "CLI Tools", d.menu})
 				default:
-					t.genericCLIMenu(d, []string{"KineRouter", "CLI Tools", d.name})
+					t.genericCLIMenu(d, []string{"KineRouter", "CLI Tools", d.menu})
 				}
 				return true
 			},
 		})
 	}
-	t.menu("🛠️  CLI Tools", breadcrumb, nil, nil, func(any) []tuiItem { return items }, "")
+	header := func(any) string {
+		return "Configure CLI tools to use KineRouter\nEndpoint: " + t.endpoint()
+	}
+	t.menu("🔧 CLI Tools", breadcrumb, header, nil, func(any) []tuiItem { return items }, "")
 }
 
 func (t *tui) cliStatus(endpoint, query string) map[string]any {
@@ -1378,6 +1430,15 @@ func (t *tui) genericCLIMenu(def cliToolDef, breadcrumb []string) {
 			if v := asStr(prov["baseUrl"]); v != "" {
 				lines = append(lines, "Endpoint: "+tuiCyan+v+tuiReset)
 			}
+			model := ""
+			if primary := asStr(pick(st, "settings", "agents", "defaults", "model", "primary")); strings.HasPrefix(primary, "kinerouter/") {
+				model = strings.TrimPrefix(primary, "kinerouter/")
+			} else if models := asList(prov["models"]); len(models) > 0 {
+				model = asStr(asMap(models[0])["id"])
+			}
+			if model != "" {
+				lines = append(lines, "Model:    "+tuiDim+model+tuiReset)
+			}
 		case "droid":
 			for _, cv := range asList(pick(st, "settings", "customModels")) {
 				c := asMap(cv)
@@ -1534,7 +1595,8 @@ func (t *tui) hermesMenu(breadcrumb []string) {
 				return true
 			}},
 			{fixedLabel("⚡ Quick Setup"), func(any) bool { t.hermesQuickSetup(profile); return true }},
-			{fixedLabel("↺ Reset Profile: " + profile), func(any) bool {
+			{fixedLabel("🔁 Apply to All Profiles"), func(any) bool { t.hermesApplyAll(); return true }},
+			{label: func(any) string { return "↺ Reset Profile: " + profile }, action: func(any) bool {
 				t.cliReset("hermes-settings?profile="+profile, fmt.Sprintf("Hermes settings reset for profile %q!", profile))
 				return true
 			}},
@@ -1559,6 +1621,48 @@ func (t *tui) hermesQuickSetup(profile string) {
 		t.status("error", "Failed: "+err.Error())
 	} else {
 		t.status("success", fmt.Sprintf("Hermes setup completed for profile %q!", profile))
+	}
+	t.pause()
+}
+
+func (t *tui) hermesApplyAll() {
+	key := t.firstKey()
+	if key == "" {
+		t.status("error", "No API keys found. Create one in API Keys menu first.")
+		t.pause()
+		return
+	}
+	model := t.selectModel("Select Model (used only for profiles with no model yet)", "", true)
+	if model == "" {
+		return
+	}
+	body := map[string]any{"applyToAll": true, "baseUrl": t.endpoint(), "apiKey": key, "model": model}
+	res, err := t.do("POST", "/api/cli-tools/hermes-settings", body)
+	if err != nil {
+		t.status("error", "Failed: "+err.Error())
+		t.pause()
+		return
+	}
+	updated := asInt(res["updated"])
+	var skipped []string
+	for _, r := range asList(res["results"]) {
+		item := asMap(r)
+		if asStr(item["status"]) != "updated" {
+			reason := asStr(item["reason"])
+			if reason == "" {
+				reason = asStr(item["status"])
+			}
+			skipped = append(skipped, "  "+asStr(item["profile"])+": "+reason)
+		}
+	}
+	if len(skipped) == 0 {
+		t.status("success", fmt.Sprintf("Endpoint applied to %d profile(s).", updated))
+	} else {
+		kind := "error"
+		if updated > 0 {
+			kind = "success"
+		}
+		t.status(kind, fmt.Sprintf("Updated %d profile(s), skipped %d:\n%s", updated, len(skipped), strings.Join(skipped, "\n")))
 	}
 	t.pause()
 }
