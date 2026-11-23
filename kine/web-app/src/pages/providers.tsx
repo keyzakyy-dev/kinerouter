@@ -88,8 +88,8 @@ function connectionErrorTag(c: Connection): string | null {
   return 'ERR'
 }
 
-function connectionStatus(conns: Connection[], authTypes: string[]): Stats {
-  const picked = conns.filter((c) => authTypes.includes(c.authType))
+function connectionStatus(conns: Connection[], providerId: string, authTypes: string[]): Stats {
+  const picked = conns.filter((c) => c.provider === providerId && authTypes.includes(c.authType))
   // A connection whose models are cooling down is still usable, so an
   // "unavailable" test status with an active model lock counts as connected.
   const effective = (c: Connection) => {
@@ -365,7 +365,7 @@ export function ProvidersPage() {
     void load()
   }, [])
 
-  const statsOf = (_id: string, authTypes: string | string[]) => connectionStatus(conns, asList(authTypes))
+  const statsOf = (id: string, authTypes: string | string[]) => connectionStatus(conns, id, asList(authTypes))
 
   const q = query.trim().toLowerCase()
   const matchSearch = (name: string) => !q || name.toLowerCase().includes(q)
