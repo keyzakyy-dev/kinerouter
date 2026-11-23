@@ -7,6 +7,10 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ### Added
 
+- **npm publish is part of the release.** Pushing `kine-vX.Y.Z` now builds the
+  binaries, pushes the GHCR image and publishes the matching npm shim version
+  in one run, so the three never drift; the job verifies the release assets
+  exist before uploading. `kine-npm-publish.yml` stays as the manual retry.
 - **Desktop tray icon.** `kinerouter tray` starts the companion
   `kinerouter-tray` binary (shipped beside the gateway on Windows). The menu
   shows the gateway state, starts/stops the gateway, opens the dashboard, and

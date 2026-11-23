@@ -158,3 +158,67 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  npm:
+    name: npm
+    needs: binaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+
+      # Stamps the shim to the same version as the binaries and verifies the
+      # release assets the postinstall downloads exist, so npm can never point
+      # at a version the GitHub Release does not carry.
+      - name: Stamp version and verify release assets
+        working-directory: npm
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          version="${TAG#kine-v}"
+          case "$version" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "'$TAG' is not kine-vX.Y.Z"; exit 1 ;;
+          esac
+
+          base="https://github.com/$REPO/releases/download/$TAG"
+          code=$(curl -sSL -o checksums.txt -w '%{http_code}' "$base/checksums.txt")
+          [ "$code" = 200 ] || { echo "checksums.txt -> HTTP $code"; exit 1; }
+          rm -f checksums.txt
+
+          for asset in \
+            "kinerouter_${version}_linux_amd64" \
+            "kinerouter_${version}_linux_arm64" \
+            "kinerouter_${version}_darwin_amd64" \
+            "kinerouter_${version}_darwin_arm64" \
+            "kinerouter_${version}_windows_amd64.exe" \
+            "kinerouter_${version}_windows_arm64.exe"; do
+            code=$(curl -sSL -o /dev/null -w '%{http_code}' -r 0-0 "$base/$asset")
+            case "$code" in
+              200|206) echo "$asset ok" ;;
+              *) echo "$asset -> HTTP $code"; exit 1 ;;
+            esac
+          done
+
+          node -e '
+            const fs = require("fs");
+            const file = "package.json";
+            const p = JSON.parse(fs.readFileSync(file, "utf8"));
+            p.version = process.argv[1];
+            fs.writeFileSync(file, JSON.stringify(p, null, 2) + "\n");
+          ' "$version"
+          node -p '"publishing " + require("./package.json").version'
+
+      - name: Publish
+        working-directory: npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
