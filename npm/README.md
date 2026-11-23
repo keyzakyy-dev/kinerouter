@@ -37,10 +37,12 @@ kinerouter connect http://localhost:20128 --tools all   # point local CLIs at it
 kinerouter --help
 ```
 
-With no arguments in a terminal, `kinerouter` serves, then offers: web
-dashboard, CLI setup, hide to tray, continue, and — when a newer release exists
-— an update entry that prints `npm i -g kinerouter@latest --prefer-online` and
-stops the server first.
+With no arguments in a terminal, `kinerouter` serves, then offers the same
+entries as 9Router: an update line when a newer release exists (prints
+`npm i -g kinerouter@latest --prefer-online` and stops the server first), Web
+UI, Terminal UI, Hide to Tray and Exit. Hide to Tray also writes the OS login
+entry and detaches the gateway, so closing the terminal leaves it running; the
+tray's Quit stops it.
 
 ## Notes
 
