@@ -17,6 +17,7 @@ package gateway
 //     target is refused unless it is loopback-free (netguard).
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -405,8 +406,21 @@ func (g *Gateway) handleExportDatabase(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleImportDatabase(w http.ResponseWriter, r *http.Request) {
+	// A backup holds every row, so it outgrows decodeBody's 1 MiB cap: a larger
+	// file used to be truncated and read as malformed JSON. ponytail: 64 MiB is
+	// plenty for now; raise it if a real export ever gets near.
+	const maxImportBytes = 64 << 20
+	raw, err := io.ReadAll(io.LimitReader(r.Body, maxImportBytes+1))
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "Failed to read body")
+		return
+	}
+	if len(raw) > maxImportBytes {
+		writeErr(w, http.StatusRequestEntityTooLarge, "Backup file too large (max 64 MB)")
+		return
+	}
 	var body map[string]any
-	if decodeBody(r, &body) != nil {
+	if json.Unmarshal(raw, &body) != nil {
 		writeErr(w, http.StatusBadRequest, "Invalid JSON body")
 		return
 	}

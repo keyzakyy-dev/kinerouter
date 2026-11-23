@@ -133,6 +133,25 @@ func TestDatabaseRoundTrip(t *testing.T) {
 	}
 }
 
+// A real backup exceeds the 1 MiB body cap the small routes use; it must still
+// import instead of failing as malformed JSON.
+func TestDatabaseImportLargePayload(t *testing.T) {
+	g := testGateway(t)
+	g.cliMachineID = "m1"
+	mux := http.NewServeMux()
+	g.registerMiscAdminRoutes(mux)
+
+	raw, err := json.Marshal(map[string]any{
+		"settings": map[string]any{"blob": strings.Repeat("x", 2<<20)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, body := do2body(mux, g, "POST", "/api/settings/database", string(raw)); code != 200 {
+		t.Fatalf("large import: %d %s", code, body)
+	}
+}
+
 func do2(mux *http.ServeMux, g *Gateway, method, path string) (int, string) {
 	return do2body(mux, g, method, path, "")
 }
