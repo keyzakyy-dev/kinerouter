@@ -16,6 +16,7 @@ import { ProviderTopology, type TopoProvider } from '@/components/usage/topology
 import { ProviderBarChart, TopModelsChart, UsageChart } from '@/components/usage/charts'
 import { RequestLogger } from '@/components/usage/request-logger'
 import { RequestDetailsTab } from '@/components/usage/request-details-tab'
+import { Icon } from '@/components/icon'
 
 const TABS = [
   { value: 'overview', label: 'Overview' },
@@ -63,7 +64,6 @@ function UsageStats({ period }: { period: string }) {
 
   const [stats, setStats] = useState<UsageStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [fetching, setFetching] = useState(false)
   const [tableView, setTableView] = useState<TableView>('model')
   const [viewMode, setViewMode] = useState<ViewMode>('costs')
   const [providers, setProviders] = useState<TopoProvider[]>([])
@@ -107,16 +107,11 @@ function UsageStats({ period }: { period: string }) {
     if (isInitialLoad.current) {
       isInitialLoad.current = false
       setLoading(true)
-    } else {
-      setFetching(true)
     }
     api.usageStats(period)
       .then((data) => setStats((prev) => ({ ...prev, ...data })))
       .catch(() => {})
-      .finally(() => {
-        setLoading(false)
-        setFetching(false)
-      })
+      .finally(() => setLoading(false))
   }, [period])
 
   useEffect(() => {
@@ -246,13 +241,13 @@ function UsageStats({ period }: { period: string }) {
 
   const spinner = (
     <div className="flex items-center justify-center py-12 text-text-muted">
-      <span className="material-symbols-outlined animate-spin text-[32px]">progress_activity</span>
+      <Icon name="progress_activity" className="animate-spin text-[32px]" />
     </div>
   )
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      {loading || !stats ? spinner : <OverviewCards stats={stats} />}
+      {loading || !stats ? spinner : <OverviewCards stats={stats} period={period} />}
 
       {loading || !stats ? spinner : (
         <div className="grid min-w-0 grid-cols-1 items-stretch gap-2 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
@@ -275,17 +270,19 @@ function UsageStats({ period }: { period: string }) {
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <section className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-surface">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+          <Icon name="table_chart" className="text-[15px] text-text-muted" />
           <select
             value={tableView}
             onChange={(e) => setTableView(e.target.value as TableView)}
-            className="w-full cursor-pointer rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium text-text-main focus:outline-none focus:ring-2 focus:ring-primary/50 sm:w-auto"
+            className="-ml-1 cursor-pointer rounded-lg bg-transparent py-1 pl-1 pr-1 text-sm font-semibold text-text-main focus:outline-none"
           >
             {TABLE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </select>
           <Segmented
-            className="grid-cols-2 sm:flex"
+            className="ml-auto grid-cols-2 sm:flex"
+            size="sm"
             options={[
               { value: 'costs' as ViewMode, label: 'Costs' },
               { value: 'tokens' as ViewMode, label: 'Tokens' },
@@ -294,22 +291,24 @@ function UsageStats({ period }: { period: string }) {
             onChange={setViewMode}
           />
         </div>
-        {loading || !table ? spinner : (
-          <UsageTable
-            columns={table.columns}
-            groupedData={table.groupedData}
-            tableType={tableView}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onToggleSort={toggleSort}
-            viewMode={viewMode}
-            storageKey={table.storageKey}
-            renderDetailCells={table.renderDetailCells}
-            renderSummaryCells={table.renderSummaryCells}
-            emptyMessage={table.emptyMessage}
-          />
-        )}
-      </div>
+        <div className="min-w-0 px-2 pb-2">
+          {loading || !table ? spinner : (
+            <UsageTable
+              columns={table.columns}
+              groupedData={table.groupedData}
+              tableType={tableView}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onToggleSort={toggleSort}
+              viewMode={viewMode}
+              storageKey={table.storageKey}
+              renderDetailCells={table.renderDetailCells}
+              renderSummaryCells={table.renderSummaryCells}
+              emptyMessage={table.emptyMessage}
+            />
+          )}
+        </div>
+      </section>
     </div>
   )
 }

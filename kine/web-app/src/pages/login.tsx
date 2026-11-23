@@ -36,7 +36,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <img src="/favicon.svg" alt="" className="h-9 w-auto" />
+          <span
+            aria-hidden
+            className="size-9 bg-text-main mask-[url(/favicon.svg)] [mask-size:145%] mask-center mask-no-repeat"
+          />
           <div>
             <h1 className="text-lg font-semibold tracking-tight">KineRouter</h1>
             <p className="mt-1 text-xs text-muted-foreground">

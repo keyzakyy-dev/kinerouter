@@ -59,35 +59,27 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         className={cn(
-          'fade-in relative w-full rounded-[14px] border border-border-subtle bg-surface shadow-[var(--shadow-elev)]',
+          'fade-in relative flex w-full max-h-[calc(100dvh-2rem)] flex-col rounded-[14px] border border-border-subtle bg-surface shadow-[var(--shadow-elev)]',
           sizes[size],
           className,
         )}
       >
-        <div className="flex items-center justify-between border-b border-border-subtle p-2">
-          <div className="flex items-center">
-            <div className="ml-2 mr-4 hidden items-center gap-2 md:flex">
-              <button
-                onClick={onClose}
-                aria-label="Close"
-                title="Close"
-                className="traffic-light red cursor-pointer transition-all hover:brightness-90"
-              />
-              <span className="traffic-light yellow" />
-              <span className="traffic-light green" />
-            </div>
-            {title && <h3 className="text-sm font-semibold text-text-main">{title}</h3>}
-          </div>
+        <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
+          {title ? (
+            <h3 className="truncate text-sm font-semibold text-text-main">{title}</h3>
+          ) : (
+            <span />
+          )}
           <button
             onClick={onClose}
             aria-label="Close"
-            className="cursor-pointer rounded p-1 text-text-muted transition-colors hover:text-text-main"
+            className="-mr-1 cursor-pointer rounded-md p-1 text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main"
           >
             <Icon name="close" className="text-[18px]" />
           </button>
         </div>
-        <div className="custom-scrollbar max-h-[70vh] overflow-y-auto p-4">{children}</div>
-        {footer && <div className="border-t border-border-subtle p-3">{footer}</div>}
+        <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
+        {footer && <div className="shrink-0 border-t border-border-subtle p-3">{footer}</div>}
       </div>
     </div>
   )

@@ -1,4 +1,9 @@
 @import "tailwindcss";
+@import "@fontsource/google-sans/latin-400.css";
+@import "@fontsource/google-sans/latin-500.css";
+@import "@fontsource/google-sans/latin-600.css";
+@import "@fontsource/google-sans/latin-700.css";
+@import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -8,44 +13,44 @@
    bg-surface, border-border, bg-brand-500, …).
    ============================================================ */
 :root {
-  /* Brand scale (light) - centered on #E56A4A */
-  --color-brand-50: #fdf1ed;
-  --color-brand-100: #fadccf;
-  --color-brand-200: #f4b59c;
-  --color-brand-300: #ee8d6a;
-  --color-brand-400: #ea7855;
-  --color-brand-500: #e56a4a;
-  --color-brand-600: #cc5236;
-  --color-brand-700: #a64027;
-  --color-brand-800: #7a2f1d;
-  --color-brand-900: #4d1e12;
+  /* Brand scale (light) - monochrome: primary is near-black */
+  --color-brand-50: #f5f5f5;
+  --color-brand-100: #e5e5e5;
+  --color-brand-200: #d4d4d4;
+  --color-brand-300: #a3a3a3;
+  --color-brand-400: #737373;
+  --color-brand-500: #0a0a0a;
+  --color-brand-600: #262626;
+  --color-brand-700: #404040;
+  --color-brand-800: #525252;
+  --color-brand-900: #171717;
 
   --color-primary: var(--color-brand-500);
-  --color-primary-hover: var(--color-brand-600);
+  --color-primary-hover: #333333;
 
   /* Surfaces & backgrounds (light) */
-  --color-bg: #fdfaf6;
-  --color-bg-alt: #f7f3ee;
+  --color-bg: #fafafa;
+  --color-bg-alt: #f5f5f5;
   --color-surface: #ffffff;
-  --color-surface-2: #f4f4f5;
-  --color-surface-3: #e7e7e9;
-  --color-sidebar: rgba(244, 241, 236, 0.85);
+  --color-surface-2: #f2f2f2;
+  --color-surface-3: #e5e5e5;
+  --color-sidebar: #ffffff;
 
   /* Borders */
-  --color-border: #e5e7eb;
-  --color-border-subtle: #f1f1f3;
+  --color-border: #e5e5e5;
+  --color-border-subtle: #f0f0f0;
 
   /* Text */
   --color-text: #0a0a0a;
   --color-text-main: #0a0a0a;
-  --color-text-muted: #6b7280;
-  --color-text-subtle: #9ca3af;
+  --color-text-muted: #737373;
+  --color-text-subtle: #a3a3a3;
 
-  /* Status */
+  /* Status - only destructive keeps a hue (errors must read as errors) */
   --color-danger: #cf222e;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-info: #3b82f6;
+  --color-success: #171717;
+  --color-warning: #525252;
+  --color-info: #404040;
 
   /* Radius */
   --radius-brand: 10px;
@@ -53,12 +58,33 @@
 
   /* Shadows */
   --shadow-soft: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
-  --shadow-warm: 0 2px 12px -2px rgba(229, 106, 74, 0.18);
-  --shadow-elevated: 0 12px 28px -4px rgba(60, 50, 45, 0.06);
+  --shadow-warm: 0 2px 12px -2px rgba(0, 0, 0, 0.1);
+  --shadow-elevated: 0 12px 28px -4px rgba(0, 0, 0, 0.06);
   --shadow-elev:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.8), 0 1px 2px rgba(15, 23, 42, 0.04),
-    0 12px 36px -8px rgba(15, 23, 42, 0.1);
-  --shadow-focus: 0 0 0 3px rgba(229, 106, 74, 0.18);
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.04),
+    0 12px 36px -8px rgba(0, 0, 0, 0.1);
+  --shadow-focus: 0 0 0 3px rgba(0, 0, 0, 0.12);
+
+  /* shadcn-style bare names: copied-in primitives (components/ui/sidebar.tsx)
+     read var(--foreground), var(--border), … instead of --color-*. */
+  --background: var(--color-bg);
+  --foreground: var(--color-text-main);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text-main);
+  --muted: var(--color-surface-2);
+  --muted-foreground: var(--color-text-muted);
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --ring: var(--color-primary);
+  --primary: var(--color-primary);
+  --primary-foreground: #ffffff;
+  --destructive: var(--color-danger);
+  --chart-1: #171717;
+  --chart-2: #404040;
+  --chart-3: #737373;
+  --chart-4: #a3a3a3;
+  --chart-5: #d4d4d4;
+  --chart-6: #262626;
 
   color-scheme: light;
 }
@@ -84,7 +110,7 @@
   --color-surface: #262626;
   --color-surface-2: #303030;
   --color-surface-3: #3a3a3a;
-  --color-sidebar: rgba(30, 30, 30, 0.85);
+  --color-sidebar: #1e1e1e;
 
   --color-border: #333333;
   --color-border-subtle: #2a2a2a;
@@ -106,6 +132,14 @@
     inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.4),
     0 16px 48px -8px rgba(0, 0, 0, 0.55);
   --shadow-focus: 0 0 0 3px rgba(229, 106, 74, 0.18);
+
+  /* Charts keep the accent palette in dark; light mode is monochrome. */
+  --chart-1: #e56a4a;
+  --chart-2: #60a5fa;
+  --chart-3: #22c55e;
+  --chart-4: #fbbf24;
+  --chart-5: #ee8d6a;
+  --chart-6: #a64027;
 
   color-scheme: dark;
 }
@@ -182,9 +216,9 @@ select {
   --color-destructive: var(--color-danger);
   --color-primary-foreground: #ffffff;
 
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --font-sans: "Google Sans", "Google Sans Text", system-ui, sans-serif;
+  --font-display: "Google Sans", "Google Sans Text", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
 }
 
 @layer base {
@@ -199,57 +233,18 @@ select {
     color: var(--color-text-main);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
-    font-feature-settings: "cv02", "cv03", "cv04";
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
   }
   ::selection {
     background: color-mix(in oklch, var(--color-primary) 35%, transparent);
   }
-}
-
-/* Material Symbols: hide ligature text until the font is ready */
-.material-symbols-outlined {
-  opacity: 0;
-}
-.fonts-loaded .material-symbols-outlined {
-  opacity: 1;
-  transition: opacity 0.12s ease-out;
-}
-
-/* ============================================================
-   Utilities ported from KineRouter's globals.css so dashboard markup
-   moves across unchanged.
-   ============================================================ */
-
-/* Material Symbols defaults + filled variant */
-.material-symbols-outlined {
-  font-family: "Material Symbols Outlined", sans-serif;
-  font-weight: normal;
-  font-style: normal;
-  font-size: 24px;
-  line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
-  display: inline-block;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  font-feature-settings: "liga";
-  -webkit-font-feature-settings: "liga";
-  -webkit-font-smoothing: antialiased;
-  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
-}
-.material-symbols-outlined.fill-1 {
-  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
-}
-
-/* Sidebar glyphs render at 18px, where the default 400 weight reads as a thick
-   outline. 350 keeps the stroke proportionate at that size. Scoped to the rail:
-   body icons stay at the default weight. */
-aside .material-symbols-outlined {
-  font-variation-settings: "FILL" 0, "wght" 350, "GRAD" 0, "opsz" 24;
-}
-aside .material-symbols-outlined.fill-1 {
-  font-variation-settings: "FILL" 1, "wght" 350, "GRAD" 0, "opsz" 24;
 }
 
 /* Cursor: Tailwind v4 dropped the default button pointer */
@@ -275,12 +270,12 @@ textarea {
 }
 
 ::selection {
-  background-color: rgba(229, 106, 74, 0.25);
+  background-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
   color: var(--color-primary);
 }
 .dark ::selection {
-  background-color: rgba(229, 106, 74, 0.3);
-  color: var(--color-brand-300);
+  background-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
+  color: var(--color-brand-200);
 }
 
 /* Scrollbars */
@@ -300,7 +295,7 @@ textarea {
 
 .scroll-thin-x {
   scrollbar-width: thin;
-  scrollbar-color: rgba(229, 106, 74, 0.55) transparent;
+  scrollbar-color: rgba(120, 120, 120, 0.55) transparent;
 }
 .scroll-thin-x::-webkit-scrollbar {
   height: 3px;
@@ -309,7 +304,7 @@ textarea {
   background: transparent;
 }
 .scroll-thin-x::-webkit-scrollbar-thumb {
-  background: rgba(229, 106, 74, 0.55);
+  background: rgba(120, 120, 120, 0.55);
   border-radius: 3px;
 }
 
@@ -368,34 +363,15 @@ textarea {
 .dark .bg-vibrancy {
   background: rgba(38, 38, 38, 0.72);
 }
-.traffic-lights {
-  display: flex;
-  gap: 8px;
-}
-.traffic-light {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-.traffic-light.red {
-  background: #ff5f56;
-}
-.traffic-light.yellow {
-  background: #ffbd2e;
-}
-.traffic-light.green {
-  background: #27c93f;
-}
-
 /* Dot grid / landing grid backgrounds */
 .dot-grid-bg {
   background-color: var(--color-bg);
-  background-image: radial-gradient(circle at 15% 20%, rgba(229, 106, 74, 0.1) 0%, transparent 40%),
-    radial-gradient(circle at 85% 80%, rgba(229, 106, 74, 0.06) 0%, transparent 40%);
+  background-image: radial-gradient(circle at 15% 20%, rgba(0, 0, 0, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(0, 0, 0, 0.03) 0%, transparent 40%);
 }
 .dark .dot-grid-bg {
-  background-image: radial-gradient(circle at 15% 20%, rgba(229, 106, 74, 0.18) 0%, transparent 40%),
-    radial-gradient(circle at 85% 80%, rgba(229, 106, 74, 0.1) 0%, transparent 40%);
+  background-image: radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 40%);
 }
 .landing-grid {
   background-image: linear-gradient(to right, var(--color-accent) 1px, transparent 1px),
@@ -434,12 +410,12 @@ textarea {
 @keyframes border-glow {
   0%,
   100% {
-    box-shadow: 0 0 5px rgba(229, 106, 74, 0.3), 0 0 10px rgba(229, 106, 74, 0.2);
-    border-color: rgba(229, 106, 74, 0.5);
+    box-shadow: 0 0 5px color-mix(in srgb, var(--color-primary) 30%, transparent), 0 0 10px color-mix(in srgb, var(--color-primary) 20%, transparent);
+    border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
   }
   50% {
-    box-shadow: 0 0 10px rgba(229, 106, 74, 0.5), 0 0 20px rgba(229, 106, 74, 0.3);
-    border-color: rgba(229, 106, 74, 0.8);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary) 50%, transparent), 0 0 20px color-mix(in srgb, var(--color-primary) 30%, transparent);
+    border-color: color-mix(in srgb, var(--color-primary) 80%, transparent);
   }
 }
 .animate-border-glow {
@@ -509,10 +485,10 @@ textarea {
 @keyframes ctaGlowPulse {
   0%,
   100% {
-    box-shadow: 0 8px 24px -8px rgba(229, 106, 74, 0.45), 0 0 0 0 rgba(229, 106, 74, 0.5);
+    box-shadow: 0 8px 24px -8px color-mix(in srgb, var(--color-primary) 45%, transparent), 0 0 0 0 color-mix(in srgb, var(--color-primary) 50%, transparent);
   }
   50% {
-    box-shadow: 0 12px 32px -8px rgba(229, 106, 74, 0.6), 0 0 0 8px rgba(229, 106, 74, 0);
+    box-shadow: 0 12px 32px -8px color-mix(in srgb, var(--color-primary) 60%, transparent), 0 0 0 8px transparent;
   }
 }
 .btn-cta {
@@ -543,12 +519,12 @@ textarea {
   0%,
   100% {
     transform: scale(1);
-    box-shadow: 0 0 8px #fde047, 0 0 20px color-mix(in srgb, var(--color-primary) 65%, transparent),
-      0 0 32px rgba(34, 211, 238, 0.4), inset 0 0 10px rgba(253, 224, 71, 0.3);
+    box-shadow: 0 0 8px var(--color-primary), 0 0 20px color-mix(in srgb, var(--color-primary) 65%, transparent),
+      0 0 32px color-mix(in srgb, var(--color-text-muted) 40%, transparent), inset 0 0 10px color-mix(in srgb, var(--color-primary) 20%, transparent);
   }
   50% {
     transform: scale(1.06);
-    box-shadow: 0 0 14px #fef08a, 0 0 28px #facc15, 0 0 44px rgba(34, 211, 238, 0.6),
+    box-shadow: 0 0 14px var(--color-primary), 0 0 28px var(--color-primary), 0 0 44px color-mix(in srgb, var(--color-text-muted) 60%, transparent),
       inset 0 0 14px rgba(255, 255, 255, 0.25);
   }
 }
@@ -556,24 +532,24 @@ textarea {
   0%,
   100% {
     transform: rotate(0deg) scale(1);
-    filter: drop-shadow(0 0 2px #fde047);
+    filter: drop-shadow(0 0 2px var(--color-primary));
   }
   25% {
     transform: rotate(-5deg) scale(1.08);
-    filter: drop-shadow(0 0 6px #facc15);
+    filter: drop-shadow(0 0 6px var(--color-primary));
   }
   75% {
     transform: rotate(5deg) scale(1.08);
-    filter: drop-shadow(0 0 6px #22d3ee);
+    filter: drop-shadow(0 0 6px var(--color-text-muted));
   }
 }
 @keyframes topology-router-label-flicker {
   0%,
   100% {
-    text-shadow: 0 0 6px #fde047, 0 0 12px #22d3ee;
+    text-shadow: 0 0 6px var(--color-primary), 0 0 12px var(--color-text-muted);
   }
   50% {
-    text-shadow: 0 0 10px #fff, 0 0 18px #facc15;
+    text-shadow: 0 0 10px #fff, 0 0 18px var(--color-primary);
   }
 }
 @keyframes topology-edge-dash {
@@ -598,7 +574,7 @@ textarea {
 }
 .topology-router-core {
   animation: topology-router-pulse 0.75s ease-in-out infinite;
-  border-color: #fde047 !important;
+  border-color: var(--color-primary) !important;
 }
 .topology-router-icon {
   animation: topology-router-icon-shake 0.45s ease-in-out infinite;
@@ -607,7 +583,7 @@ textarea {
   animation: topology-router-label-flicker 0.7s ease-in-out infinite;
 }
 .topology-router-badge {
-  box-shadow: 0 0 10px #fde047, 0 0 16px rgba(34, 211, 238, 0.6);
+  box-shadow: 0 0 10px var(--color-primary), 0 0 16px color-mix(in srgb, var(--color-text-muted) 60%, transparent);
 }
 .topology-edge-kame {
   stroke-dasharray: 8 6;
@@ -620,6 +596,11 @@ textarea {
   stroke-dasharray: 14 10;
   animation: topology-edge-dash 0.18s linear infinite, topology-edge-flicker 0.22s steps(3) infinite;
 }
+
+/* React Flow ships `color-scheme: light dark` on .react-flow, so its light-dark()
+   tokens follow the OS, not the app theme. Re-anchor it to our .dark class. */
+.react-flow { color-scheme: light; }
+.dark .react-flow { color-scheme: dark; }
 
 /* React Flow controls */
 .react-flow-controls-custom {
@@ -682,7 +663,7 @@ textarea {
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   font-size: 0.875em;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .changelog-body a {
   color: var(--color-primary);
@@ -700,28 +681,28 @@ textarea {
   0%, 100% {
     transform: scale(1);
     box-shadow:
-      0 0 8px #fde047,
+      0 0 8px var(--color-primary),
       0 0 20px color-mix(in srgb, var(--color-primary) 65%, transparent),
-      0 0 32px rgba(34, 211, 238, 0.4),
-      inset 0 0 10px rgba(253, 224, 71, 0.3);
+      0 0 32px color-mix(in srgb, var(--color-text-muted) 40%, transparent),
+      inset 0 0 10px color-mix(in srgb, var(--color-primary) 20%, transparent);
   }
   50% {
     transform: scale(1.06);
     box-shadow:
-      0 0 14px #fef08a,
-      0 0 28px #facc15,
-      0 0 44px rgba(34, 211, 238, 0.6),
+      0 0 14px var(--color-primary),
+      0 0 28px var(--color-primary),
+      0 0 44px color-mix(in srgb, var(--color-text-muted) 60%, transparent),
       inset 0 0 14px rgba(255, 255, 255, 0.25);
   }
 }
 @keyframes topology-router-icon-shake {
-  0%, 100% { transform: rotate(0deg) scale(1); filter: drop-shadow(0 0 2px #fde047); }
-  25% { transform: rotate(-5deg) scale(1.08); filter: drop-shadow(0 0 6px #facc15); }
-  75% { transform: rotate(5deg) scale(1.08); filter: drop-shadow(0 0 6px #22d3ee); }
+  0%, 100% { transform: rotate(0deg) scale(1); filter: drop-shadow(0 0 2px var(--color-primary)); }
+  25% { transform: rotate(-5deg) scale(1.08); filter: drop-shadow(0 0 6px var(--color-primary)); }
+  75% { transform: rotate(5deg) scale(1.08); filter: drop-shadow(0 0 6px var(--color-text-muted)); }
 }
 @keyframes topology-router-label-flicker {
-  0%, 100% { text-shadow: 0 0 6px #fde047, 0 0 12px #22d3ee; }
-  50% { text-shadow: 0 0 10px #fff, 0 0 18px #facc15; }
+  0%, 100% { text-shadow: 0 0 6px var(--color-primary), 0 0 12px var(--color-text-muted); }
+  50% { text-shadow: 0 0 10px #fff, 0 0 18px var(--color-primary); }
 }
 @keyframes topology-edge-dash { to { stroke-dashoffset: -36; } }
 @keyframes topology-edge-flicker {
@@ -732,11 +713,11 @@ textarea {
 }
 .topology-router-core {
   animation: topology-router-pulse 0.75s ease-in-out infinite;
-  border-color: #fde047 !important;
+  border-color: var(--color-primary) !important;
 }
 .topology-router-icon { animation: topology-router-icon-shake 0.45s ease-in-out infinite; }
 .topology-router-label { animation: topology-router-label-flicker 0.7s ease-in-out infinite; }
-.topology-router-badge { box-shadow: 0 0 10px #fde047, 0 0 16px rgba(34, 211, 238, 0.6); }
+.topology-router-badge { box-shadow: 0 0 10px var(--color-primary), 0 0 16px color-mix(in srgb, var(--color-text-muted) 60%, transparent); }
 .topology-edge-kame { stroke-dasharray: 8 6; animation: topology-edge-dash 0.22s linear infinite; }
 .topology-edge-halo { animation: topology-edge-flicker 0.18s steps(2) infinite; }
 .topology-edge-plasma {
@@ -758,26 +739,3 @@ textarea {
 }
 .react-flow-controls-custom button:last-child { border-bottom: 0; }
 .react-flow-controls-custom button:hover { background: var(--color-bg-alt); }
-
-/* ============================================================
-   Sidebar motion, after Animate UI's sidebar primitive.
-   ============================================================ */
-
-/* A folded submenu staggers its rows in: 8px from the right, out of a 4px blur. */
-@keyframes sidebar-sub-in {
-  from { opacity: 0; transform: translateX(8px); filter: blur(4px); }
-  to { opacity: 1; transform: translateX(0); filter: blur(0); }
-}
-.sidebar-sub-in > * {
-  animation: sidebar-sub-in 0.3s cubic-bezier(0.215, 0.61, 0.355, 1) both;
-}
-.sidebar-sub-in > * { animation-delay: inherit; }
-@media (prefers-reduced-motion: reduce) {
-  .sidebar-sub-in > * { animation: none; }
-}
-
-/* The collapsed rail's tooltip grows from the row, from 0.7. */
-@keyframes rail-tip-in {
-  from { opacity: 0; transform: translateY(-50%) scale(0.7); }
-  to { opacity: 1; transform: translateY(-50%) scale(1); }
-}

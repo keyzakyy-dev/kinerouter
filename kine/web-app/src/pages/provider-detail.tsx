@@ -11,8 +11,8 @@ import { Modal, ConfirmModal } from '@/components/modal'
 import { EditConnectionModal, AutoPingScheduleModal } from '@/components/connection-modals'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 
@@ -79,6 +79,8 @@ export function ProviderDetailPage() {
   const [liveModelsError, setLiveModelsError] = useState('')
 
   const [selected, setSelected] = useState<string[]>([])
+  const [selectModels, setSelectModels] = useState(false)
+  const [modelSelection, setModelSelection] = useState<string[]>([])
   const [oneByOne, setOneByOne] = useState<Record<string, OneByOneState>>({})
   const [oneByOneRunning, setOneByOneRunning] = useState(false)
   const [oneByOneStopping, setOneByOneStopping] = useState(false)
@@ -400,6 +402,26 @@ export function ProviderDetailPage() {
     }
   }
 
+  const bulkDisableModels = async (ids: string[]) => {
+    try {
+      await api.disableModels(storageAlias, [...disabledIds, ...ids])
+      setDisabledIds((prev) => [...prev, ...ids])
+      setModelSelection([])
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Failed to disable models')
+    }
+  }
+
+  const bulkDeleteCustomModels = async (ids: string[]) => {
+    try {
+      await Promise.all(ids.map((id) => api.deleteCustomModel(storageAlias, id)))
+      setModelSelection([])
+      await load()
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Failed to delete models')
+    }
+  }
+
   const deleteAlias = async (alias: string) => {
     try {
       await api.deleteAlias(alias)
@@ -524,6 +546,9 @@ export function ProviderDetailPage() {
   const suggestedNotAdded = suggested.filter(
     (m) => !llmModels.some((x) => x.id === m.id) && !customModelRows.some((x) => x.id === m.id),
   )
+  const selectableModelIds = [...customModelRows.map((m) => m.id), ...displayModels.map((m) => m.id)]
+  const selectedCustomIds = modelSelection.filter((mid) => customModelRows.some((m) => m.id === mid))
+  const selectedCatalogIds = modelSelection.filter((mid) => displayModels.some((m) => m.id === mid))
   // Compatible-node model list: custom rows plus legacy aliases pointing at
   // this node's alias (getProviderCustomModelRows in the reference).
   // Plain computation, not useMemo: this sits after the early returns below, and
@@ -562,103 +587,108 @@ export function ProviderDetailPage() {
 
   return (
     <>
-      <Button variant="ghost" size="sm" className="mb-4 -ml-2" onClick={() => navigate('/dashboard/providers')}>
-        <Icon name="arrow_back" /> Back to Providers
-      </Button>
+      <button
+        type="button"
+        className="mb-4 -ml-1 inline-flex items-center gap-1.5 text-xs text-text-muted transition-colors hover:text-text-main"
+        onClick={() => navigate('/dashboard/providers')}
+      >
+        <Icon name="arrow_back" className="text-[15px]" /> Back to Providers
+      </button>
 
       <div className="mb-6 flex min-w-0 items-center gap-3">
         <div
-          className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg"
+          className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg"
           style={{ backgroundColor: `${detail.display?.color ?? '#888'}15` }}
         >
-          <ProviderIcon provider={detail.id} size={48} fallbackText={detail.display?.textIcon} />
+          <ProviderIcon provider={detail.id} size={44} fallbackText={detail.display?.textIcon} />
         </div>
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="truncate text-2xl font-semibold tracking-tight">{detail.display?.name ?? detail.id}</h1>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h1 className="truncate text-2xl font-semibold tracking-tight text-text-main">{detail.display?.name ?? detail.id}</h1>
             {website && (
               <a
                 href={website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                className="inline-flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-main hover:underline"
               >
-                <Icon name="open_in_new" className="text-sm" />
+                <Icon name="open_in_new" className="text-[13px]" />
                 {detail.display?.notice?.apiKeyUrl ? 'Get API Key' : 'Sign up / Learn more'}
               </a>
             )}
           </div>
-          <p className="text-sm text-text-muted">
+          <p className="mt-0.5 text-xs text-text-muted">
             {detail.connections.length} connection{detail.connections.length === 1 ? '' : 's'}
           </p>
         </div>
       </div>
 
       {detail.display?.deprecated && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2">
-          <Icon name="warning" className="shrink-0 text-[16px] text-warning" />
-          <p className="text-xs leading-relaxed text-warning">{detail.display.deprecationNotice}</p>
+        <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-surface-2 px-4 py-3">
+          <Icon name="warning" className="mt-px shrink-0 text-[15px] text-warning" />
+          <p className="text-xs leading-relaxed text-text-muted">{detail.display.deprecationNotice}</p>
         </div>
       )}
 
       {detail.display?.notice?.text && !detail.display?.deprecated && (
-        <div className="mb-4 flex flex-col gap-2 rounded-lg border border-info/30 bg-info/10 px-3 py-2 sm:flex-row sm:items-center">
-          <Icon name="info" className="shrink-0 text-[16px] text-info" />
-          <p className="min-w-0 flex-1 text-xs leading-relaxed text-info">{detail.display.notice.text}</p>
+        <div className="mb-4 flex flex-col gap-2 rounded-xl bg-surface-2 px-4 py-3 sm:flex-row sm:items-center">
+          <Icon name="info" className="shrink-0 text-[15px] text-text-muted" />
+          <p className="min-w-0 flex-1 text-xs leading-relaxed text-text-muted">{detail.display.notice.text}</p>
           {detail.display.notice.apiKeyUrl && (
             <a
               href={detail.display.notice.apiKeyUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex justify-center rounded bg-info px-2 py-1 text-xs font-medium text-white hover:bg-info/90"
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-text-main px-2.5 py-1 text-[11px] font-medium text-background transition-opacity hover:opacity-90"
             >
-              Get API Key →
+              Get API Key <Icon name="arrow_forward" className="text-[12px]" />
             </a>
           )}
         </div>
       )}
 
       {isCompatible && node && (
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <h2 className="text-lg font-semibold">
-                  {isAnthropicCompatible ? 'Anthropic Compatible Details' : isNodeEmbedding ? 'Custom Embedding Details' : 'OpenAI Compatible Details'}
-                </h2>
-                <p className="break-all text-sm text-text-muted">
-                  {isAnthropicCompatible ? 'Messages API' : node.apiType === 'responses' ? 'Responses API' : isNodeEmbedding ? 'Embeddings API' : 'Chat Completions'} ·{' '}
+        <section className="mb-4 overflow-hidden rounded-xl bg-surface">
+          <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-text-main">
+                {isAnthropicCompatible ? 'Anthropic Compatible Details' : isNodeEmbedding ? 'Custom Embedding Details' : 'OpenAI Compatible Details'}
+              </h2>
+              <p className="mt-0.5 break-all text-xs text-text-muted">
+                {isAnthropicCompatible ? 'Messages API' : node.apiType === 'responses' ? 'Responses API' : isNodeEmbedding ? 'Embeddings API' : 'Chat Completions'} ·{' '}
+                <span className="font-mono">
                   {String(node.baseUrl ?? '').replace(/\/$/, '')}/{nodeEndpoint}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" onClick={() => setShowAddKey(true)}>
-                  <Icon name="add" /> Add API Key
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => setShowEditNode(true)}>
-                  <Icon name="edit" /> Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() =>
-                    setConfirm({
-                      title: 'Delete Compatible Node',
-                      message: `Delete this ${isAnthropicCompatible ? 'Anthropic' : 'OpenAI'} Compatible node?`,
-                      onConfirm: async () => {
-                        await api.deleteProviderNode(detail.id)
-                        setConfirm(null)
-                        navigate('/dashboard/providers')
-                      },
-                    })
-                  }
-                >
-                  <Icon name="delete" /> Delete
-                </Button>
-              </div>
+                </span>
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setShowAddKey(true)}>
+                <Icon name="add" /> Add API Key
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowEditNode(true)}>
+                <Icon name="edit" /> Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-text-muted hover:text-danger"
+                onClick={() =>
+                  setConfirm({
+                    title: 'Delete Compatible Node',
+                    message: `Delete this ${isAnthropicCompatible ? 'Anthropic' : 'OpenAI'} Compatible node?`,
+                    onConfirm: async () => {
+                      await api.deleteProviderNode(detail.id)
+                      setConfirm(null)
+                      navigate('/dashboard/providers')
+                    },
+                  })
+                }
+              >
+                <Icon name="delete" /> Delete
+              </Button>
+            </div>
+          </div>
+        </section>
       )}
 
       {detail.noAuth && (
@@ -666,73 +696,82 @@ export function ProviderDetailPage() {
       )}
 
       {!detail.noAuth && (
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-lg font-semibold">Connections</h2>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-                {detail.connections.length > 0 && proxyPools.length > 0 && (
-                  <Button size="sm" variant="secondary" onClick={() => setShowBulkProxy(true)}>
-                    <Icon name="lan" /> Apply Proxy
-                  </Button>
-                )}
-                {detail.connections.length > 0 && (
-                  <>
-                    {selected.length > 0 && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() =>
-                          setConfirm({
-                            title: 'Delete Connections',
-                            message: `Delete ${selected.length} selected connection${selected.length === 1 ? '' : 's'}? This cannot be undone.`,
-                            onConfirm: async () => {
-                              await bulkDelete()
-                              setConfirm(null)
-                            },
-                          })
-                        }
-                      >
-                        <Icon name="delete" /> Delete Selected ({selected.length})
-                      </Button>
-                    )}
-                    <Button size="sm" variant="secondary" onClick={oneByOneTest} disabled={oneByOneRunning}>
-                      <Icon name="sync" /> {oneByOneRunning ? 'Testing Connection One-by-One...' : 'Test Connection One-by-One'}
-                    </Button>
-                    {oneByOneRunning && (
-                      <Button size="sm" variant="ghost" onClick={stopOneByOne} disabled={oneByOneStopping}>
-                        <Icon name="stop" /> {oneByOneStopping ? 'Stopping...' : 'Stop'}
-                      </Button>
-                    )}
-                  </>
-                )}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium text-text-muted">Round Robin</span>
-                  <Switch checked={providerStrategy === 'round-robin'} onCheckedChange={(v) => void saveStrategy(v ? 'round-robin' : 'priority', stickyLimit)} />
-                  {providerStrategy === 'round-robin' && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-text-muted">Sticky:</span>
-                      <Input
-                        type="number"
-                        min={1}
-                        className="h-7 w-14 px-2 text-xs"
-                        value={stickyLimit}
-                        onChange={(e) => void saveStrategy('round-robin', Number.parseInt(e.target.value, 10) || 1)}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
+        <section className="mb-4 overflow-hidden rounded-xl bg-surface">
+          <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-text-main">Connections</h2>
+              <span className="font-mono text-[11px] text-text-muted">{detail.connections.length}</span>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {detail.connections.length > 0 && proxyPools.length > 0 && (
+                <Button size="sm" variant="ghost" onClick={() => setShowBulkProxy(true)}>
+                  <Icon name="lan" /> Apply Proxy
+                </Button>
+              )}
+              {selected.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-text-muted hover:text-danger"
+                  onClick={() =>
+                    setConfirm({
+                      title: 'Delete Connections',
+                      message: `Delete ${selected.length} selected connection${selected.length === 1 ? '' : 's'}? This cannot be undone.`,
+                      onConfirm: async () => {
+                        await bulkDelete()
+                        setConfirm(null)
+                      },
+                    })
+                  }
+                >
+                  <Icon name="delete" /> Delete ({selected.length})
+                </Button>
+              )}
+              {detail.connections.length > 0 && (
+                <Button size="sm" variant="ghost" onClick={oneByOneTest} disabled={oneByOneRunning}>
+                  <Icon name="sync" /> {oneByOneRunning ? 'Testing…' : 'Test All'}
+                </Button>
+              )}
+              {oneByOneRunning && (
+                <Button size="sm" variant="ghost" onClick={stopOneByOne} disabled={oneByOneStopping}>
+                  <Icon name="stop" /> {oneByOneStopping ? 'Stopping…' : 'Stop'}
+                </Button>
+              )}
+              <button
+                type="button"
+                aria-pressed={providerStrategy === 'round-robin'}
+                onClick={() => void saveStrategy(providerStrategy === 'round-robin' ? 'priority' : 'round-robin', stickyLimit)}
+                className={cn(
+                  'inline-flex h-7 items-center rounded-lg px-2.5 text-[11px] font-medium transition-colors',
+                  providerStrategy === 'round-robin'
+                    ? 'bg-text-main text-background'
+                    : 'bg-surface-2 text-text-muted hover:text-text-main',
+                )}
+              >
+                Round Robin
+              </button>
+              {providerStrategy === 'round-robin' && (
+                <label className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                  Sticky
+                  <Input
+                    type="number"
+                    min={1}
+                    className="h-7 w-14 border-0 bg-surface-2 px-2 text-xs shadow-none"
+                    value={stickyLimit}
+                    onChange={(e) => void saveStrategy('round-robin', Number.parseInt(e.target.value, 10) || 1)}
+                  />
+                </label>
+              )}
+            </div>
+          </div>
 
+          <div className="border-t border-border px-2 py-2">
             {detail.connections.length === 0 ? (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Icon name={isOAuth ? 'lock' : 'key'} className="text-[18px]" />
-                  </div>
+              <div className="flex flex-col gap-3 rounded-lg bg-surface-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <Icon name={isOAuth ? 'lock' : 'key'} className="shrink-0 text-[16px] text-text-muted" />
                   <div className="min-w-0">
-                    <p className="text-sm text-text-muted">No connections yet</p>
+                    <p className="text-sm text-text-main">No connections yet</p>
                     {dual && <p className="text-xs text-text-muted">Choose OAuth or API Key.</p>}
                   </div>
                 </div>
@@ -800,18 +839,18 @@ export function ProviderDetailPage() {
             ) : (
               <>
                 {oneByOneSummary && (
-                  <div className="mb-4 rounded-lg border border-border-subtle bg-surface-2 px-3 py-2 text-xs text-text-muted">
+                  <div className="mb-2 rounded-lg bg-surface-2 px-3 py-2 text-[11px] text-text-muted">
                     <div className="flex flex-wrap items-center gap-3">
-                      <span>Total: {oneByOneSummary.total}</span>
-                      <span>Completed: {oneByOneSummary.completed}</span>
-                      <span>Passed: {oneByOneSummary.passed}</span>
-                      <span>Failed: {oneByOneSummary.failed}</span>
+                      <span>Total {oneByOneSummary.total}</span>
+                      <span>Completed {oneByOneSummary.completed}</span>
+                      <span>Passed {oneByOneSummary.passed}</span>
+                      <span>Failed {oneByOneSummary.failed}</span>
                       {oneByOneSummary.stopped && <span className="text-warning">Stopped</span>}
                     </div>
                   </div>
                 )}
-                <div className="mb-3 flex items-center gap-2 border-b border-border-subtle pb-2">
-                  <label className="flex cursor-pointer items-center gap-1.5 text-xs text-text-muted hover:text-primary">
+                <div className="mb-2 flex items-center gap-2 px-2">
+                  <label className="flex cursor-pointer items-center gap-1.5 text-xs text-text-muted transition-colors hover:text-text-main">
                     <input
                       type="checkbox"
                       className="size-3.5 rounded border-border"
@@ -820,7 +859,7 @@ export function ProviderDetailPage() {
                         setSelected(e.target.checked ? detail.connections.map((c) => c.id) : [])
                       }
                     />
-                    Select All
+                    Select all
                   </label>
                 </div>
                 <div className="flex flex-col gap-2">
@@ -859,11 +898,11 @@ export function ProviderDetailPage() {
                     />
                   ))}
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-2 px-2 pb-1">
                   {(detail.id === 'minimax-code' || detail.id === 'minimax-code-global') && (
                     <Button
                       size="sm"
-                      variant="secondary"
+                      variant="ghost"
                       disabled={leaseBusy}
                       onClick={runLeaseConnect}
                       title="Borrow the signed-in MiniMax Code desktop app's login — no second sign-in, refresh stays with the desktop app"
@@ -872,24 +911,24 @@ export function ProviderDetailPage() {
                     </Button>
                   )}
                   {detail.id === 'iflow' && (
-                    <Button size="sm" variant="secondary" onClick={() => setShowIFlowCookie(true)}>
+                    <Button size="sm" variant="ghost" onClick={() => setShowIFlowCookie(true)}>
                       <Icon name="cookie" /> Cookie
                     </Button>
                   )}
                   {detail.id === 'codex' && (
-                    <Button size="sm" variant="secondary" onClick={() => setShowBulkImport(true)}>
+                    <Button size="sm" variant="ghost" onClick={() => setShowBulkImport(true)}>
                       <Icon name="playlist_add" /> Bulk Add
                     </Button>
                   )}
                   {detail.id === 'grok-cli' && (
-                    <Button size="sm" variant="secondary" onClick={() => setShowBulkImport(true)}>
+                    <Button size="sm" variant="ghost" onClick={() => setShowBulkImport(true)}>
                       <Icon name="playlist_add" /> Bulk Add
                     </Button>
                   )}
                   {IMPORT_LANES[detail.id] && (
                     <Button
                       size="sm"
-                      variant="secondary"
+                      variant="ghost"
                       onClick={() => setImportTarget(IMPORT_LANES[detail.id])}
                       title={IMPORT_TITLES[IMPORT_LANES[detail.id]]}
                     >
@@ -898,85 +937,166 @@ export function ProviderDetailPage() {
                   )}
                   {dual ? (
                     <>
-                      <Button size="sm" variant="secondary" onClick={() => setShowOAuth(true)}>
+                      <Button size="sm" variant="ghost" onClick={() => setShowOAuth(true)}>
                         <Icon name="lock" /> OAuth
                       </Button>
-                      <Button size="sm" onClick={() => setShowAddKey(true)}>
+                      <Button size="sm" variant="secondary" onClick={() => setShowAddKey(true)}>
                         <Icon name="key" /> API Key
                       </Button>
                     </>
                   ) : isOAuth && !supportsApiKey ? (
-                    <Button size="sm" onClick={() => setShowOAuth(true)}>
+                    <Button size="sm" variant="ghost" onClick={() => setShowOAuth(true)}>
                       <Icon name="lock" /> Add
                     </Button>
                   ) : (
-                    <Button size="sm" onClick={() => setShowAddKey(true)}>
+                    <Button size="sm" variant="ghost" onClick={() => setShowAddKey(true)}>
                       <Icon name="add" /> Add
                     </Button>
                   )}
                 </div>
               </>
             )}
-            {leaseError && <p className="mt-3 text-xs text-red-400">{leaseError}</p>}
-          </CardContent>
-        </Card>
+            {leaseError && <p className="mt-3 px-2 text-xs text-danger">{leaseError}</p>}
+          </div>
+        </section>
       )}
 
       {!isCompatible && !detail.noAuth && <CustomConfigCard providerId={detail.id} />}
 
-      <Card className="mt-4">
-        <CardContent className="p-4">
-          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold">Available Models</h2>
+      <section className="mt-4 overflow-hidden rounded-xl bg-surface">
+          <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-semibold text-text-main">Available Models</h2>
+              <span className="font-mono text-[11px] text-text-muted">{displayModels.length + customModelRows.length}</span>
               {thinkingLevels.length > 0 && (
-                <select
-                  value={thinkingMode}
-                  onChange={(e) => void saveThinking(e.target.value)}
-                  title="Appends (level) suffix to copied model names"
-                  className="rounded-md border border-border bg-background px-2 py-1 text-xs focus:border-primary focus:outline-none"
-                >
-                  {thinkingLevels.map((opt) => (
-                    <option key={opt} value={opt}>
-                      Thinking: {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                    </option>
-                  ))}
-                </select>
+                <Select value={thinkingMode} onValueChange={(v) => void saveThinking(v)}>
+                  <SelectTrigger
+                    aria-label="Thinking level"
+                    title="Appends (level) suffix to copied model names"
+                    className="h-7 w-auto gap-1.5 rounded-lg border-0 bg-surface-2 px-2 text-[11px] text-text-muted hover:bg-surface-3 hover:text-text-main focus:ring-1"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Icon name="psychology" className="text-[14px] text-violet-600 dark:text-violet-400" />
+                      <span>Thinking</span>
+                      <SelectValue className="font-medium text-text-main" />
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent className="min-w-36">
+                    {thinkingLevels.map((opt) => (
+                      <SelectItem key={opt} value={opt} className="text-xs">
+                        {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
             {!isCompatible && (
-              <div className="flex gap-2">
-                {disabledIds.length > 0 && (
-                  <Button size="sm" variant="secondary" onClick={async () => {
-                    await Promise.all(disabledIds.map((mid) => api.enableModel(storageAlias, mid).catch(() => {})))
-                    setDisabledIds([])
-                  }}>
-                    <Icon name="restart_alt" /> Active All
-                  </Button>
-                )}
-                {displayModels.length > 0 && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() =>
-                      setConfirm({
-                        title: 'Disable All Models',
-                        message: `Disable all ${displayModels.length} models for this provider?`,
-                        onConfirm: async () => {
-                          const ids = displayModels.map((m) => m.id)
-                          await api.disableModels(storageAlias, [...disabledIds, ...ids])
-                          setDisabledIds((prev) => [...prev, ...ids])
-                          setConfirm(null)
-                        },
-                      })
-                    }
-                  >
-                    <Icon name="block" /> Disable All
-                  </Button>
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                {selectModels ? (
+                  <>
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-text-muted hover:text-text-main">
+                      <input
+                        type="checkbox"
+                        className="size-3.5 rounded border-border"
+                        checked={modelSelection.length > 0 && modelSelection.length === selectableModelIds.length}
+                        onChange={(e) => setModelSelection(e.target.checked ? selectableModelIds : [])}
+                      />
+                      {modelSelection.length > 0 ? `${modelSelection.length} selected` : 'Select all'}
+                    </label>
+                    {selectedCatalogIds.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          setConfirm({
+                            title: 'Disable Selected Models',
+                            message: `Disable ${selectedCatalogIds.length} selected model${selectedCatalogIds.length === 1 ? '' : 's'}?`,
+                            onConfirm: async () => {
+                              await bulkDisableModels(selectedCatalogIds)
+                              setConfirm(null)
+                            },
+                          })
+                        }
+                      >
+                        <Icon name="block" /> Disable ({selectedCatalogIds.length})
+                      </Button>
+                    )}
+                    {selectedCustomIds.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-text-muted hover:text-danger"
+                        onClick={() =>
+                          setConfirm({
+                            title: 'Delete Selected Models',
+                            message: `Delete ${selectedCustomIds.length} custom model${selectedCustomIds.length === 1 ? '' : 's'}? This cannot be undone.`,
+                            onConfirm: async () => {
+                              await bulkDeleteCustomModels(selectedCustomIds)
+                              setConfirm(null)
+                            },
+                          })
+                        }
+                      >
+                        <Icon name="delete" /> Delete ({selectedCustomIds.length})
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSelectModels(false)
+                        setModelSelection([])
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {disabledIds.length > 0 && (
+                      <Button size="sm" variant="ghost" onClick={async () => {
+                        await Promise.all(disabledIds.map((mid) => api.enableModel(storageAlias, mid).catch(() => {})))
+                        setDisabledIds([])
+                      }}>
+                        <Icon name="restart_alt" /> Active All
+                      </Button>
+                    )}
+                    {selectableModelIds.length > 0 && (
+                      <Button size="sm" variant="ghost" aria-label="Select models" onClick={() => setSelectModels(true)}>
+                        <Icon name="checklist" /> Select
+                      </Button>
+                    )}
+                    {displayModels.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          setConfirm({
+                            title: 'Disable All Models',
+                            message: `Disable all ${displayModels.length} models for this provider?`,
+                            onConfirm: async () => {
+                              const ids = displayModels.map((m) => m.id)
+                              await api.disableModels(storageAlias, [...disabledIds, ...ids])
+                              setDisabledIds((prev) => [...prev, ...ids])
+                              setConfirm(null)
+                            },
+                          })
+                        }
+                      >
+                        <Icon name="block" /> Disable All
+                      </Button>
+                    )}
+                    <Button size="sm" variant="secondary" onClick={() => setShowCustomModel(true)}>
+                      <Icon name="add" /> Add Model
+                    </Button>
+                  </>
                 )}
               </div>
             )}
           </div>
+
+          <div className="border-t border-border px-2 py-2">
 
           {!!modelsTestError && (
             <div className="mb-3">
@@ -999,15 +1119,16 @@ export function ProviderDetailPage() {
           )}
 
           {isCompatible ? (
-            <div className="flex flex-col gap-4">
-              <p className="text-sm text-text-muted">
+            <div className="flex flex-col gap-3">
+              <p className="text-xs text-text-muted">
                 Add {isAnthropicCompatible ? 'Anthropic' : 'OpenAI'}-compatible models manually or import them from the /models endpoint.
               </p>
               <div className="flex flex-wrap items-end gap-2">
                 <div className="min-w-[240px] flex-1">
-                  <label htmlFor="new-compatible-model" className="mb-1 block text-xs text-text-muted">Model ID</label>
+                  <label htmlFor="new-compatible-model" className="mb-1 block text-[11px] text-text-muted">Model ID</label>
                   <Input
                     id="new-compatible-model"
+                    className="border-0 bg-surface-2 shadow-none"
                     value={newModelId}
                     onChange={(e) => setNewModelId(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && void addCompatibleModel()}
@@ -1017,47 +1138,48 @@ export function ProviderDetailPage() {
                 <Button size="sm" onClick={() => void addCompatibleModel()} disabled={!newModelId.trim() || addingModel}>
                   <Icon name="add" /> {addingModel ? 'Adding…' : 'Add'}
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => void importCompatibleModels()} disabled={!compatibleImportReady || importingModels}>
+                <Button size="sm" variant="ghost" onClick={() => void importCompatibleModels()} disabled={!compatibleImportReady || importingModels}>
                   <Icon name="download" /> {importingModels ? 'Importing…' : 'Import from /models'}
                 </Button>
               </div>
               {!compatibleImportReady && (
-                <p className="text-xs text-text-muted">Add a connection to enable importing models.</p>
+                <p className="text-[11px] text-text-muted">Add a connection to enable importing models.</p>
               )}
               {compatibleRows.length > 0 && (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
                   {compatibleRows.map((m) => (
                     <div
                       key={`${m.source}-${m.id}`}
-                      className={cn(
-                        'flex items-center gap-3 rounded-lg border p-3 hover:bg-sidebar/50',
-                        modelTestResults[m.id] === 'ok' ? 'border-success/40' : modelTestResults[m.id] === 'error' ? 'border-danger/40' : 'border-border',
-                      )}
+                      className="flex items-center gap-3 rounded-lg bg-surface-2 px-3 py-2 transition-colors hover:bg-surface-3"
                     >
                       <Icon
-                        name={modelTestResults[m.id] === 'ok' ? 'check_circle' : modelTestResults[m.id] === 'error' ? 'cancel' : 'smart_toy'}
-                        className={cn('text-base', modelTestResults[m.id] === 'ok' ? 'text-success' : modelTestResults[m.id] === 'error' ? 'text-danger' : 'text-text-muted')}
+                        name={modelTestResults[m.id] === 'ok' ? 'check_circle' : modelTestResults[m.id] === 'error' ? 'cancel' : 'science'}
+                        className={cn('shrink-0 text-[15px]', modelTestResults[m.id] === 'ok' ? 'text-success' : modelTestResults[m.id] === 'error' ? 'text-danger' : 'text-text-muted')}
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{m.id}</p>
-                        <div className="mt-1 flex items-center gap-1">
-                          <code className="rounded bg-sidebar px-1.5 py-0.5 font-mono text-xs text-text-muted">
+                        <p className="truncate text-sm font-medium text-text-main">{m.id}</p>
+                        <div className="mt-0.5 flex items-center gap-1">
+                          <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[11px] text-text-muted">
                             {displayAlias}/{m.id}
                           </code>
                           <CopyButton value={`${displayAlias}/${m.id}`} />
                           {detail.connections.length > 0 && (
-                            <button className="text-text-muted hover:text-primary" onClick={() => void testModel(m.id)} title="Test">
-                              <Icon name={testingModels.includes(m.id) ? 'progress_activity' : 'science'} className="text-sm" />
+                            <button
+                              className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-3 hover:text-text-main"
+                              onClick={() => void testModel(m.id)}
+                              title="Test"
+                            >
+                              <Icon name={testingModels.includes(m.id) ? 'progress_activity' : 'science'} className="text-[16px]" />
                             </button>
                           )}
                         </div>
                       </div>
                       <button
-                        className="rounded p-1 text-text-muted hover:bg-sidebar hover:text-danger"
+                        className="flex size-7 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-3 hover:text-danger"
                         title="Remove model"
                         onClick={() => void (m.source === 'custom' ? deleteCustomModel(m.id) : deleteAlias(m.alias!))}
                       >
-                        <Icon name="delete" className="text-sm" />
+                        <Icon name="delete" className="text-[16px]" />
                       </button>
                     </div>
                   ))}
@@ -1065,11 +1187,10 @@ export function ProviderDetailPage() {
               )}
             </div>
           ) : (
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
             {customModelRows.map((m) => (
               <ModelRow
                 key={`custom-${m.id}`}
-                modelId={m.id}
                 fullModel={`${displayAlias}/${m.id}`}
                 alias={aliasFor(m.id)}
                 testStatus={modelTestResults[m.id]}
@@ -1082,13 +1203,14 @@ export function ProviderDetailPage() {
                 caps={detail.modelMeta?.[m.id]?.caps}
                 thinkingSuffix={thinkingSuffix(m.id)}
                 custom
+                selected={modelSelection.includes(m.id)}
+                onSelect={selectModels ? (v) => setModelSelection((prev) => (v ? [...prev, m.id] : prev.filter((x) => x !== m.id))) : undefined}
               />
             ))}
 
             {displayModels.map((m) => (
               <ModelRow
                 key={m.id}
-                modelId={m.id}
                 fullModel={`${displayAlias}/${m.id}`}
                 alias={aliasFor(m.id)}
                 testStatus={modelTestResults[m.id]}
@@ -1100,24 +1222,19 @@ export function ProviderDetailPage() {
                 onSetAlias={() => setAliasTarget(m.id)}
                 caps={detail.modelMeta?.[m.id]?.caps}
                 thinkingSuffix={thinkingSuffix(m.id)}
+                selected={modelSelection.includes(m.id)}
+                onSelect={selectModels ? (v) => setModelSelection((prev) => (v ? [...prev, m.id] : prev.filter((x) => x !== m.id))) : undefined}
               />
             ))}
-
-            <button
-              onClick={() => setShowCustomModel(true)}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 px-3 py-2 text-xs text-primary transition-colors hover:border-primary hover:bg-primary/5 sm:w-auto"
-            >
-              <Icon name="add" className="text-sm" /> Add Model
-            </button>
 
             {(detail.id === 'qoder' || detail.id === 'qoder-cn') &&
               detail.connections.some((c) => c.isActive !== false) && (
                 <button
                   onClick={() => void importLiveModels('Fetch Qoder Models')}
                   disabled={importingModels}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 px-3 py-2 text-xs text-primary transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50 sm:w-auto"
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-surface-2 px-3 py-2 text-xs text-text-muted transition-colors hover:bg-surface-3 hover:text-text-main disabled:opacity-50 lg:col-span-full"
                 >
-                  <Icon name={importingModels ? 'progress_activity' : 'download'} className={importingModels ? 'animate-spin text-sm' : 'text-sm'} />
+                  <Icon name={importingModels ? 'progress_activity' : 'download'} className={importingModels ? 'animate-spin text-[15px]' : 'text-[15px]'} />
                   {importingModels ? 'Fetching…' : 'Fetch Qoder Models'}
                 </button>
               )}
@@ -1127,17 +1244,17 @@ export function ProviderDetailPage() {
                 <button
                   onClick={() => void importLiveModels('Import from /models')}
                   disabled={importingModels}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 px-3 py-2 text-xs text-primary transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50 sm:w-auto"
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-surface-2 px-3 py-2 text-xs text-text-muted transition-colors hover:bg-surface-3 hover:text-text-main disabled:opacity-50 lg:col-span-full"
                 >
-                  <Icon name={importingModels ? 'progress_activity' : 'download'} className={importingModels ? 'animate-spin text-sm' : 'text-sm'} />
+                  <Icon name={importingModels ? 'progress_activity' : 'download'} className={importingModels ? 'animate-spin text-[15px]' : 'text-[15px]'} />
                   {importingModels ? 'Fetching…' : 'Import from /models'}
                 </button>
               )}
 
             {suggestedNotAdded.length > 0 && (
-              <div className="mt-2 w-full">
-                <p className="mb-2 text-xs text-text-muted">Suggested free models (≥200k context):</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="lg:col-span-full">
+                <p className="mb-1.5 px-1 text-[11px] text-text-muted">Suggested free models (≥200k context)</p>
+                <div className="flex flex-wrap gap-1.5">
                   {suggestedNotAdded.map((m) => (
                     <button
                       key={m.id}
@@ -1145,7 +1262,7 @@ export function ProviderDetailPage() {
                         await api.addCustomModel({ providerAlias: storageAlias, id: m.id, type: 'llm' })
                         await load()
                       }}
-                      className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-text-muted transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                      className="flex items-center gap-1 rounded-lg bg-surface-2 px-2 py-1 font-mono text-[11px] text-text-muted transition-colors hover:bg-surface-3 hover:text-text-main"
                       title={`${m.name ?? m.id} · ${Math.round((m.contextLength ?? 0) / 1000)}k ctx`}
                     >
                       <Icon name="add" className="text-[13px]" />
@@ -1157,14 +1274,14 @@ export function ProviderDetailPage() {
             )}
 
             {disabledModels.length > 0 && (
-              <div className="mt-2 w-full">
-                <p className="mb-2 text-xs text-text-muted">Disabled models ({disabledModels.length}):</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="lg:col-span-full">
+                <p className="mb-1.5 px-1 text-[11px] text-text-muted">Disabled models ({disabledModels.length})</p>
+                <div className="flex flex-wrap gap-1.5">
                   {disabledModels.map((m) => (
                     <button
                       key={m.id}
                       onClick={() => void enableModel(m.id)}
-                      className="flex items-center gap-1 rounded-lg border border-dashed border-border px-2.5 py-1.5 text-xs text-text-muted transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                      className="flex items-center gap-1 rounded-lg bg-surface-2 px-2 py-1 font-mono text-[11px] text-text-muted transition-colors hover:bg-surface-3 hover:text-text-main"
                       title="Restore model"
                     >
                       <Icon name="add" className="text-[13px]" />
@@ -1176,8 +1293,8 @@ export function ProviderDetailPage() {
             )}
           </div>
           )}
-        </CardContent>
-      </Card>
+          </div>
+        </section>
 
       {showAddKey && (
         <AddApiKeyModal
@@ -1395,63 +1512,60 @@ export function NoAuthProxyCard({
   }
 
   return (
-    <Card className="mb-4">
-      <CardContent className="p-4">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">
-            <Icon name="lock_open" className="text-[20px]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">No authentication required</p>
-            <p className="text-xs text-text-muted">
-              This provider is ready to use. Optionally route requests through a proxy pool to bypass IP-based limits.
-            </p>
-          </div>
+    <section className="mb-4 overflow-hidden rounded-xl bg-surface">
+      <div className="flex items-center gap-2.5 px-4 py-3">
+        <Icon name="lock_open" className="shrink-0 text-[16px] text-text-muted" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-text-main">No authentication required</p>
+          <p className="text-[11px] text-text-muted">
+            Ready to use. Route through a proxy pool to bypass IP limits.
+          </p>
         </div>
+      </div>
 
-        <div className="flex flex-col gap-1">
-          <p className="text-xs font-medium text-text-muted">Proxy Pool</p>
-          <select
-            value={poolId}
-            onChange={(e) => void save(e.target.value, strategy)}
-            disabled={rotating}
-            className="rounded-md border border-border bg-background px-2 py-1.5 text-sm disabled:opacity-50"
-          >
-            <option value="">None (direct)</option>
-            {active.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name ?? p.id}
-              </option>
-            ))}
-          </select>
-          {rotating && (
-            <p className="text-[11px] text-text-muted">
-              Pool selector is ignored while rotation is active — all active pools are used.
-            </p>
-          )}
-        </div>
+      <div className="grid gap-3 border-t border-border px-4 py-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] text-text-muted">Proxy Pool</p>
+            <Select value={poolId || 'none'} onValueChange={(v) => void save(v === 'none' ? '' : v, strategy)} disabled={rotating}>
+              <SelectTrigger className="h-9 rounded-lg border-0 bg-surface-2 px-3 focus:ring-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None (direct)</SelectItem>
+                {active.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name ?? p.id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {rotating && (
+              <p className="text-[11px] text-text-muted">Rotation active — all pools used.</p>
+            )}
+          </div>
 
-        <div className="mt-4 flex flex-col gap-1">
-          <p className="text-xs font-medium text-text-muted">Rotation Strategy</p>
-          <select
-            value={strategy}
-            onChange={(e) => void save(poolId, e.target.value)}
-            className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          >
-            <option value="none">None (single pool)</option>
-            <option value="round-robin" disabled={!canRotate}>
-              Round-robin
-            </option>
-            <option value="random" disabled={!canRotate}>
-              Random
-            </option>
-          </select>
-          {!canRotate && (
-            <p className="text-[11px] text-text-muted">Need at least 2 active proxy pools for rotation.</p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] text-text-muted">Rotation Strategy</p>
+            <Select value={strategy} onValueChange={(v) => void save(poolId, v)}>
+              <SelectTrigger className="h-9 rounded-lg border-0 bg-surface-2 px-3 focus:ring-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None (single pool)</SelectItem>
+                <SelectItem value="round-robin" disabled={!canRotate}>
+                  Round-robin
+                </SelectItem>
+                <SelectItem value="random" disabled={!canRotate}>
+                  Random
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {!canRotate && (
+              <p className="text-[11px] text-text-muted">Need at least 2 active proxy pools.</p>
+            )}
+          </div>
+      </div>
+    </section>
   )
 }
 
@@ -1494,7 +1608,7 @@ function ConnectionRow({
   const statusVariant = testStatus === 'error' ? 'error' : testStatus === 'active' ? 'success' : 'outline'
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-3">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-3 py-2.5 transition-colors hover:bg-surface-3">
       <input
         type="checkbox"
         className="size-3.5 rounded border-border"
@@ -1504,7 +1618,7 @@ function ConnectionRow({
 
       <div className="flex flex-col">
         <button
-          className="text-text-muted hover:text-primary disabled:opacity-30"
+          className="text-text-muted transition-colors hover:text-text-main disabled:opacity-30"
           onClick={onMoveUp}
           disabled={!onMoveUp}
           title="Move up"
@@ -1512,7 +1626,7 @@ function ConnectionRow({
           <Icon name="keyboard_arrow_up" className="text-[16px]" />
         </button>
         <button
-          className="text-text-muted hover:text-primary disabled:opacity-30"
+          className="text-text-muted transition-colors hover:text-text-main disabled:opacity-30"
           onClick={onMoveDown}
           disabled={!onMoveDown}
           title="Move down"
@@ -1525,7 +1639,7 @@ function ConnectionRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-medium">{conn.name || conn.email || conn.id}</span>
+          <span className="truncate text-sm font-medium text-text-main">{conn.name || conn.email || conn.id}</span>
           <Badge variant="outline" size="sm">
             {isLease ? 'Desktop Lease' : conn.authType === 'oauth' ? 'OAuth' : conn.authType === 'cookie' ? 'Cookie' : 'API Key'}
           </Badge>
@@ -1543,7 +1657,7 @@ function ConnectionRow({
             </Badge>
           )}
           {conn.priority !== undefined && conn.priority !== 0 && (
-            <span className="text-[11px] text-text-muted">priority {conn.priority}</span>
+            <span className="font-mono text-[10px] text-text-muted">priority {conn.priority}</span>
           )}
         </div>
         <div className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-text-muted">
@@ -1556,7 +1670,7 @@ function ConnectionRow({
       <select
         value={poolId}
         onChange={(e) => onProxyChange(e.target.value)}
-        className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+        className="h-7 rounded-lg border-0 bg-card px-2 text-[11px] text-text-muted"
         title="Proxy pool"
       >
         <option value="">No proxy</option>
@@ -1569,17 +1683,31 @@ function ConnectionRow({
       {poolId && !pool && <Badge variant="error" size="sm">missing pool</Badge>}
       {proxyEnabled && <Badge variant="success" size="sm">proxy</Badge>}
 
-      {onAutoPing && (
-        <Button variant="ghost" size="icon" onClick={onAutoPing} title="Auto-ping schedule">
-          <Icon name="schedule" />
-        </Button>
-      )}
-      <Button variant="ghost" size="icon" onClick={onEdit} title="Edit">
-        <Icon name="edit" />
-      </Button>
-      <Button variant="ghost" size="icon" onClick={onDelete} title="Delete">
-        <Icon name="delete" />
-      </Button>
+      <div className="flex shrink-0 items-center">
+        {onAutoPing && (
+          <button
+            className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-card hover:text-text-main"
+            onClick={onAutoPing}
+            title="Auto-ping schedule"
+          >
+            <Icon name="schedule" className="text-[16px]" />
+          </button>
+        )}
+        <button
+          className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-card hover:text-text-main"
+          onClick={onEdit}
+          title="Edit"
+        >
+          <Icon name="edit" className="text-[16px]" />
+        </button>
+        <button
+          className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-card hover:text-danger"
+          onClick={onDelete}
+          title="Delete"
+        >
+          <Icon name="delete" className="text-[16px]" />
+        </button>
+      </div>
       <Switch checked={conn.isActive} onCheckedChange={onToggleActive} />
     </div>
   )
@@ -1588,7 +1716,6 @@ function ConnectionRow({
 // ---------------------------------------------------------------- model row
 
 function ModelRow({
-  modelId,
   fullModel,
   alias,
   testStatus,
@@ -1600,8 +1727,9 @@ function ModelRow({
   caps,
   thinkingSuffix,
   custom,
+  selected,
+  onSelect,
 }: {
-  modelId: string
   fullModel: string
   alias?: string
   testStatus?: 'ok' | 'error'
@@ -1613,42 +1741,81 @@ function ModelRow({
   caps?: { vision?: boolean; reasoning?: boolean; contextWindow?: number; maxOutput?: number }
   thinkingSuffix?: string | null
   custom?: boolean
+  selected?: boolean
+  onSelect?: (v: boolean) => void
 }) {
   const displayModel = thinkingSuffix ? `${fullModel}(${thinkingSuffix})` : fullModel
-  const border =
-    testStatus === 'ok' ? 'border-success/50' : testStatus === 'error' ? 'border-danger/50' : 'border-border'
   return (
-    <div className={cn('flex min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs', border)}>
+    <div
+      className={cn(
+        'group flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 py-1.5 pl-3 pr-1.5 text-xs transition-colors hover:bg-surface-3',
+        selected && 'bg-surface-3',
+      )}
+    >
+      {onSelect && (
+        <input
+          type="checkbox"
+          className="size-3.5 shrink-0 cursor-pointer rounded border-border"
+          checked={!!selected}
+          onChange={(e) => onSelect(e.target.checked)}
+          aria-label={`Select ${displayModel}`}
+        />
+      )}
+      <span className="min-w-0 flex-1 truncate font-medium" title={displayModel}>
+        {displayModel}
+      </span>
       <CapacityBadges caps={caps} />
-      <span className="truncate">{displayModel}</span>
       {alias && (
-        <Badge variant="outline" size="sm" title={`alias: ${alias}`}>
+        <Badge variant="outline" size="sm" className="shrink-0" title={`alias: ${alias}`}>
           {alias}
         </Badge>
       )}
-      {testStatus && <Icon name={testStatus === 'ok' ? 'check_circle' : 'cancel'} className="text-[13px]" />}
-      <CopyButton value={displayModel} />
-      {onTest && (
-        <button className="text-text-muted hover:text-primary" onClick={onTest} title="Test model">
-          <Icon name={testing ? 'progress_activity' : 'smart_toy'} className="text-[13px]" />
-        </button>
+      {testStatus && (
+        <Icon
+          name={testStatus === 'ok' ? 'check_circle' : 'cancel'}
+          className={cn('shrink-0 text-[15px]', testStatus === 'ok' ? 'text-success' : 'text-danger')}
+        />
       )}
-      {onSetAlias && (
-        <button className="text-text-muted hover:text-primary" onClick={onSetAlias} title="Set alias">
-          <Icon name="label" className="text-[13px]" />
-        </button>
-      )}
-      {custom && onDelete ? (
-        <button className="text-text-muted hover:text-danger" onClick={onDelete} title="Delete custom model">
-          <Icon name="close" className="text-[13px]" />
-        </button>
-      ) : (
-        onDisable && (
-          <button className="text-text-muted hover:text-danger" onClick={onDisable} title="Disable model">
-            <Icon name="block" className="text-[13px]" />
+      <div className="flex shrink-0 items-center">
+        <CopyButton value={displayModel} className="size-7 shrink-0 [&_svg]:size-4" />
+        {onTest && (
+          <button
+            className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-3 hover:text-text-main"
+            onClick={onTest}
+            title="Test model"
+          >
+            <Icon name={testing ? 'progress_activity' : 'science'} className="text-[16px]" />
           </button>
-        )
-      )}
+        )}
+        {onSetAlias && (
+          <button
+            className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-3 hover:text-text-main"
+            onClick={onSetAlias}
+            title="Set alias"
+          >
+            <Icon name="label" className="text-[16px]" />
+          </button>
+        )}
+        {custom && onDelete ? (
+          <button
+            className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-3 hover:text-danger"
+            onClick={onDelete}
+            title="Delete custom model"
+          >
+            <Icon name="close" className="text-[16px]" />
+          </button>
+        ) : (
+          onDisable && (
+            <button
+              className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-3 hover:text-danger"
+              onClick={onDisable}
+              title="Disable model"
+            >
+              <Icon name="block" className="text-[16px]" />
+            </button>
+          )
+        )}
+      </div>
     </div>
   )
 }
@@ -1710,7 +1877,6 @@ export function AddApiKeyModal({
   const isCloudflare = provider === 'cloudflare-ai'
   const isOllama = provider === 'ollama-local'
   const label = isCookie ? 'Cookie Value' : usesAws ? 'AWS Secret Access Key' : 'API Key'
-  const apiKeyOptional = isOllama
 
   // Mirrors AddApiKeyModal.js apiKeySatisfied: AWS static keys are a pair, and
   // the Azure / Cloudflare forms carry fields the create route must receive.
@@ -2760,32 +2926,36 @@ function CustomConfigCard({ providerId }: { providerId: string }) {
   const dirty = JSON.stringify(Object.fromEntries(rows.filter((r) => r.name && r.value).map((r) => [r.name, r.value]))) !== JSON.stringify(saved)
 
   return (
-    <Card className="mt-4">
-      <CardContent className="p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Custom Headers</h2>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setRows(Object.entries(saved).map(([name, value]) => ({ name, value })))}
-              disabled={!dirty}
-            >
-              Reset
-            </Button>
-            <Button size="sm" onClick={() => void save()} disabled={busy || !dirty}>
-              {busy ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
+    <section className="mt-4 overflow-hidden rounded-xl bg-surface">
+      <div className="flex items-center justify-between gap-2 px-4 py-3">
+        <h2 className="text-sm font-semibold text-text-main">Custom Headers</h2>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setRows(Object.entries(saved).map(([name, value]) => ({ name, value })))}
+            disabled={!dirty}
+          >
+            Reset
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => void save()} disabled={busy || !dirty}>
+            {busy ? 'Saving…' : 'Save'}
+          </Button>
         </div>
+      </div>
+      <div className="border-t border-border px-4 py-3">
         {Object.keys(builtin).length > 0 && (
           <div className="mb-3">
-            <p className="mb-1 text-xs text-text-muted">Built-in headers</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="mb-1.5 text-[11px] text-text-muted">Built-in headers</p>
+            <div className="flex flex-wrap gap-1.5">
               {Object.entries(builtin).map(([k, v]) => (
-                <Badge key={k} variant="outline" size="sm" title={v}>
+                <span
+                  key={k}
+                  title={v}
+                  className="inline-flex items-center rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-text-muted"
+                >
                   {k}
-                </Badge>
+                </span>
               ))}
             </div>
           </div>
@@ -2794,32 +2964,36 @@ function CustomConfigCard({ providerId }: { providerId: string }) {
           {rows.map((row, i) => (
             <div key={i} className="flex gap-2">
               <Input
-                className="w-1/3"
+                className="w-1/3 border-0 bg-surface-2 shadow-none"
                 value={row.name}
                 placeholder="X-Header"
                 onChange={(e) => setRows((prev) => prev.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)))}
               />
               <Input
-                className="flex-1"
+                className="flex-1 border-0 bg-surface-2 shadow-none"
                 value={row.value}
                 placeholder="value"
                 onChange={(e) => setRows((prev) => prev.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)))}
               />
-              <Button variant="ghost" size="icon" onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}>
-                <Icon name="close" />
-              </Button>
+              <button
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-2 hover:text-danger"
+                onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}
+                title="Remove header"
+              >
+                <Icon name="close" className="text-[16px]" />
+              </button>
             </div>
           ))}
           <Button
             size="sm"
-            variant="secondary"
+            variant="ghost"
             className="self-start"
             onClick={() => setRows((prev) => [...prev, { name: '', value: '' }])}
           >
             <Icon name="add" /> Add header
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }

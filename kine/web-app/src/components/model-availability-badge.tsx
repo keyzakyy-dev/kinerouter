@@ -12,10 +12,10 @@ import { useNotify } from '@/lib/toast'
  * here the badge is the trigger: same popover body, no dead UI when healthy.
  */
 const STATUS = {
-  available: { icon: 'check_circle', color: '#22c55e' },
-  cooldown: { icon: 'schedule', color: '#f59e0b' },
-  unavailable: { icon: 'error', color: '#ef4444' },
-  unknown: { icon: 'help', color: '#6b7280' },
+  available: { icon: 'check_circle', color: 'var(--color-text-main)' },
+  cooldown: { icon: 'schedule', color: 'var(--color-text-muted)' },
+  unavailable: { icon: 'error', color: 'var(--color-danger)' },
+  unknown: { icon: 'help', color: 'var(--color-text-subtle)' },
 } as const
 
 export function ModelAvailabilityBadge() {
@@ -89,13 +89,10 @@ export function ModelAvailabilityBadge() {
         <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
           <div className="flex items-center justify-between border-b border-border bg-bg px-4 py-3">
             <div className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className="material-symbols-outlined text-[16px]"
-                style={{ color: healthy ? '#22c55e' : '#f59e0b' }}
-              >
-                {healthy ? 'verified' : 'warning'}
-              </span>
+              <Icon
+                name={healthy ? 'verified' : 'warning'}
+                className={healthy ? 'text-[16px] text-text-main' : 'text-[16px] text-text-muted'}
+              />
               <span className="text-sm font-semibold text-text-main">Model Status</span>
             </div>
             <button
@@ -125,12 +122,8 @@ export function ModelAvailabilityBadge() {
                             className="flex items-center justify-between rounded-lg bg-surface-2 px-2.5 py-1.5"
                           >
                             <div className="flex min-w-0 items-center gap-1.5">
-                              <span
-                                aria-hidden
-                                className="material-symbols-outlined shrink-0 text-[14px]"
-                                style={{ color: s.color }}
-                              >
-                                {s.icon}
+                              <span aria-hidden className="shrink-0 text-[14px]" style={{ color: s.color }}>
+                                <Icon name={s.icon} />
                               </span>
                               <span className="truncate font-mono text-xs text-text-main">{m.model}</span>
                             </div>

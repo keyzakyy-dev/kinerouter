@@ -29,10 +29,10 @@ type Meta = { provider: string; model: string; sourceFormat: string; targetForma
 
 function MetaBadge({ label, value, color }: { label: string; value?: string; color: string }) {
   const colors: Record<string, string> = {
-    blue: 'bg-blue-500/10 text-blue-500',
-    orange: 'bg-orange-500/10 text-orange-500',
-    green: 'bg-green-500/10 text-green-500',
-    purple: 'bg-purple-500/10 text-purple-500',
+    blue: 'bg-foreground/5 text-muted-foreground',
+    orange: 'bg-foreground/5 text-muted-foreground',
+    green: 'bg-foreground/5 text-muted-foreground',
+    purple: 'bg-foreground/5 text-muted-foreground',
   }
   return (
     <span
@@ -299,7 +299,7 @@ export default function TranslatorPage() {
                   <span className="w-4 font-mono text-xs text-text-muted/60">{step.id}</span>
                   <h3 className="text-sm font-semibold text-text-main">{step.label}</h3>
                   <span className="font-mono text-xs text-text-muted/60">{step.file}</span>
-                  {content && <span className="text-xs text-green-500">({content.length} chars)</span>}
+                  {content && <span className="text-xs text-muted-foreground">({content.length} chars)</span>}
                 </button>
                 {!isExpanded && (
                   <div className="flex shrink-0 gap-1">

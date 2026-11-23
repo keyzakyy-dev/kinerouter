@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { RecentRequest } from '@/lib/api'
-import { Card } from '@/components/ui/card'
+import { Icon } from '@/components/icon'
 import { fmt } from './helpers'
 
 /** Ticks every second without re-rendering the parent list. */
@@ -19,46 +19,39 @@ function TimeAgo({ timestamp }: { timestamp: string }) {
 /** Live tail of the last few completed requests. */
 export function RecentRequests({ requests = [] }: { requests?: RecentRequest[] }) {
   return (
-    <Card className="flex min-w-0 flex-col overflow-hidden p-3" style={{ height: 480 }}>
-      <div className="shrink-0 border-b border-border px-1 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">Recent Requests</span>
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-surface" style={{ height: 480 }}>
+      <div className="flex shrink-0 items-center gap-2 px-4 py-3">
+        <Icon name="schedule" className="text-[15px] text-text-muted" />
+        <h2 className="text-sm font-semibold text-text-main">Recent requests</h2>
+        <span className="ml-auto font-mono text-[11px] text-text-muted">{requests.length}</span>
       </div>
+
       {!requests.length ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-text-muted">No requests yet.</div>
-      ) : (
-        <div className="flex-1 overflow-y-auto">
-          <table className="w-full min-w-[300px] border-collapse text-xs">
-            <thead className="sticky top-0 z-10 bg-bg">
-              <tr className="border-b border-border">
-                <th className="w-2 py-1.5 text-left font-semibold text-text-muted" />
-                <th className="py-1.5 text-left font-semibold text-text-muted">Model</th>
-                <th className="whitespace-nowrap py-1.5 text-right font-semibold text-text-muted">In / Out</th>
-                <th className="py-1.5 text-right font-semibold text-text-muted">When</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/50">
-              {requests.map((r, i) => {
-                const ok = !r.status || r.status === 'ok' || r.status === 'success'
-                return (
-                  <tr key={i} className="transition-colors hover:bg-bg-alt">
-                    <td className="py-1.5">
-                      <span className={`block size-1.5 rounded-full ${ok ? 'bg-success' : 'bg-danger'}`} />
-                    </td>
-                    <td className="max-w-[120px] truncate py-1.5 font-mono" title={r.model}>{r.model}</td>
-                    <td className="whitespace-nowrap py-1.5 text-right">
-                      <span className="text-primary">{fmt(r.promptTokens)}↑</span>{' '}
-                      <span className="text-success">{fmt(r.completionTokens)}↓</span>
-                    </td>
-                    <td className="whitespace-nowrap py-1.5 text-right text-text-muted">
-                      <TimeAgo timestamp={r.timestamp} />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl bg-surface-2 p-6 text-center text-xs text-text-muted">
+          <Icon name="schedule" className="text-[24px] text-text-muted/60" />
+          <span>No requests yet. Send one from Endpoint &amp; Key.</span>
         </div>
+      ) : (
+        <ul className="custom-scrollbar flex-1 divide-y divide-border overflow-y-auto border-t border-border">
+          {requests.map((r, i) => {
+            const ok = !r.status || r.status === 'ok' || r.status === 'success'
+            return (
+              <li key={i} className="flex items-center gap-2 px-4 py-2 transition-colors hover:bg-surface-2/40">
+                <span className={`size-1.5 shrink-0 rounded-full ${ok ? 'bg-success' : 'bg-danger'}`} />
+                <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-main" title={r.model}>
+                  {r.model}
+                </code>
+                <span className="shrink-0 font-mono text-[10px] text-text-muted">
+                  {fmt(r.promptTokens)}↑ {fmt(r.completionTokens)}↓
+                </span>
+                <span className="w-14 shrink-0 text-right font-mono text-[10px] text-text-muted">
+                  <TimeAgo timestamp={r.timestamp} />
+                </span>
+              </li>
+            )
+          })}
+        </ul>
       )}
-    </Card>
+    </section>
   )
 }

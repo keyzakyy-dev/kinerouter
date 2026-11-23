@@ -19,7 +19,7 @@ function apply(theme: Theme) {
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem(KEY)
-    return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system'
+    return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'light'
   })
 
   const setTheme = useCallback((next: Theme) => {

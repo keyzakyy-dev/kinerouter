@@ -5,7 +5,6 @@ import { AutoPingScheduleModal, EditConnectionModal } from '@/components/connect
 import { ProviderIcon } from '@/components/provider-icon'
 import { QuotaTable } from '@/components/quota-table'
 import { ConfirmModal, Modal } from '@/components/modal'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -773,7 +772,7 @@ export default function QuotaPage() {
             className={cn(
               'flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-2 text-xs transition-colors',
               expiringFirst
-                ? 'border-amber-500/40 bg-amber-500/10 text-amber-500'
+                ? 'border-border bg-foreground/5 text-muted-foreground'
                 : 'border-black/10 text-text-main hover:bg-black/5',
             )}
             title="Sort accounts by earliest quota reset time"
@@ -807,7 +806,7 @@ export default function QuotaPage() {
               )
             }
             disabled={bulkToggling}
-            className="flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-emerald-500/30 px-2 text-xs text-emerald-500 transition-colors hover:bg-emerald-500/10 disabled:opacity-50"
+            className="flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-foreground/5 disabled:opacity-50"
             title="Enable connections that still have quota on the current page"
           >
             <Icon name="check_circle" className="text-[14px]" />
@@ -840,7 +839,7 @@ export default function QuotaPage() {
       </div>
 
       {expiringFirst && (
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+        <div className="rounded-xl border border-border bg-foreground/5 px-3 py-2 text-xs text-muted-foreground">
           Expiring-first currently reorders accounts inside the current page. Cross-page ordering
           still follows backend pagination.
         </div>
@@ -1137,7 +1136,7 @@ function QuotaCard({
                     {kiroMethodLabel(conn)}
                   </span>
                   {kiroRegion(conn) && (
-                    <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-600">
+                    <span className="rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
                       {kiroRegion(conn)}
                     </span>
                   )}
@@ -1147,7 +1146,7 @@ function QuotaCard({
                       isInactive
                         ? 'bg-surface-2 text-text-muted'
                         : conn.testStatus === 'active' || conn.testStatus === 'success'
-                          ? 'bg-green-500/10 text-green-600'
+                          ? 'bg-foreground/5 text-muted-foreground'
                           : conn.testStatus === 'error' ||
                               conn.testStatus === 'expired' ||
                               conn.testStatus === 'unavailable'

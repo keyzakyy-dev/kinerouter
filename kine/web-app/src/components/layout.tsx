@@ -1,42 +1,44 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { cn } from '@/lib/utils'
+import { useEffect, useRef, useState } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import {
+  Sidebar,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarItem,
+  SidebarNested,
+  SidebarNav,
+  SidebarSection,
+  useSidebar,
+} from '@/components/ui/sidebar'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { Modal } from '@/components/modal'
 import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
+import { Icon } from '@/components/icon'
 
 /** Fallback until /api/version reports how this binary was installed. */
 const INSTALL_CMD = 'npm i -g kinerouter@latest --prefer-online'
 const SHUTDOWN_COUNTDOWN_SEC = 3
 
-/** Collapsed/expanded state survives reloads; local only, nothing is sent to the gateway. */
+/** Collapsed state survives reloads; local only, nothing is sent to the gateway. */
 const COLLAPSE_KEY = 'kinerouter.sidebar'
-
-/** Sidebar motion, on Animate UI's curve: the collapse and everything inside it. */
-const SIDEBAR_EASE = 'ease-[cubic-bezier(0.77,0,0.175,1)]'
-const SIDEBAR_MS = 'duration-[280ms]'
-
-/** Label + trailing chrome: they fold their width and fade into a light blur. */
-const HIDES = `shrink-0 overflow-hidden whitespace-nowrap transition-[opacity,filter,width] duration-150 ease-out group-data-[collapsed=true]/sidebar:w-0 group-data-[collapsed=true]/sidebar:opacity-0 group-data-[collapsed=true]/sidebar:blur-[2px] motion-reduce:transition-none`
-/** The row becomes a 36×34 icon tile in the slim rail. */
-const ROW_COLLAPSED = `group-data-[collapsed=true]/sidebar:mx-auto group-data-[collapsed=true]/sidebar:size-9 group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:gap-0 group-data-[collapsed=true]/sidebar:rounded-[10px] group-data-[collapsed=true]/sidebar:px-0`
-/** Row motion shared by every nav row, so buttons resize on the sidebar's timing. */
-const ROW_BASE = `relative z-[1] flex shrink-0 items-center gap-3 overflow-hidden rounded-lg px-3 py-1 min-h-8 text-[13px] font-medium transition-[color,background-color,width,height,padding,border-radius] ${SIDEBAR_MS} ${SIDEBAR_EASE} motion-reduce:transition-none`
 
 /** Sidebar structure mirrors KineRouter's src/shared/components/Sidebar.js. */
 type NavItem = { href: string; label: string; icon: string }
 
-const navItems: NavItem[] = [
-  { href: '/dashboard/endpoint', label: 'Endpoint & Key', icon: 'api' },
+const gatewayItems: NavItem[] = [
+  { href: '/dashboard/endpoint', label: 'Endpoint & Key', icon: 'key' },
   { href: '/dashboard/providers', label: 'Providers', icon: 'dns' },
   { href: '/dashboard/combos', label: 'Combo & Vision Adapter', icon: 'layers' },
+]
+
+const insightItems: NavItem[] = [
   { href: '/dashboard/usage', label: 'Usage', icon: 'bar_chart' },
   { href: '/dashboard/quota', label: 'Quota Tracker', icon: 'data_usage' },
   { href: '/dashboard/token-saver', label: 'Token Saver', icon: 'savings' },
-  { href: '/dashboard/cli-tools', label: 'CLI Tools', icon: 'terminal' },
 ]
+
+const toolItems: NavItem[] = [{ href: '/dashboard/cli-tools', label: 'CLI Tools', icon: 'terminal' }]
 
 const systemItems: NavItem[] = [
   { href: '/dashboard/proxy-pools', label: 'Proxy Pools', icon: 'lan' },
@@ -65,100 +67,128 @@ const MEDIA_ITEMS: NavItem[] = [
   { href: '/dashboard/media-providers/web', label: 'Web Fetch & Search', icon: 'travel_explore' },
 ]
 
-/** Left edge of the bubble: the 64px slim rail plus a small gap. */
-const TIP_LEFT = 72
+const SETTINGS_ITEM: NavItem = { href: '/dashboard/settings', label: 'Settings', icon: 'settings' }
 
-/**
- * Hover bubble for the collapsed rail. Native `title` waits ~1s and can't be
- * styled, so this draws its own. Portalled to <body>: the <aside> clips with
- * overflow-hidden and the <nav> scrolls with overflow-y-auto, either of which
- * would cut an absolutely-positioned child off.
- */
-function RailTip({ label, children }: { label?: string; children: React.ReactNode }) {
-  const [top, setTop] = useState<number | null>(null)
-  // Expanding mid-hover unmounts nothing, so the bubble would linger over a
-  // now-labelled row; clear it whenever the rail stops being collapsed.
-  useEffect(() => {
-    if (!label) setTop(null)
-  }, [label])
-  if (!label) return <>{children}</>
+/** Navbar crumb: every routable page in the same order the rail lists it. */
+const ALL_NAV_ITEMS: NavItem[] = [
+  ...gatewayItems,
+  ...insightItems,
+  ...toolItems,
+  ...MEDIA_ITEMS,
+  ...systemItems,
+  ...debugItems,
+  SETTINGS_ITEM,
+]
+
+/** The menu glyph, on the same Tabler set the rest of the dashboard uses. */
+function MenuIcon({ icon }: { icon: string }) {
+  return <Icon name={icon} className="text-[18px]" />
+}
+
+/** Same match NavLink uses: the endpoint page is exact, the rest cover their children. */
+function isActive(pathname: string, href: string) {
+  return pathname === href || (href !== '/dashboard/endpoint' && pathname.startsWith(`${href}/`))
+}
+
+function NavItems({ items }: { items: NavItem[] }) {
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
   return (
-    <span
-      className="contents"
-      onMouseEnter={(e) => {
-        // display:contents gives the span no box of its own; measure the row.
-        const r = e.currentTarget.firstElementChild?.getBoundingClientRect()
-        if (r) setTop(r.top + r.height / 2)
-      }}
-      onMouseLeave={() => setTop(null)}
-    >
-      {children}
-      {top !== null &&
-        createPortal(
-          <div
-            role="tooltip"
-            style={{ top, left: TIP_LEFT }}
-            className="pointer-events-none fixed z-50 -translate-y-1/2 origin-left animate-[rail-tip-in_140ms_cubic-bezier(0.34,1.56,0.64,1)] whitespace-nowrap rounded-md bg-surface-3 px-2.5 py-1 text-xs font-medium text-text-main shadow-lg ring-1 ring-border before:absolute before:top-1/2 before:-left-1 before:h-2 before:w-2 before:-translate-y-1/2 before:rotate-45 before:rounded-sm before:bg-surface-3"
-          >
-            {label}
-          </div>,
-          document.body,
-        )}
-    </span>
+    <>
+      {items.map((item) => (
+        <SidebarItem
+          key={item.href}
+          icon={<MenuIcon icon={item.icon} />}
+          active={isActive(pathname, item.href)}
+          onClick={() => navigate(item.href)}
+        >
+          {item.label}
+        </SidebarItem>
+      ))}
+    </>
   )
 }
 
-function NavRow({
-  item,
-  collapsed,
-  onNavigate,
-}: {
-  item: NavItem
-  collapsed: boolean
-  onNavigate?: () => void
-}) {
-  return (
-    <RailTip label={collapsed ? item.label : undefined}>
-    <NavLink
-      to={item.href}
-      end={item.href === '/dashboard/endpoint'}
-      onClick={onNavigate}
-      data-sidebar="menu-button"
-      className={({ isActive }) =>
-        cn(
-          ROW_BASE,
-          'group',
-          ROW_COLLAPSED,
-          isActive
-            ? 'bg-primary/10 text-primary group-data-[collapsed=true]/sidebar:bg-primary group-data-[collapsed=true]/sidebar:text-white group-data-[collapsed=true]/sidebar:shadow-[0_4px_14px_-4px_rgba(229,106,74,0.7)]'
-            : 'text-text-muted hover:text-text-main',
-        )
-      }
-    >
-      {({ isActive }) => (
-        <>
-          <span
-            className={cn(
-              'material-symbols-outlined text-[18px] shrink-0',
-              isActive ? 'fill-1' : 'group-hover:text-primary transition-colors',
-            )}
-          >
-            {item.icon}
+/** Brand rail. The collapsed rail is all mark: the primitive's header expands on click. */
+function Brand({ version }: { version: string }) {
+  const { collapsed } = useSidebar()
+  const mark = (
+    <>
+      <span
+        aria-hidden
+        className="size-7 shrink-0 bg-text-main mask-[url(/favicon.svg)] [mask-size:145%] mask-center mask-no-repeat"
+      />
+      {!collapsed && (
+        <span className="flex min-w-0 flex-col whitespace-nowrap">
+          <span className="font-display text-[15px] font-semibold leading-tight tracking-tight text-text-main">
+            KineRouter
           </span>
-          <span className={cn('text-[13px] font-medium whitespace-nowrap', HIDES)}>{item.label}</span>
-        </>
+          <span className="flex items-center gap-1.5 text-[11px] leading-tight text-text-muted">
+            <span className="size-1.5 rounded-full bg-success" />
+            {version ? `v${version}` : 'local gateway'}
+          </span>
+        </span>
       )}
-    </NavLink>
-    </RailTip>
+    </>
+  )
+
+  if (collapsed) return <div className="flex min-w-0 items-center gap-2.5">{mark}</div>
+  return (
+    <a href="/dashboard" className="flex min-w-0 items-center gap-2.5">
+      {mark}
+    </a>
+  )
+}
+
+/** Footer status text: the primitive's footer only has room for the dot at rail width. */
+
+function UpdateBanner({ latestVersion, onUpdate, onCopy, copied }: {
+  latestVersion: string
+  onUpdate: () => void
+  onCopy: () => void
+  copied: string | null
+}) {
+  const { collapsed } = useSidebar()
+  if (collapsed) {
+    return (
+      <button
+        onClick={onUpdate}
+        title={`Update to v${latestVersion}`}
+        aria-label={`Update to v${latestVersion}`}
+        className="mx-auto mb-1 grid size-7 cursor-pointer place-items-center rounded-md border border-success/40 text-[13px] font-semibold text-success transition-colors hover:bg-success/10"
+      >
+        ↑
+      </button>
+    )
+  }
+  return (
+    <div className="mb-2 flex flex-col gap-1.5 px-[18px]">
+      <span className="text-xs font-semibold text-success">↑ New version available: v{latestVersion}</span>
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={onUpdate}
+          className="cursor-pointer rounded bg-success px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:opacity-90"
+        >
+          Update now
+        </button>
+        <button
+          onClick={onCopy}
+          title="Copy install command"
+          aria-label="Copy install command"
+          className="grid size-6 cursor-pointer place-items-center rounded border border-success/30 text-success/80 transition-colors hover:bg-success/10 hover:text-success"
+        >
+          <Icon name={copied ? 'check' : 'content_copy'} className="text-[13px]" />
+        </button>
+      </div>
+    </div>
   )
 }
 
 export function AppShell() {
   const { logout } = useAuth()
-  const navigate = useNavigate()
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const [version, setVersion] = useState('')
-  const [mediaOpen, setMediaOpen] = useState(false)
   const [enableTranslator, setEnableTranslator] = useState(false)
   const [latestVersion, setLatestVersion] = useState('')
   const [installCmd, setInstallCmd] = useState(INSTALL_CMD)
@@ -168,46 +198,7 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) !== 'open')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { copied, copy } = useCopyToClipboard()
-
-  /* One highlight surface hands itself from row to row, as Animate UI's does. */
-  const navRef = useRef<HTMLElement | null>(null)
-  const [hl, setHl] = useState({ top: 0, left: 0, width: 0, height: 0, on: false })
-
-  const measure = useCallback((el: HTMLElement | null) => {
-    const box = navRef.current
-    if (!el || !box) return
-    const b = box.getBoundingClientRect()
-    const r = el.getBoundingClientRect()
-    setHl({
-      top: r.top - b.top + box.scrollTop,
-      left: r.left - b.left,
-      width: r.width,
-      height: r.height,
-      on: true,
-    })
-  }, [])
-
-  const activeRow = useCallback(
-    () => navRef.current?.querySelector<HTMLElement>('[aria-current="page"]') ?? null,
-    [],
-  )
-
-  // Follow the active row: after navigation, while the rail resizes, and when a
-  // submenu folds (its rows move everything below them).
-  useEffect(() => {
-    const box = navRef.current
-    if (!box) return
-    const follow = () => measure(activeRow())
-    follow()
-    // The rail's CSS transition ends after this; ResizeObserver covers the frames.
-    const settle = window.setTimeout(follow, 300)
-    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(follow)
-    ro?.observe(box)
-    return () => {
-      window.clearTimeout(settle)
-      ro?.disconnect()
-    }
-  }, [pathname, collapsed, mediaOpen, measure, activeRow])
+  const currentLabel = ALL_NAV_ITEMS.find((item) => isActive(pathname, item.href))?.label
 
   useEffect(() => {
     api
@@ -231,7 +222,7 @@ export function AppShell() {
     localStorage.setItem(COLLAPSE_KEY, collapsed ? 'closed' : 'open')
   }, [collapsed])
 
-  // Cmd/Ctrl+B. Skipped while typing so it never eats a keystroke.
+  // Cmd/Ctrl+B, the habit from the previous rail. Skipped while typing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'b') return
@@ -270,273 +261,110 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen">
-      <aside
-        data-collapsed={collapsed}
-        className="group/sidebar sticky top-0 flex h-screen w-72 flex-col overflow-hidden border-r border-border-subtle bg-vibrancy backdrop-blur-xl transition-[width] duration-[280ms] ease-[cubic-bezier(0.77,0,0.175,1)] data-[collapsed=true]:w-16 motion-reduce:transition-none"
-      >
-        {/* Brand rail: mark, name and the collapse toggle. */}
-        <div className="flex flex-col gap-2 px-3 pt-4 pb-3 group-data-[collapsed=true]/sidebar:px-2 group-data-[collapsed=true]/sidebar:pt-4">
-          <div className="flex items-center gap-2.5 group-data-[collapsed=true]/sidebar:flex-col group-data-[collapsed=true]/sidebar:gap-2">
-            <NavLink to="/dashboard" className="flex min-w-0 items-center gap-2.5" title={collapsed ? `KineRouter${version ? ` v${version}` : ''}` : undefined}>
-              <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-warm group-data-[collapsed=true]/sidebar:size-8 group-data-[collapsed=true]/sidebar:rounded-[10px]">
-                <img src="/favicon.svg" alt="" className="size-5 w-auto" />
-              </span>
-              <span className="flex min-w-0 flex-col whitespace-nowrap group-data-[collapsed=true]/sidebar:hidden">
-                <span className="text-[15px] font-semibold leading-tight tracking-tight text-text-main">KineRouter</span>
-                <span className="flex items-center gap-1.5 text-[11px] leading-tight text-text-muted">
-                  <span className="size-1.5 rounded-full bg-success" />
-                  {version ? `v${version}` : 'local gateway'}
-                </span>
-              </span>
-            </NavLink>
-            <button
-              onClick={() => setCollapsed((v) => !v)}
-              title={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'}
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              aria-expanded={!collapsed}
-              className="ml-auto inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main group-data-[collapsed=true]/sidebar:mx-auto"
-            >
-              {/* Animated panel-left: the divider narrows as the rail closes. */}
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden
-                className="size-[17px]"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.9"
-                strokeLinecap="round"
-              >
-                <rect x="3" y="4" width="18" height="16" rx="2.5" />
-                <path
-                  d="M9.5 4.5v15"
-                  className={`transition-transform duration-[350ms] ease-[cubic-bezier(0.215,0.61,0.355,1)] motion-reduce:transition-none ${collapsed ? '-translate-x-[1.5px]' : ''}`}
-                />
-              </svg>
-            </button>
-          </div>
-          {latestVersion && (
-            <>
-              <div className="-m-1 hidden flex-col gap-1.5 rounded p-1 group-data-[collapsed=true]/sidebar:flex">
-                <button
-                  onClick={() => setShowUpdate(true)}
-                  title={`Update to v${latestVersion}`}
-                  className="mx-auto grid size-7 cursor-pointer place-items-center rounded-md border border-success/40 text-[13px] font-semibold text-success transition-colors hover:bg-success/10"
-                >
-                  ↑
-                </button>
-              </div>
-              <div className="-m-1 flex flex-col gap-1.5 rounded p-1 group-data-[collapsed=true]/sidebar:hidden">
-                <span className="text-xs font-semibold text-success">↑ New version available: v{latestVersion}</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setShowUpdate(true)}
-                    className="cursor-pointer rounded bg-success px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:opacity-90"
-                  >
-                    Update now
-                  </button>
-                  <button
-                    onClick={() => copy(installCmd)}
-                    title="Copy install command"
-                    aria-label="Copy install command"
-                    className="grid size-6 cursor-pointer place-items-center rounded border border-success/30 text-success/80 transition-colors hover:bg-success/10 hover:text-success"
-                  >
-                    <span className="material-symbols-outlined text-[13px]">
-                      {copied ? 'check' : 'content_copy'}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Navigation */}
-        {/* RailTip wraps rows in display:contents, which `space-y-*` can't space,
-            so the gaps come from flex `gap` on each list instead. */}
-        <nav
-          ref={navRef}
-          onPointerOver={(e) => {
-            const row = (e.target as HTMLElement).closest<HTMLElement>('[data-sidebar="menu-button"]')
-            if (row) measure(row)
-          }}
-          onPointerLeave={() => measure(activeRow())}
-          className="custom-scrollbar relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-2 group-data-[collapsed=true]/sidebar:px-2 [&>*]:shrink-0"
+      <div className="sticky top-0 h-screen">
+        <Sidebar
+          variant="collapsible"
+          width={256}
+          collapsedWidth={64}
+          collapsed={collapsed}
+          onCollapsedChange={setCollapsed}
+          aria-label="Dashboard"
+          className="bg-[var(--color-sidebar)] backdrop-blur-xl"
         >
-          {/* The shared surface: it glides to the row under the pointer, and back
-              to the active row when the pointer leaves. Rows paint their content
-              above it (z-1), so only one highlight is ever visible. */}
-          <div
-            aria-hidden
-            className={`pointer-events-none absolute left-0 rounded-lg bg-surface-2 transition-[top,left,width,height,opacity] ${SIDEBAR_MS} ${SIDEBAR_EASE} motion-reduce:transition-none`}
-            style={{
-              top: hl.top,
-              left: hl.left,
-              width: hl.width,
-              height: hl.height,
-              opacity: hl.on ? 1 : 0,
-            }}
-          />
-          <p className={cn('mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-text-muted/60', HIDES)}>
-            Gateway
-          </p>
-          {navItems.slice(0, 3).map((item) => (
-            <NavRow key={item.href} item={item} collapsed={collapsed} />
-          ))}
+          <SidebarHeader>
+            <Brand version={version} />
+          </SidebarHeader>
 
-          <div className="mx-auto my-2 h-px w-6 bg-border-subtle group-data-[collapsed=false]/sidebar:hidden" />
-          <p className={cn('mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-text-muted/60', HIDES)}>
-            Insight
-          </p>
-          {navItems.slice(3, 6).map((item) => (
-            <NavRow key={item.href} item={item} collapsed={collapsed} />
-          ))}
+          {latestVersion && (
+            <UpdateBanner
+              latestVersion={latestVersion}
+              onUpdate={() => setShowUpdate(true)}
+              onCopy={() => copy(installCmd)}
+              copied={copied}
+            />
+          )}
 
-          <div className="mx-auto my-2 h-px w-6 bg-border-subtle group-data-[collapsed=false]/sidebar:hidden" />
-          <p className={cn('mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-text-muted/60', HIDES)}>
-            Tools
-          </p>
-          {navItems.slice(6).map((item) => (
-            <NavRow key={item.href} item={item} collapsed={collapsed} />
-          ))}
+          <SidebarNav className="custom-scrollbar">
+            <SidebarSection label="Gateway">
+              <NavItems items={gatewayItems} />
+            </SidebarSection>
 
-          <div className="mt-1 flex flex-col gap-1 pt-2">
-            <div className="mx-auto mb-2 h-px w-6 bg-border-subtle group-data-[collapsed=false]/sidebar:hidden" />
-            <p className={cn('mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.09em] text-text-muted/60', HIDES)}>
-              System
-            </p>
+            <SidebarSection label="Insight">
+              <NavItems items={insightItems} />
+            </SidebarSection>
 
-            {/* Media Providers accordion. The slim rail keeps one icon instead of
-                the whole sub-nav, and it lands on the first media page directly. */}
-            <button
-              onClick={() => setMediaOpen((v) => !v)}
-              aria-expanded={mediaOpen}
-              data-sidebar="menu-button"
-              className={`group relative z-[1] flex w-full shrink-0 items-center gap-3 overflow-hidden rounded-lg px-3 py-1 min-h-8 text-[13px] font-medium text-text-muted transition-[color,background-color] duration-200 hover:text-text-main group-data-[collapsed=true]/sidebar:hidden`}
-            >
-              <span className="material-symbols-outlined text-[18px] shrink-0">perm_media</span>
-              <span className="flex-1 text-left text-[13px] font-medium">Media Providers</span>
-              <span
-                className="material-symbols-outlined text-[14px] transition-transform"
-                style={{ transform: mediaOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            <SidebarSection label="Tools">
+              <NavItems items={toolItems} />
+            </SidebarSection>
+
+            <SidebarSection label="System">
+              <SidebarNested
+                icon={<MenuIcon icon="perm_media" />}
+                label="Media Providers"
+                active={MEDIA_ITEMS.some((item) => isActive(pathname, item.href))}
               >
-                expand_more
-              </span>
-            </button>
-            <RailTip label={collapsed ? 'Media Providers' : undefined}>
-              <NavLink
-                to={MEDIA_ITEMS[0].href}
-                data-sidebar="menu-button"
-                className={({ isActive }) =>
-                  cn(
-                    ROW_BASE,
-                    'group hidden',
-                    ROW_COLLAPSED,
-                    'group-data-[collapsed=true]/sidebar:flex',
-                    isActive
-                      ? 'bg-primary/10 text-primary group-data-[collapsed=true]/sidebar:bg-primary group-data-[collapsed=true]/sidebar:text-white group-data-[collapsed=true]/sidebar:shadow-[0_4px_14px_-4px_rgba(229,106,74,0.7)]'
-                      : 'text-text-muted hover:text-text-main',
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span
-                      className={cn(
-                        'material-symbols-outlined text-[18px] shrink-0',
-                        isActive ? 'fill-1' : 'group-hover:text-primary transition-colors',
-                      )}
-                    >
-                      perm_media
-                    </span>
-                    <span className={cn('text-[13px] font-medium whitespace-nowrap', HIDES)}>
-                      Media Providers
-                    </span>
-                  </>
-                )}
-              </NavLink>
-            </RailTip>
-            {mediaOpen && !collapsed && (
-              <div className="flex shrink-0 flex-col gap-1.5 pl-4">
-                {MEDIA_ITEMS.map((item, i) => (
-                  <div
+                {MEDIA_ITEMS.map((item) => (
+                  <SidebarItem
                     key={item.href}
-                    className="sidebar-sub-in"
-                    style={{ animationDelay: `${Math.min(i, 9) * 33}ms` }}
+                    icon={<MenuIcon icon={item.icon} />}
+                    active={isActive(pathname, item.href)}
+                    onClick={() => navigate(item.href)}
                   >
-                    <NavRow item={item} collapsed={collapsed} />
-                  </div>
+                    {item.label}
+                  </SidebarItem>
                 ))}
-              </div>
-            )}
-
-            {systemItems.map((item) => (
-              <NavRow key={item.href} item={item} collapsed={collapsed} />
-            ))}
-
-            {debugItems
-              .filter((item) => item.href !== '/dashboard/translator' || enableTranslator)
-              .map((item) => (
-                <NavRow key={item.href} item={item} collapsed={collapsed} />
-              ))}
-
-            {/* Settings */}
-            <RailTip label={collapsed ? 'Settings' : undefined}>
-              <NavLink
-                to="/dashboard/settings"
-                data-sidebar="menu-button"
-                className={({ isActive }) =>
-                  cn(
-                    ROW_BASE,
-                    'group',
-                    ROW_COLLAPSED,
-                    isActive
-                      ? 'bg-primary/10 text-primary group-data-[collapsed=true]/sidebar:bg-primary group-data-[collapsed=true]/sidebar:text-white group-data-[collapsed=true]/sidebar:shadow-[0_4px_14px_-4px_rgba(229,106,74,0.7)]'
-                      : 'text-text-muted hover:text-text-main',
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span
-                      className={cn(
-                        'material-symbols-outlined text-[18px] shrink-0',
-                        isActive ? 'fill-1' : 'group-hover:text-primary transition-colors',
-                      )}
-                    >
-                      settings
-                    </span>
-                    <span className={cn('text-[13px] font-medium whitespace-nowrap', HIDES)}>Settings</span>
-                  </>
+              </SidebarNested>
+              <NavItems items={systemItems} />
+              <NavItems
+                items={debugItems.filter(
+                  (item) => item.href !== '/dashboard/translator' || enableTranslator,
                 )}
-              </NavLink>
-            </RailTip>
-          </div>
-        </nav>
+              />
+              <SidebarItem
+                icon={<MenuIcon icon="settings" />}
+                active={isActive(pathname, '/dashboard/settings')}
+                onClick={() => navigate('/dashboard/settings')}
+              >
+                Settings
+              </SidebarItem>
+            </SidebarSection>
+          </SidebarNav>
 
-        <div className="flex flex-col gap-1.5 px-3 pb-3 pt-1 group-data-[collapsed=true]/sidebar:items-center group-data-[collapsed=true]/sidebar:px-2">
-          <RailTip label={collapsed ? 'Gateway online' : undefined}>
-            <div className="flex items-center gap-2 py-1 group-data-[collapsed=true]/sidebar:mx-auto">
-              <span className="size-1.5 shrink-0 rounded-full bg-success shadow-[0_0_0_3px_rgba(34,197,94,0.12)]" />
-              <span className={cn('text-[11px] text-text-muted', HIDES)}>online</span>
-            </div>
-          </RailTip>
-          <RailTip label={collapsed ? 'Log out' : undefined}>
+          <SidebarFooter>
             <button
               onClick={handleLogout}
-              className={cn(
-                'flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-1 text-[13px] font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main',
-                ROW_COLLAPSED,
-              )}
+              title="Log out"
+              aria-label="Log out"
+              className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main"
             >
-              <span className="material-symbols-outlined text-[18px] shrink-0">logout</span>
-              <span className={cn('whitespace-nowrap', HIDES)}>Log out</span>
+              <Icon name="logout" className="text-[18px]" />
             </button>
-          </RailTip>
-        </div>
-      </aside>
+          </SidebarFooter>
+        </Sidebar>
+      </div>
 
-      <main className="min-w-0 flex-1">
-        <div className="mx-auto max-w-6xl px-6 py-8">
+      <main className="min-w-0 flex-1 bg-[#fafafa] dark:bg-bg">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 bg-[var(--color-sidebar)] px-6 backdrop-blur-xl">
+          <button
+            onClick={() => setCollapsed((v) => !v)}
+            title="Toggle sidebar (Ctrl+B)"
+            aria-label="Toggle sidebar"
+            className="grid size-6 shrink-0 cursor-pointer place-items-center rounded text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main"
+          >
+            <Icon
+              name={collapsed ? 'left_panel_open' : 'left_panel_close'}
+              className="text-[18px] leading-none"
+            />
+          </button>
+          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
+            <span className="text-text-muted">Dashboard</span>
+            <span className="text-text-muted/50" aria-hidden>
+              /
+            </span>
+            <span className="truncate font-medium text-text-main">{currentLabel ?? 'Overview'}</span>
+          </nav>
+        </header>
+        <div className="mx-auto w-full max-w-7xl px-8 py-8">
           <Outlet />
         </div>
       </main>
@@ -572,7 +400,7 @@ export function AppShell() {
       {disconnected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm">
           <div className="max-w-lg rounded-xl border border-white/10 bg-neutral-900/95 p-6 text-center text-white">
-            <span className="material-symbols-outlined mb-3 text-[32px] text-danger">power_off</span>
+            <Icon name="power_off" className="mb-3 block text-[32px] text-danger" />
             <h2 className="mb-2 text-xl font-semibold">
               {countdown > 0 ? `Server stops in ${countdown}s…` : 'Server Disconnected'}
             </h2>

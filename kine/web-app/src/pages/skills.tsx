@@ -4,7 +4,6 @@ import { Icon } from '@/components/icon'
 import {
   SKILLS,
   SKILLS_BLOB_BASE,
-  SKILLS_REPO_URL,
   getSkillBlobUrl,
   getSkillRawUrl,
   type Skill,

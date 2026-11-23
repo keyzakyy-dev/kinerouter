@@ -6,10 +6,12 @@ export function CopyButton({
   value,
   label,
   size = 'icon',
+  className,
 }: {
   value: string
   label?: string
   size?: 'icon' | 'sm'
+  className?: string
 }) {
   const [copied, setCopied] = useState(false)
 
@@ -38,7 +40,7 @@ export function CopyButton({
     )
   }
   return (
-    <Button variant="ghost" size="icon" onClick={copy} title={label ?? 'Copy'}>
+    <Button variant="ghost" size="icon" onClick={copy} title={label ?? 'Copy'} className={className}>
       {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
     </Button>
   )

@@ -225,23 +225,24 @@ export default function CombosPage() {
 
   return (
     <>
-      <PageHeader
-        title="Combo & Vision Adapter"
-        description="Group models under one name, then pick a strategy per combo."
-      />
+      <PageHeader title="Combo & Vision Adapter" />
 
-      <ul className="mb-5 flex flex-col gap-1 text-sm text-text-muted">
-        <li><span className="font-medium text-text-main">Fallback</span> — tries models in order (next on failure)</li>
-        <li><span className="font-medium text-text-main">Round Robin</span> — rotates models across requests to spread load</li>
-        <li>
-          <span className="font-medium text-text-main">Smart Router</span> — queries a System One decision model to pick
-          the optimal model before generation; Smart Switch / Strict Lock / Per-Turn modes maximise prompt-cache retention
-        </li>
-        <li>
-          <span className="font-medium text-text-main">Fusion</span> — queries all models in parallel, then a judge
-          synthesises one answer. Best quality, but every request bills all panel models + the judge (N+1 calls)
-        </li>
-      </ul>
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          ['Fallback', 'Next model on failure.', 'arrow_downward'],
+          ['Round Robin', 'Rotates models per request.', 'sync'],
+          ['Smart Router', 'Best model picked first.', 'route'],
+          ['Fusion', 'All parallel, judge merges.', 'hub'],
+        ].map(([name, desc, icon]) => (
+          <div key={name} className="relative rounded-lg bg-surface px-4 py-4">
+            <span className="absolute right-4 top-4 text-text-muted">
+              <Icon name={icon} className="text-[18px]" />
+            </span>
+            <p className="mb-1 pr-10 text-base font-medium text-text-main">{name}</p>
+            <p className="pr-2 text-xs leading-snug text-text-muted">{desc}</p>
+          </div>
+        ))}
+      </div>
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:w-64">
@@ -581,23 +582,26 @@ function CapacityAdapterSection({
   getCaps: (m: string) => FullCaps | undefined
 }) {
   return (
-    <div className="mt-8 flex flex-col gap-3">
-      <div>
-        <p className="text-sm font-medium">Vision Adapter</p>
-        <p className="mt-0.5 text-xs text-text-muted">
-          Your model can’t read image/audio? Auto-switches to a model in the pool below.
-        </p>
+    <Card className="mt-8 overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div>
+          <p className="text-sm font-medium">Vision Adapter</p>
+          <p className="mt-0.5 text-xs text-text-muted">Send image and audio requests to a model pool.</p>
+        </div>
+        <Icon name="visibility" className="text-[18px] text-text-muted" />
       </div>
-      {CAPACITY_ADAPTER_CAPS.map((cap) => (
-        <CapacityAdapterCap
-          key={cap.key}
-          cap={cap}
-          entry={adapter[cap.key] ?? EMPTY_CAP_ENTRY}
-          onChange={(entry) => onChange({ ...adapter, [cap.key]: entry })}
-          getCaps={getCaps}
-        />
-      ))}
-    </div>
+      <div className="divide-y divide-border/40 border-t border-border/40">
+        {CAPACITY_ADAPTER_CAPS.map((cap) => (
+          <CapacityAdapterCap
+            key={cap.key}
+            cap={cap}
+            entry={adapter[cap.key] ?? EMPTY_CAP_ENTRY}
+            onChange={(entry) => onChange({ ...adapter, [cap.key]: entry })}
+            getCaps={getCaps}
+          />
+        ))}
+      </div>
+    </Card>
   )
 }
 
@@ -617,38 +621,49 @@ function CapacityAdapterCap({
   const dropTo = (next: string[]) => patch({ models: next.length === 0 ? [DEFAULT_FALLBACK_MODEL] : next })
 
   return (
-    <Card className={cn('p-3', !enabled && 'opacity-50')}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+    <>
+      <div className={cn('flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between', !enabled && 'opacity-50')}>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <Switch checked={enabled} onCheckedChange={(v) => patch({ enabled: v })} aria-label={`Enable ${cap.label} adapter`} />
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-            <Icon name={cap.icon} className="text-[18px] text-primary" />
-          </div>
+          <Icon name={cap.icon} className="text-[16px] text-text-main" />
           <div className="min-w-0 flex-1">
-            <code className="font-mono text-sm font-medium">{cap.label}</code>
-            <span className="ml-1.5 text-[10px] text-text-muted">— {cap.desc}</span>
+            <p className="text-sm font-medium leading-tight">{cap.label}</p>
+            <p className="truncate text-xs leading-tight text-text-muted">{cap.desc}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <label className="flex cursor-pointer select-none items-center gap-1.5 text-xs text-text-muted">
-            <Switch checked={roundRobin} disabled={!enabled} onCheckedChange={(v) => patch({ roundRobin: v })} aria-label={`Round-robin ${cap.label}`} />
-            Round
-          </label>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={!enabled}
+            onClick={() => patch({ roundRobin: !roundRobin })}
+            aria-pressed={roundRobin}
+            title="Rotate between models instead of falling back"
+            className={cn(
+              'flex h-7 items-center gap-1.5 rounded-md px-2 text-xs transition-colors disabled:opacity-40',
+              roundRobin ? 'bg-surface-2 text-text-main' : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
+            )}
+          >
+            <Icon name="sync" className="text-[14px]" />
+            Round-robin
+          </button>
           <Button variant="ghost" size="sm" disabled={!enabled} onClick={() => setShowPicker(true)} title={`Add ${cap.label} model`}>
-            <Plus /> Add Model
+            <Plus /> Add model
           </Button>
         </div>
       </div>
 
       {models.length === 0 ? (
-        <p className="mt-3 py-2 text-center text-xs italic text-text-muted">
-          No models in pool (will fallback to {DEFAULT_FALLBACK_MODEL})
-        </p>
+        <div className="mx-4 mb-3 flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2 text-xs text-text-muted">
+          <Icon name="info" className="shrink-0 text-[14px]" />
+          <span className={cn('min-w-0 truncate', !enabled && 'opacity-50')}>
+            No models yet — requests fall back to <code className="font-mono text-text-main">{DEFAULT_FALLBACK_MODEL}</code>.
+          </span>
+        </div>
       ) : (
-        <div className="mt-3 overflow-hidden rounded-lg border border-border/50 text-xs">
+        <div className={cn('mx-4 mb-3 overflow-hidden rounded-md bg-surface-2/50 text-xs', !enabled && 'opacity-50')}>
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-border/40 bg-surface-2/60 text-text-muted">
+              <tr className="text-text-muted">
                 <th className="w-12 px-3 py-1.5 text-center font-medium">#</th>
                 <th className="px-3 py-1.5 font-medium">Model</th>
                 <th className="w-24 px-3 py-1.5 text-center font-medium">Order</th>
@@ -721,7 +736,7 @@ function CapacityAdapterCap({
           closeOnSelect={false}
         />
       )}
-    </Card>
+    </>
   )
 }
 
@@ -768,15 +783,15 @@ function ComboFormModal({
         onClose={onClose}
         title={combo ? 'Edit Combo' : 'Create Combo'}
         footer={
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button size="sm" className="flex-1" onClick={save} disabled={!name.trim() || !!error || saving}>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" className="min-w-20" onClick={onClose}>Cancel</Button>
+            <Button size="sm" className="min-w-20" onClick={save} disabled={!name.trim() || !!error || saving}>
               {saving ? 'Saving…' : combo ? 'Save' : 'Create'}
             </Button>
           </div>
         }
       >
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <div>
             <Label htmlFor="combo-name">Combo Name</Label>
             <Input
@@ -787,22 +802,39 @@ function ComboFormModal({
               value={name}
               onChange={(e) => { setName(e.target.value); setError(e.target.value ? validate(e.target.value) : '') }}
             />
-            <p className="mt-0.5 text-[10px] text-text-muted">
-              {error || 'Only letters, numbers, -, _ and . allowed'}
+            <p className={cn('mt-1 text-[11px]', error ? 'text-danger' : 'text-text-muted')}>
+              {error || 'Letters, numbers, - _ . only'}
             </p>
           </div>
 
           <div>
-            <Label>Models</Label>
+            <div className="flex items-center justify-between">
+              <Label>Models</Label>
+              {models.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-text-muted">{models.length} added</span>
+                  <Button variant="ghost" size="sm" className="h-6 px-1.5" onClick={() => setShowPicker(true)}>
+                    <Plus className="size-3.5" /> Add
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {models.length === 0 ? (
-              <div className="mt-1.5 rounded-lg border border-dashed border-border/60 py-4 text-center">
-                <Icon name="layers" className="mb-1 block text-xl text-text-muted" />
-                <p className="text-xs text-text-muted">No models added yet</p>
+              <div className="mt-1.5 flex items-center gap-3 rounded-lg bg-surface-2 px-3 py-2.5">
+                <Icon name="layers" className="text-[16px] text-text-muted" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-text-main">No models yet</p>
+                  <p className="truncate text-[11px] text-text-muted">Pick from the available models.</p>
+                </div>
+                <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setShowPicker(true)}>
+                  <Plus /> Add
+                </Button>
               </div>
             ) : (
               <div className="mt-1.5 flex max-h-[350px] flex-col gap-1 overflow-y-auto">
                 {models.map((model, i) => (
-                  <div key={`${model}-${i}`} className="group flex min-w-0 items-center gap-1.5 rounded-md bg-surface-2/50 px-2 py-1">
+                  <div key={`${model}-${i}`} className="group flex min-w-0 items-center gap-1.5 rounded-md bg-surface-2 px-2 py-1.5">
                     <span className="w-3 shrink-0 text-center text-[10px] font-medium text-text-muted">{i + 1}</span>
                     <span className="min-w-0 flex-1 truncate font-mono text-xs" title={model}>{model}</span>
                     <button
@@ -832,13 +864,6 @@ function ComboFormModal({
                 ))}
               </div>
             )}
-            {/* ponytail: arrows instead of dnd-kit; add drag when the kit is already a dep. */}
-            <button
-              onClick={() => setShowPicker(true)}
-              className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-border/60 py-2 text-xs font-medium text-primary hover:border-primary/50"
-            >
-              <Plus className="size-4" /> Add Model
-            </button>
           </div>
         </div>
       </Modal>

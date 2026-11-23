@@ -439,7 +439,6 @@ export function MediaProviderDetailPage() {
 
   const summary = providers.find((p) => p.id === providerId)
   const name = isCustom ? customNode?.name || 'Custom Embedding' : detail?.display?.name ?? summary?.display?.name ?? providerId
-  const color = isCustom ? '#6366F1' : detail?.display?.color ?? summary?.display?.color ?? '#888'
   const textIcon = isCustom ? 'CE' : detail?.display?.textIcon ?? summary?.display?.textIcon
   const kinds = isCustom ? ['embedding'] : (summary?.serviceKinds ?? ['embedding'])
   const mine = connections.filter((c) => c.provider === providerId)
@@ -482,44 +481,45 @@ export function MediaProviderDetailPage() {
   const info = configFor()
 
   return (
-    <div className="flex flex-col gap-6">
-      <Link to={`/dashboard/media-providers/${kind}`} className="inline-flex items-center gap-1 text-sm text-text-muted transition-colors hover:text-primary">
-        <Icon name="arrow_back" className="text-[18px]" /> {cfg.label}
+    <div className="flex flex-col gap-5">
+      <Link
+        to={`/dashboard/media-providers/${kind}`}
+        className="inline-flex w-fit items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-main"
+      >
+        <Icon name="arrow_back" className="text-[15px]" /> {cfg.label}
       </Link>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: hexTint(color) }}>
-          <ProviderIcon provider={isCustom ? 'custom-embedding' : providerId} size={48} fallbackText={textIcon} />
-        </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-2">
+          <ProviderIcon provider={isCustom ? 'custom-embedding' : providerId} size={34} fallbackText={textIcon} />
+        </span>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-text-main">{name}</h1>
+          <h1 className="truncate text-xl font-semibold tracking-tight text-text-main">{name}</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {isCustom && <Chip>{String(customNode?.prefix ?? '')}</Chip>}
+            {kinds.map((k) => (
+              <Chip key={k} active={k === kind}>
+                {k.toUpperCase()}
+              </Chip>
+            ))}
             {!isCustom && detail?.display?.notice?.apiKeyUrl && (
               <a
                 href={detail.display.notice.apiKeyUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                className="inline-flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-text-main transition-colors hover:bg-card"
               >
-                <Icon name="open_in_new" className="text-[14px]" /> Get API Key
+                <Icon name="open_in_new" className="text-[11px]" /> Get API key
               </a>
             )}
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            {isCustom && <Badge size="sm">Custom · {String(customNode?.prefix ?? '')}</Badge>}
-            {kinds.map((k) => (
-              <Badge key={k} variant={k === kind ? 'default' : 'secondary'} size="sm">
-                {k.toUpperCase()}
-              </Badge>
-            ))}
-          </div>
         </div>
         {isCustom && (
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <Button size="sm" variant="outline" onClick={() => setShowEditModal(true)}>
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" variant="secondary" onClick={() => setShowEditModal(true)}>
               <Icon name="edit" className="text-[16px]" /> Edit
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setConfirmDelete(true)}>
+            <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(true)} className="text-danger hover:bg-danger/10">
               <Icon name="delete" className="text-[16px]" /> Delete
             </Button>
           </div>
@@ -527,24 +527,24 @@ export function MediaProviderDetailPage() {
       </div>
 
       {!isCustom && detail?.display?.kindNotice?.[kind] && (
-        <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-warning">
-          <Icon name="warning" className="mt-0.5 text-[20px]" />
-          <p className="text-sm">{detail.display.kindNotice[kind]}</p>
+        <div className="flex items-start gap-2.5 rounded-xl bg-surface-2 px-4 py-3 text-warning">
+          <Icon name="warning" className="mt-0.5 text-[16px]" />
+          <p className="text-xs leading-relaxed">{detail.display.kindNotice[kind]}</p>
         </div>
       )}
 
       {!isCustom && detail?.display?.notice?.text && !detail.display.deprecated && (
-        <div className="flex flex-col gap-2 rounded-lg border border-info/30 bg-info/10 px-3 py-2 sm:flex-row sm:items-center">
-          <Icon name="info" className="shrink-0 text-[16px] text-info" />
+        <div className="flex flex-wrap items-center gap-3 rounded-xl bg-surface px-4 py-3">
+          <Icon name="info" className="shrink-0 text-[16px] text-text-muted" />
           <p className="min-w-0 flex-1 text-xs leading-relaxed text-text-main">{detail.display.notice.text}</p>
           {detail.display.notice.apiKeyUrl && (
             <a
               href={detail.display.notice.apiKeyUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex justify-center rounded bg-primary px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-primary/90 sm:py-0.5"
+              className="inline-flex items-center gap-1 rounded-lg bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-text-main transition-colors hover:bg-card"
             >
-              Get API Key →
+              Get API key <Icon name="open_in_new" className="text-[12px]" />
             </a>
           )}
         </div>
@@ -553,46 +553,55 @@ export function MediaProviderDetailPage() {
       {!isCustom && detail?.noAuth ? (
         <NoAuthProxyCard providerId={providerId} proxyPools={proxyPools} settings={settings} onSaved={setSettings} />
       ) : kind === 'stt' && detail?.hasOAuth ? (
-        <Card className="p-3">
-          <p className="mb-3 text-sm text-text-muted">This service shares your existing OAuth connections.</p>
-          <Link to={`/dashboard/providers/${providerId}`} className="text-primary hover:underline">
-            Manage OAuth connections →
+        <section className="flex flex-wrap items-center gap-3 rounded-xl bg-surface px-4 py-3">
+          <p className="min-w-0 flex-1 text-xs text-text-muted">This service shares your existing OAuth connections.</p>
+          <Link
+            to={`/dashboard/providers/${providerId}`}
+            className="inline-flex items-center gap-1 rounded-lg bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-text-main transition-colors hover:bg-card"
+          >
+            Manage OAuth <Icon name="arrow_forward" className="text-[12px]" />
           </Link>
-        </Card>
+        </section>
       ) : (
-        <Card className="p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-text-main">Connections</h3>
+        <section className="overflow-hidden rounded-xl bg-surface">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Icon name="key" className="text-[15px] text-text-muted" />
+              <h2 className="text-sm font-semibold text-text-main">Connections</h2>
+              <span className="font-mono text-[11px] text-text-muted">{mine.length}</span>
+            </div>
             <div className="flex items-center gap-2">
               {mine.length > 0 && (
-                <label className="flex items-center gap-2 text-xs text-text-muted">
+                <label className="flex items-center gap-1.5 text-[11px] text-text-muted">
                   Enabled
                   <Switch checked={mine.some((c) => c.isActive !== false)} onCheckedChange={(next) => void toggleAll(providerId, mine, next)} />
                 </label>
               )}
-              <Button size="sm" variant="outline" onClick={() => setShowAddKey(true)}>
-                <Icon name="add" className="text-[16px]" /> Add API Key
+              <Button size="sm" variant="secondary" onClick={() => setShowAddKey(true)}>
+                <Icon name="add" className="text-[16px]" /> Add API key
               </Button>
             </div>
           </div>
           {mine.length === 0 ? (
-            <p className="py-6 text-center text-xs text-text-muted">No connections.</p>
+            <p className="border-t border-border px-4 py-8 text-center text-xs text-text-muted">
+              No connections yet. Add an API key to start routing requests.
+            </p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="divide-y divide-border border-t border-border">
               {mine.map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-2 rounded-md border border-border p-2">
+                <li key={c.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                   <span className="truncate text-xs text-text-main">{c.name || c.email || c.id}</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-1.5">
                     {typeof c.testStatus === 'string' && c.testStatus !== '' && (
-                      <Badge variant={c.testStatus === 'active' ? 'success' : 'outline'} size="sm">{c.testStatus}</Badge>
+                      <Chip danger={c.testStatus === 'error'}>{c.testStatus}</Chip>
                     )}
-                    <Badge variant={c.isActive ? 'success' : 'secondary'} size="sm">{c.isActive ? 'active' : 'inactive'}</Badge>
+                    <Chip>{c.isActive ? 'active' : 'inactive'}</Chip>
                   </div>
                 </li>
               ))}
             </ul>
           )}
-        </Card>
+        </section>
       )}
 
       {kind !== 'tts' && kind !== 'webSearch' && kind !== 'webFetch' && (
@@ -729,51 +738,85 @@ function MediaModelsCard({
   }
 
   return (
-    <Card className="p-3">
-      <h3 className="mb-2 text-sm font-semibold text-text-main">Models — {kind.toUpperCase()}</h3>
-      {builtin.length === 0 && customMine.length === 0 && !isCustom ? (
-        <p className="py-3 text-center text-xs text-text-muted">No {kind} models registered.</p>
+    <section className="overflow-hidden rounded-xl bg-surface">
+      <div className="flex items-center gap-2 px-4 py-3">
+        <Icon name="layers" className="text-[15px] text-text-muted" />
+        <h2 className="text-sm font-semibold text-text-main">Models</h2>
+        <Chip>{kind.toUpperCase()}</Chip>
+        <span className="ml-auto font-mono text-[11px] text-text-muted">{builtin.length + customMine.length}</span>
+      </div>
+
+      {builtin.length === 0 && customMine.length === 0 ? (
+        <p className="border-t border-border px-4 py-8 text-center text-xs text-text-muted">
+          No {kind} models registered.
+        </p>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="divide-y divide-border border-t border-border">
           {builtin.map((m) => {
             const full = `${alias}/${m.id}`
             const off = disabled.includes(m.id)
             return (
-              <div key={m.id} className={cn('flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5', off && 'opacity-50')}>
-                <code className="font-mono text-xs text-text-main">{full}</code>
-                {aliases[full] && <Badge size="sm">↦ {aliases[full]}</Badge>}
-                <button className="text-text-muted hover:text-primary disabled:opacity-30" disabled={testing === m.id} onClick={() => void test(m.id)} title="Test model">
-                  <Icon name={testing === m.id ? 'progress_activity' : 'science'} className="text-[14px]" />
+              <div key={m.id} className="flex items-center gap-1.5 px-4 py-2 transition-colors hover:bg-surface-2/40">
+                <code className={cn('min-w-0 flex-1 truncate font-mono text-xs', off ? 'text-text-muted' : 'text-text-main')}>
+                  {full}
+                </code>
+                {aliases[full] && <Chip>→ {aliases[full]}</Chip>}
+                {off && <Chip>disabled</Chip>}
+                <button
+                  className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main disabled:opacity-30"
+                  disabled={testing === m.id}
+                  onClick={() => void test(m.id)}
+                  title="Test model"
+                >
+                  <Icon name={testing === m.id ? 'progress_activity' : 'science'} className={cn('text-[16px]', testing === m.id && 'animate-spin')} />
                 </button>
-                <button className="text-text-muted hover:text-warning" onClick={() => void toggleDisabled(m.id)} title={off ? 'Enable model' : 'Disable model'}>
-                  <Icon name={off ? 'add' : 'block'} className="text-[14px]" />
+                <button
+                  className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main"
+                  onClick={() => void toggleDisabled(m.id)}
+                  title={off ? 'Enable model' : 'Disable model'}
+                >
+                  <Icon name={off ? 'check' : 'block'} className="text-[16px]" />
                 </button>
               </div>
             )
           })}
           {customMine.map((m) => (
-            <div key={`custom-${m.id}`} className="flex items-center gap-1.5 rounded-lg border border-dashed border-primary/40 px-2.5 py-1.5">
-              <code className="font-mono text-xs text-text-main">{alias}/{m.id}</code>
-              <Badge size="sm">custom</Badge>
-              <button className="text-text-muted hover:text-primary disabled:opacity-30" disabled={testing === m.id} onClick={() => void test(m.id)} title="Test model">
-                <Icon name={testing === m.id ? 'progress_activity' : 'science'} className="text-[14px]" />
+            <div key={`custom-${m.id}`} className="flex items-center gap-1.5 px-4 py-2 transition-colors hover:bg-surface-2/40">
+              <code className="min-w-0 flex-1 truncate font-mono text-xs text-text-main">{alias}/{m.id}</code>
+              <Chip>custom</Chip>
+              <button
+                className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main disabled:opacity-30"
+                disabled={testing === m.id}
+                onClick={() => void test(m.id)}
+                title="Test model"
+              >
+                <Icon name={testing === m.id ? 'progress_activity' : 'science'} className={cn('text-[16px]', testing === m.id && 'animate-spin')} />
               </button>
-              <button className="text-text-muted hover:text-danger" onClick={() => void remove(m.id)} title="Remove model">
-                <Icon name="delete" className="text-[14px]" />
+              <button
+                className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-danger/10 hover:text-danger"
+                onClick={() => void remove(m.id)}
+                title="Remove model"
+              >
+                <Icon name="delete" className="text-[16px]" />
               </button>
             </div>
           ))}
         </div>
       )}
       {(isCustom || builtin.length > 0) && (
-        <div className="mt-3 flex gap-2">
-          <Input value={newModel} onChange={(e) => setNewModel(e.target.value)} placeholder="Add model id (e.g. text-embedding-3-small)" className="h-8 font-mono text-xs" />
-          <Button size="sm" variant="outline" onClick={() => void add()} disabled={!newModel.trim() || added.has(newModel.trim())}>
+        <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+          <Input
+            value={newModel}
+            onChange={(e) => setNewModel(e.target.value)}
+            placeholder="Add model id (e.g. text-embedding-3-small)"
+            className="h-8 rounded-lg border-0 bg-surface-2 font-mono text-xs shadow-none"
+          />
+          <Button size="sm" variant="secondary" onClick={() => void add()} disabled={!newModel.trim() || added.has(newModel.trim())}>
             <Icon name="add" className="text-[16px]" /> Add
           </Button>
         </div>
       )}
-    </Card>
+    </section>
   )
 }
 
@@ -805,24 +848,31 @@ function ProviderInfoCard({ title, config, website }: { title: string; config: M
 
   if (rows.length === 0) return null
   return (
-    <Card className="p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text-main">{title}</h3>
+    <section className="overflow-hidden rounded-xl bg-surface">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <h2 className="text-sm font-semibold text-text-main">{title}</h2>
         {website && (
-          <a href={website} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
-            Docs →
+          <a
+            href={website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-text-muted transition-colors hover:text-text-main"
+          >
+            Docs <Icon name="open_in_new" className="text-[12px]" />
           </a>
         )}
       </div>
-      <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+      <dl className="grid grid-cols-1 gap-x-8 gap-y-1 border-t border-border px-4 py-3 text-xs sm:grid-cols-2">
         {rows.map(([k, v]) => (
-          <div key={k} className="flex min-w-0 gap-2">
-            <dt className="w-24 shrink-0 text-text-muted">{k}</dt>
-            <dd className="min-w-0 break-all font-mono text-text-main">{v}</dd>
+          <div key={k} className="flex min-w-0 items-baseline justify-between gap-3">
+            <dt className="shrink-0 text-[11px] text-text-muted">{k}</dt>
+            <dd className="min-w-0 truncate text-right font-mono text-[11px] text-text-main" title={v}>
+              {v}
+            </dd>
           </div>
         ))}
       </dl>
-    </Card>
+    </section>
   )
 }
 
@@ -1117,16 +1167,23 @@ function ExampleCard({
   }
 
   return (
-    <Card className="flex flex-col gap-3 p-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text-main">Example</h3>
-        <Button variant="ghost" size="sm" onClick={() => copy(curlSnippet, 'curl')}>
-          <Icon name={copied === 'curl' ? 'check' : 'content_copy'} className="text-[16px]" /> cURL
-        </Button>
+    <section className="overflow-hidden rounded-xl bg-surface">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Icon name="science" className="text-[15px] text-text-muted" />
+          <h2 className="text-sm font-semibold text-text-main">Example</h2>
+        </div>
+        <button
+          onClick={() => copy(curlSnippet, 'curl')}
+          className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-text-main transition-colors hover:bg-card"
+        >
+          <Icon name={copied === 'curl' ? 'check' : 'content_copy'} className="text-[12px]" /> cURL
+        </button>
       </div>
 
+      <div className="flex flex-col gap-3 border-t border-border px-4 py-3">
       <Row label="Model">
-        <Input value={modelFull} onChange={(e) => setModel(e.target.value.split('/').slice(1).join('/'))} className="font-mono text-xs" />
+        <Input value={modelFull} onChange={(e) => setModel(e.target.value.split('/').slice(1).join('/'))} className="border-0 bg-surface-2 font-mono text-xs shadow-none" />
       </Row>
 
       <Row label="Endpoint">
@@ -1134,25 +1191,26 @@ function ExampleCard({
           <Input
             value={endpointRoot}
             onChange={(e) => (useTunnel ? setTunnelEndpoint(e.target.value) : setLocalEndpoint(e.target.value))}
-            className="min-w-0 flex-1 font-mono text-xs"
+            className="min-w-0 flex-1 border-0 bg-surface-2 font-mono text-xs shadow-none"
           />
           {isTunnelPublic(tunnelEndpoint) && (
             <button
               onClick={() => setUseTunnel((v) => !v)}
               title={useTunnel ? 'Using tunnel' : 'Using local'}
+              aria-pressed={useTunnel}
               className={cn(
-                'flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-xs transition-colors',
-                useTunnel ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-text-muted hover:text-primary',
+                'flex shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors',
+                useTunnel ? 'bg-text-main text-background' : 'bg-surface-2 text-text-muted hover:text-text-main',
               )}
             >
-              <Icon name="wifi_tethering" className="text-[14px]" /> Tunnel
+              <Icon name="wifi_tethering" className="text-[13px]" /> Tunnel
             </button>
           )}
         </div>
       </Row>
 
-      <Row label="API Key">
-        <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" placeholder="sk-…" className="font-mono text-xs" />
+      <Row label="API key">
+        <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" placeholder="sk-…" className="border-0 bg-surface-2 font-mono text-xs shadow-none" />
       </Row>
 
       {conns.length > 1 && (
@@ -1160,7 +1218,7 @@ function ExampleCard({
           <select
             value={connectionId}
             onChange={(e) => setConnectionId(e.target.value)}
-            className="h-9 w-full cursor-pointer rounded-md border border-border bg-background px-3 text-sm text-text-main"
+            className="h-9 w-full cursor-pointer rounded-lg border-0 bg-surface-2 px-3 text-xs text-text-main outline-none"
           >
             <option value="">Auto (round robin)</option>
             {conns.map((c) => (
@@ -1172,27 +1230,27 @@ function ExampleCard({
 
       {kind === 'stt' ? (
         <>
-          <Row label="Audio File">
+          <Row label="Audio file">
             <input
               type="file"
               accept="audio/*,video/mp4,.m4a,.mp3,.wav,.ogg,.flac,.webm,.opus"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="w-full text-xs text-text-muted file:mr-2 file:cursor-pointer file:rounded-lg file:border file:border-border file:bg-background file:px-2.5 file:py-1 file:text-text-main hover:file:bg-surface-2"
+              className="w-full text-xs text-text-muted file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-surface-2 file:px-2.5 file:py-1.5 file:text-[11px] file:font-medium file:text-text-main hover:file:bg-card"
             />
           </Row>
           <Row label="Language">
-            <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="optional" className="text-xs" />
+            <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="optional" className="border-0 bg-surface-2 text-xs shadow-none" />
           </Row>
         </>
       ) : (
         <Row label={ex.inputLabel}>
           <div className="relative">
-            <Input value={input} onChange={(e) => setInput(e.target.value)} className="pr-7" />
+            <Input value={input} onChange={(e) => setInput(e.target.value)} className="border-0 bg-surface-2 pr-7 text-xs shadow-none" />
             {input && (
               <button
                 type="button"
                 onClick={() => setInput('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-primary"
+                className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-text-muted hover:text-text-main"
               >
                 <Icon name="close" className="text-[14px]" />
               </button>
@@ -1209,7 +1267,7 @@ function ExampleCard({
                 value={String(extra[f.key] ?? '')}
                 onChange={(e) => setExtra((p) => ({ ...p, [f.key]: e.target.value }))}
                 placeholder="https://…"
-                className="min-w-0 flex-1 font-mono text-xs"
+                className="min-w-0 flex-1 border-0 bg-surface-2 font-mono text-xs shadow-none"
               />
               <input
                 type="file"
@@ -1221,7 +1279,7 @@ function ExampleCard({
                   reader.onload = () => setExtra((p) => ({ ...p, [f.key]: String(reader.result ?? '') }))
                   reader.readAsDataURL(file)
                 }}
-                className="text-xs text-text-muted file:mr-2 file:cursor-pointer file:rounded-lg file:border file:border-border file:bg-background file:px-2.5 file:py-1"
+                className="text-xs text-text-muted file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-surface-2 file:px-2.5 file:py-1.5 file:text-[11px] file:font-medium file:text-text-main hover:file:bg-card"
               />
             </div>
           </Row>
@@ -1230,7 +1288,7 @@ function ExampleCard({
             <select
               value={String(extra[f.key] ?? '')}
               onChange={(e) => setExtra((p) => ({ ...p, [f.key]: e.target.value }))}
-              className="h-9 w-full cursor-pointer rounded-md border border-border bg-background px-3 text-sm text-text-main"
+              className="h-9 w-full cursor-pointer rounded-lg border-0 bg-surface-2 px-3 text-xs text-text-main outline-none"
             >
               {f.options.map((o) => (
                 <option key={o} value={o}>{o || '(default)'}</option>
@@ -1249,23 +1307,23 @@ function ExampleCard({
               max={f.max}
               value={String(extra[f.key] ?? '')}
               onChange={(e) => setExtra((p) => ({ ...p, [f.key]: e.target.value }))}
-              className="text-xs"
+              className="border-0 bg-surface-2 text-xs shadow-none"
             />
           </Row>
         ) : (
           <Row key={f.key} label={f.label}>
-            <Input value={String(extra[f.key] ?? '')} onChange={(e) => setExtra((p) => ({ ...p, [f.key]: e.target.value }))} className="text-xs" />
+            <Input value={String(extra[f.key] ?? '')} onChange={(e) => setExtra((p) => ({ ...p, [f.key]: e.target.value }))} className="border-0 bg-surface-2 text-xs shadow-none" />
           </Row>
         ),
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         <Button size="sm" onClick={() => void run()} disabled={running || !model || (kind !== 'stt' && !input.trim()) || (kind === 'stt' && !file)}>
           {running ? 'Running…' : 'Run'}
         </Button>
         {latency !== null && !running && (
-          <span className="text-xs text-text-muted">
-            <Icon name="bolt" className="text-[14px]" /> {latency}ms
+          <span className="inline-flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-text-muted">
+            <Icon name="bolt" className="text-[12px]" /> {latency}ms
           </span>
         )}
       </div>
@@ -1274,38 +1332,61 @@ function ExampleCard({
 
       {mediaUrl && (kind === 'image' || kind === 'imageToText') && (
         <div className="flex flex-col gap-2">
-          <img src={mediaUrl} alt="result" className="max-h-80 rounded-lg border border-border object-contain" />
-          <Button size="sm" variant="outline" onClick={download}>
-            <Icon name="download" className="text-[16px]" /> Download
-          </Button>
+          <img src={mediaUrl} alt="result" className="max-h-80 rounded-lg bg-surface-2 object-contain" />
+          <div>
+            <Button size="sm" variant="secondary" onClick={download}>
+              <Icon name="download" className="text-[16px]" /> Download
+            </Button>
+          </div>
         </div>
       )}
       {mediaUrl && kind === 'tts' && (
         <div className="flex flex-col gap-2">
           <audio controls src={mediaUrl} className="w-full" />
-          <Button size="sm" variant="outline" onClick={download}>
-            <Icon name="download" className="text-[16px]" /> Download
-          </Button>
+          <div>
+            <Button size="sm" variant="secondary" onClick={download}>
+              <Icon name="download" className="text-[16px]" /> Download
+            </Button>
+          </div>
         </div>
       )}
       {mediaUrl && kind === 'video' && (
         <div className="flex flex-col gap-2">
-          <video controls src={mediaUrl} className="max-h-80 w-full rounded-lg border border-border" />
-          <a href={mediaUrl} download="video.mp4" className="text-xs text-primary hover:underline">Download</a>
+          <video controls src={mediaUrl} className="max-h-80 w-full rounded-lg" />
+          <div>
+            <Button size="sm" variant="secondary" onClick={download}>
+              <Icon name="download" className="text-[16px]" /> Download
+            </Button>
+          </div>
         </div>
       )}
 
-      <pre className="custom-scrollbar max-h-72 overflow-auto rounded-md border border-border bg-surface-2/50 p-2 font-mono text-[11px] text-text-main">
+      <pre className="custom-scrollbar max-h-72 overflow-auto rounded-lg bg-surface-2 p-3 font-mono text-[11px] leading-relaxed text-text-main">
         {result ? (typeof result === 'string' ? result : JSON.stringify(maskB64(result), null, 2)) : ex.defaultResponse}
       </pre>
-    </Card>
+      </div>
+    </section>
+  )
+}
+
+function Chip({ children, active, danger }: { children: React.ReactNode; active?: boolean; danger?: boolean }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px]',
+        active ? 'bg-card text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.06)]' : 'bg-surface-2 text-text-muted',
+        danger && 'text-danger',
+      )}
+    >
+      {children}
+    </span>
   )
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-      <span className="w-full text-xs font-medium text-text-muted sm:w-20 sm:shrink-0">{label}</span>
+      <span className="w-full text-[11px] text-text-muted sm:w-24 sm:shrink-0">{label}</span>
       <div className="w-full min-w-0 flex-1">{children}</div>
     </div>
   )

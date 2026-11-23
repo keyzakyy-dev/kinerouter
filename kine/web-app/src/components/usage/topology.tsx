@@ -75,7 +75,7 @@ function RouterNode({ data }: NodeProps) {
     <div
       className={`relative z-[1] flex min-w-[130px] items-center justify-center rounded-xl border-2 px-5 py-3 ${
         powering
-          ? 'topology-router-core border-yellow-300 bg-gradient-to-br from-primary/30 via-yellow-400/20 to-cyan-400/25'
+          ? 'topology-router-core border-foreground/40 bg-gradient-to-br from-foreground/10 via-foreground/5 to-transparent'
           : 'border-primary bg-primary/5 shadow-md'
       }`}
     >
@@ -88,14 +88,17 @@ function RouterNode({ data }: NodeProps) {
           style={{ opacity: 0, width: 0, height: 0, border: 0, background: 'transparent' }}
         />
       ))}
-      <span className={`material-symbols-outlined mr-2 text-[24px] ${powering ? 'topology-router-icon text-yellow-300' : 'text-primary'}`}>
-        hub
-      </span>
-      <span className={`text-sm font-bold ${powering ? 'topology-router-label text-yellow-300' : 'text-primary'}`}>
+      <span
+        aria-hidden
+        className={`mr-2 size-5 shrink-0 bg-current mask-[url(/favicon.svg)] [mask-size:145%] mask-center mask-no-repeat ${
+          powering ? 'text-foreground' : 'text-primary'
+        }`}
+      />
+      <span className={`text-sm font-bold ${powering ? 'topology-router-label text-foreground' : 'text-primary'}`}>
         KineRouter
       </span>
       {activeCount > 0 && (
-        <span className="topology-router-badge ml-2 rounded-full bg-yellow-400 px-1.5 py-0.5 text-xs font-bold text-black">
+        <span className="topology-router-badge ml-2 rounded-full bg-foreground px-1.5 py-0.5 text-xs font-bold text-background">
           {activeCount}
         </span>
       )}
@@ -123,25 +126,25 @@ function TopologyEdge({
           <feDisplacementMap in="SourceGraphic" in2="noise" scale={3.5} xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </defs>
-      <path d={edgePath} fill="none" stroke="#22d3ee" strokeWidth={10} strokeOpacity={0.35}
+      <path d={edgePath} fill="none" stroke="var(--color-text-main)" strokeWidth={10} strokeOpacity={0.18}
         strokeLinecap="round" filter={`url(#${filterId})`} className="topology-edge-halo" />
-      <path d={edgePath} fill="none" stroke="#4ade80" strokeWidth={5} strokeOpacity={0.85}
+      <path d={edgePath} fill="none" stroke="var(--color-text-main)" strokeWidth={5} strokeOpacity={0.6}
         strokeLinecap="round" filter={`url(#${filterId})`} className="topology-edge-plasma" />
-      <BaseEdge id={id} path={edgePath} style={{ stroke: '#f8fafc', strokeWidth: 2.2, opacity: 1 }}
+      <BaseEdge id={id} path={edgePath} style={{ stroke: 'var(--color-text-main)', strokeWidth: 2.2, opacity: 1 }}
         className="topology-edge-kame" />
       {Array.from({ length: KAME_PARTICLE_COUNT }, (_, i) => (
         <circle
           key={`${id}-p-${i}`}
           r={i % 2 === 0 ? 4 : 2.5}
-          fill={i % 3 === 0 ? '#fde047' : i % 3 === 1 ? '#67e8f9' : '#fff'}
+          fill="var(--color-text-main)"
           opacity={0.95}
-          style={{ filter: 'drop-shadow(0 0 4px #22d3ee)' }}
+          style={{ filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.35))' }}
         >
           <animateMotion dur={`${0.4 + i * 0.08}s`} repeatCount="indefinite" path={edgePath} begin={`${i * 0.09}s`} />
         </circle>
       ))}
       {Array.from({ length: SPARK_COUNT }, (_, i) => (
-        <circle key={`${id}-s-${i}`} r={1.8} fill="#e0f2fe" opacity={0}>
+        <circle key={`${id}-s-${i}`} r={1.8} fill="var(--color-text-main)" opacity={0}>
           <animate attributeName="opacity" values="0;1;0;0;1;0" dur={`${0.35 + (i % 3) * 0.1}s`}
             begin={`${i * 0.07}s`} repeatCount="indefinite" />
           <animateMotion dur={`${0.28 + i * 0.05}s`} repeatCount="indefinite" path={edgePath} begin={`${i * 0.11}s`} />
@@ -185,9 +188,9 @@ function buildLayout(
   const edges: Record<string, unknown>[] = []
 
   const edgeStyle = (active: boolean, last: boolean, error: boolean) => {
-    if (error) return { stroke: '#ef4444', strokeWidth: 2.5, opacity: 0.9 }
-    if (active) return { stroke: '#22d3ee', strokeWidth: 3.5, opacity: 1 }
-    if (last) return { stroke: '#f59e0b', strokeWidth: 2, opacity: 0.7 }
+    if (error) return { stroke: 'var(--color-danger)', strokeWidth: 2.5, opacity: 0.9 }
+    if (active) return { stroke: 'var(--color-text-main)', strokeWidth: 3.5, opacity: 1 }
+    if (last) return { stroke: 'var(--color-text-muted)', strokeWidth: 2, opacity: 0.7 }
     return { stroke: 'var(--color-border)', strokeWidth: 1, opacity: 0.3 }
   }
 

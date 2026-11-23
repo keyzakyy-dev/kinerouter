@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import {
   api,
@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getErrorCode, getRelativeTime } from '@/lib/format'
 import { useNotify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -312,23 +313,6 @@ function TestResultsBody({ results }: { results: ProviderTestResults }) {
   )
 }
 
-function SectionHeader({
-  title,
-  children,
-}: {
-  title: string
-  children?: ReactNode
-}) {
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <h2 className="flex items-center gap-2 text-lg font-semibold leading-tight sm:text-xl">{title}</h2>
-      {children && (
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">{children}</div>
-      )}
-    </div>
-  )
-}
-
 function TestAllButton({ mode, testing, onClick }: { mode: ProviderTestMode; testing: ProviderTestMode | null; onClick: () => void }) {
   const active = testing === mode
   return (
@@ -358,6 +342,9 @@ export function ProvidersPage() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const tab = tabParam === 'oauth' || tabParam === 'free' || tabParam === 'apikey' ? tabParam : 'custom'
   const [showAllApikey, setShowAllApikey] = useState(false)
   const [addVariant, setAddVariant] = useState<'openai' | 'anthropic' | null>(null)
   const [testing, setTesting] = useState<ProviderTestMode | null>(null)
@@ -378,7 +365,7 @@ export function ProvidersPage() {
     void load()
   }, [])
 
-  const statsOf = (id: string, authTypes: string | string[]) => connectionStatus(conns, asList(authTypes))
+  const statsOf = (_id: string, authTypes: string | string[]) => connectionStatus(conns, asList(authTypes))
 
   const q = query.trim().toLowerCase()
   const matchSearch = (name: string) => !q || name.toLowerCase().includes(q)
@@ -520,58 +507,90 @@ export function ProvidersPage() {
             </div>
           )}
 
-          {/* Custom Providers (OpenAI/Anthropic Compatible) */}
-          <div className="flex flex-col gap-4">
-            <SectionHeader title="Custom Providers (OpenAI/Anthropic Compatible)">
-              <Button size="sm" onClick={() => setAddVariant('anthropic')} className="w-full sm:w-auto">
-                <Icon name="add" className="text-[16px]" /> Add Anthropic Compatible
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => setAddVariant('openai')} className="w-full sm:w-auto">
-                <Icon name="add" className="text-[16px]" /> Add OpenAI Compatible
-              </Button>
-            </SectionHeader>
-            {oaiNodes.length + anthNodes.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-border py-2 text-sm text-text-muted">
-                <Icon name="extension" className="text-[18px]" />
-                <span>No custom providers — use buttons above to add OpenAI/Anthropic compatible endpoints</span>
-              </div>
-            ) : (
-              <div className={GRID}>
-                {[...oaiNodes, ...anthNodes].map((n) => (
-                  <ProviderCard
-                    key={n.id}
-                    p={{
-                      id: n.id,
-                      category: 'compatible',
-                      authType: 'apikey',
-                      hasOAuth: false,
-                      display: { name: n.name ?? (n.type === 'anthropic-compatible' ? 'Anthropic Compatible' : 'OpenAI Compatible') },
-                      modelsCount: 0,
-                      connections: 0,
-                      activeConnections: 0,
-                      serviceKinds: ['llm'],
-                    }}
-                    stats={statsOf(n.id, 'apikey')}
-                    iconSrc={nodeIcon(n)}
-                    extraBadge={
-                      <Badge size="sm">
-                        {n.type === 'anthropic-compatible' ? 'Messages' : n.apiType === 'responses' ? 'Responses' : 'Chat'}
-                      </Badge>
-                    }
-                    onToggle={(active) => void toggle(n.id, 'apikey', active)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <Tabs
+            value={tab}
+            onValueChange={(v) => setSearchParams(v === 'custom' ? {} : { tab: v }, { replace: true })}
+            className="flex flex-col gap-4"
+          >
+            <TabsList className="w-fit max-w-full overflow-x-auto">
+              <TabsTrigger value="custom">
+                Custom<span className="text-[10px] tabular-nums opacity-60">{oaiNodes.length + anthNodes.length}</span>
+              </TabsTrigger>
+              <TabsTrigger value="oauth">
+                OAuth<span className="text-[10px] tabular-nums opacity-60">{oauthEntries.length}</span>
+              </TabsTrigger>
+              <TabsTrigger value="free">
+                Free Tier<span className="text-[10px] tabular-nums opacity-60">{freeEntries.length + freeTierEntries.length}</span>
+              </TabsTrigger>
+              <TabsTrigger value="apikey">
+                API Key<span className="text-[10px] tabular-nums opacity-60">{apikeyEntries.length + webCookieEntries.length}</span>
+              </TabsTrigger>
+            </TabsList>
 
-          {/* OAuth Providers */}
-          {oauthEntries.length > 0 && (
-            <div className="flex flex-col gap-4">
-              <SectionHeader title="OAuth Providers">
+            <TabsContent value="custom" className="mt-0 flex flex-col gap-4">
+              {oaiNodes.length + anthNodes.length === 0 ? (
+                <div className="flex flex-col items-center gap-4 rounded-xl bg-surface-2 px-6 py-10 text-center">
+                  <Icon name="extension" className="text-[20px] text-text-main" />
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm font-medium">Add your first custom provider</p>
+                    <p className="max-w-md text-xs leading-relaxed text-text-muted">
+                      Point KineRouter at any OpenAI- or Anthropic-compatible endpoint — a local model server, gateway, or hosted proxy.
+                    </p>
+                  </div>
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                    <Button size="sm" onClick={() => setAddVariant('openai')}>
+                      <Icon name="add" className="text-[16px]" /> Add OpenAI Compatible
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => setAddVariant('anthropic')}>
+                      <Icon name="add" className="text-[16px]" /> Add Anthropic Compatible
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <Button size="sm" onClick={() => setAddVariant('anthropic')} className="w-full sm:w-auto">
+                      <Icon name="add" className="text-[16px]" /> Add Anthropic Compatible
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => setAddVariant('openai')} className="w-full sm:w-auto">
+                      <Icon name="add" className="text-[16px]" /> Add OpenAI Compatible
+                    </Button>
+                  </div>
+                  <div className={GRID}>
+                    {[...oaiNodes, ...anthNodes].map((n) => (
+                      <ProviderCard
+                        key={n.id}
+                        p={{
+                          id: n.id,
+                          category: 'compatible',
+                          authType: 'apikey',
+                          hasOAuth: false,
+                          display: { name: n.name ?? (n.type === 'anthropic-compatible' ? 'Anthropic Compatible' : 'OpenAI Compatible') },
+                          modelsCount: 0,
+                          connections: 0,
+                          activeConnections: 0,
+                          serviceKinds: ['llm'],
+                        }}
+                        stats={statsOf(n.id, 'apikey')}
+                        iconSrc={nodeIcon(n)}
+                        extraBadge={
+                          <Badge size="sm">
+                            {n.type === 'anthropic-compatible' ? 'Messages' : n.apiType === 'responses' ? 'Responses' : 'Chat'}
+                          </Badge>
+                        }
+                        onToggle={(active) => void toggle(n.id, 'apikey', active)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="oauth" className="mt-0 flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <ModelAvailabilityBadge />
                 <TestAllButton mode="oauth" testing={testing} onClick={() => void batchTest('oauth')} />
-              </SectionHeader>
+              </div>
               <div className={GRID}>
                 {oauthEntries.map((p) => {
                   const types = dualAuthTypes(p, p.id)
@@ -585,15 +604,12 @@ export function ProvidersPage() {
                   )
                 })}
               </div>
-            </div>
-          )}
+            </TabsContent>
 
-          {/* Free Tier Providers */}
-          {(freeEntries.length > 0 || freeTierEntries.length > 0) && (
-            <div className="flex flex-col gap-4">
-              <SectionHeader title="Free Tier Providers">
+            <TabsContent value="free" className="mt-0 flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <TestAllButton mode="free" testing={testing} onClick={() => void batchTest('free')} />
-              </SectionHeader>
+              </div>
               <div className={GRID}>
                 {freeEntries.map((p) => {
                   const types = dualAuthTypes(p, p.id)
@@ -618,15 +634,12 @@ export function ProvidersPage() {
                   )
                 })}
               </div>
-            </div>
-          )}
+            </TabsContent>
 
-          {/* API Key Providers */}
-          {apikeyEntries.length + webCookieEntries.length > 0 && (
-            <div className="flex flex-col gap-4">
-              <SectionHeader title="API Key Providers">
+            <TabsContent value="apikey" className="mt-0 flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <TestAllButton mode="apikey" testing={testing} onClick={() => void batchTest('apikey')} />
-              </SectionHeader>
+              </div>
               <div className={GRID}>
                 {visibleApikey.map((p) => (
                   <ProviderCard
@@ -654,8 +667,8 @@ export function ProvidersPage() {
                   Show all {apikeyEntries.length} providers
                 </button>
               )}
-            </div>
-          )}
+            </TabsContent>
+          </Tabs>
 
           <AddCompatibleModal
             variant="openai"

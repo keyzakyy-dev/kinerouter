@@ -3,6 +3,31 @@
 All notable changes to KineRouter. Format based on Keep a Changelog;
 versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
+## [0.1.10] — 2026-11-23
+
+### Changed
+
+- **Dashboard sidebar rebuilt on the new compound sidebar primitive**
+  (`src/components/ui/sidebar.tsx`): collapsible 256px → 64px rail, active pill
+  gliding between rows on a spring, labels fading through `AnimatePresence`,
+  `SidebarNested` for Media Providers, and `icon-rail` / `floating` /
+  `resizable` variants available. `Ctrl+B` and the `kinerouter.sidebar` key
+  still drive the collapsed state.
+- **shadcn-style token aliases** (`--foreground`, `--border`, `--card`,
+  `--chart-1..6`, …) now map onto the KineRouter palette, so copied primitives
+  theme correctly in light and dark.
+
+### Added
+
+- **Top navbar in the app shell** (`components/layout.tsx`): a sticky 64px bar,
+  the collapsed rail's width, with the sidebar toggle and a `Dashboard / <page>`
+  breadcrumb. `@base-ui/react`, `framer-motion`, `@tabler/icons-react`.
+
+### Removed
+
+- `@animate-ui/react`, `@radix-ui/react-tooltip`, `motion`: the old rail and its
+  custom highlight/tooltip keyframes are gone.
+
 ## [0.1.9] — 2026-11-23
 
 ### Added

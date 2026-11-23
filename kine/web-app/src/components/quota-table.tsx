@@ -26,17 +26,17 @@ function formatResetTimeDisplay(resetTime: string | null | undefined): string | 
 
 function colorClasses(remaining: number) {
   if (remaining > 70)
-    return { text: 'text-green-600', bg: 'bg-green-500', bgLight: 'bg-green-500/10', emoji: '🟢' }
+    return { text: 'text-foreground', bg: 'bg-foreground', bgLight: 'bg-foreground/5', emoji: '●' }
   if (remaining >= 30)
-    return { text: 'text-yellow-600', bg: 'bg-yellow-500', bgLight: 'bg-yellow-500/10', emoji: '🟡' }
-  return { text: 'text-red-600', bg: 'bg-red-500', bgLight: 'bg-red-500/10', emoji: '🔴' }
+    return { text: 'text-muted-foreground', bg: 'bg-muted-foreground', bgLight: 'bg-foreground/5', emoji: '◐' }
+  return { text: 'text-muted-foreground/70', bg: 'bg-muted-foreground/50', bgLight: 'bg-foreground/5', emoji: '○' }
 }
 
 const CREDIT_COLORS = {
-  text: 'text-blue-600',
-  bg: 'bg-blue-500',
-  bgLight: 'bg-blue-500/10',
-  emoji: '💰',
+  text: 'text-muted-foreground',
+  bg: 'bg-foreground',
+  bgLight: 'bg-foreground/5',
+  emoji: '◆',
 }
 
 /**
@@ -198,7 +198,7 @@ export function QuotaTable({
                   <span
                     className={cn(
                       'shrink-0 font-medium',
-                      isUnlimited ? 'text-green-600' : isCredit ? 'text-blue-600' : colors.text,
+                      isUnlimited ? 'text-muted-foreground' : isCredit ? 'text-muted-foreground' : colors.text,
                     )}
                   >
                     {isUnlimited ? 'Unlimited' : isCredit ? '' : `${quota.remaining}%`}

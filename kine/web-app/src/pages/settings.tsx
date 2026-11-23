@@ -68,31 +68,82 @@ function localeFromCookie(): string {
 
 function Section({
   icon,
-  iconClass,
   title,
   subtitle,
   children,
 }: {
   icon: string
-  iconClass: string
   title: string
   subtitle?: string
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
-      <div className="mb-4 flex items-center gap-3">
-        <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg', iconClass)}>
-          <Icon name={icon} className="text-[20px]" />
-        </div>
+    <section className="overflow-hidden rounded-xl bg-surface">
+      <div className="flex items-center gap-3 px-5 py-4">
+        <Icon name={icon} className="text-[18px] text-text-muted" />
         <div className="min-w-0">
-          <h3 className="text-base font-semibold text-text-main sm:text-lg">{title}</h3>
+          <h2 className="text-sm font-semibold text-text-main">{title}</h2>
           {subtitle && <p className="text-xs text-text-muted">{subtitle}</p>}
         </div>
       </div>
       {children}
+    </section>
+  )
+}
+
+function Row({
+  title,
+  desc,
+  right,
+  children,
+  className,
+}: {
+  title: string
+  desc?: string
+  right?: React.ReactNode
+  children?: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div className={cn('border-t border-border px-5 py-4', className)}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-medium text-text-main">{title}</p>
+          {desc && <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{desc}</p>}
+        </div>
+        {right}
+      </div>
+      {children}
     </div>
   )
+}
+
+function Field({
+  label,
+  hint,
+  action,
+  children,
+}: {
+  label: string
+  hint?: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">{label}</span>
+        {action}
+      </span>
+      {children}
+      {hint && <span className="text-[11px] leading-relaxed text-text-muted">{hint}</span>}
+    </div>
+  )
+}
+
+/** Borderless input used across the page; keeps the shared Input behaviour. */
+function TextInput(props: React.ComponentProps<typeof Input>) {
+  return <Input {...props} className={cn('border-0 bg-surface-2 shadow-none', props.className)} />
 }
 
 function Notice({ status }: { status: Status }) {
@@ -548,65 +599,60 @@ export default function SettingsPage() {
     <>
       <PageHeader title="Settings" description="Theme, security, SSO, routing defaults, and network." />
 
-      <div className="max-w-2xl">
-        <div className="flex flex-col gap-6">
-          {/* Local Mode + theme + database backup */}
-          <div className="rounded-xl border border-border bg-surface p-5">
-            <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success sm:size-12">
-                  <Icon name="computer" className="text-xl sm:text-2xl" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-text-main sm:text-xl">Local Mode</h2>
-                  <p className="text-sm text-text-muted">Running on your machine</p>
-                </div>
-              </div>
-              <div className="inline-flex w-full rounded-lg bg-black/5 p-1 sm:w-auto dark:bg-white/5">
+      <div className="space-y-4">
+        <Section icon="computer" title="Local Mode" subtitle="Running on your machine">
+          <Row
+            title="Appearance"
+            desc="Theme applied to the dashboard and topology views."
+            right={
+              <div className="inline-flex shrink-0 items-center gap-0.5 rounded-lg bg-surface-2 p-1">
                 {THEME_OPTIONS.map((option) => (
                   <button
                     key={option.value}
                     type="button"
                     onClick={() => setTheme(option.value)}
                     className={cn(
-                      'flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-md px-2 py-1.5 font-medium transition-all sm:flex-initial sm:gap-1.5 sm:px-3',
+                      'flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
                       theme === option.value
-                        ? 'bg-white text-text-main shadow-sm dark:bg-white/10'
+                        ? 'bg-card text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.08)]'
                         : 'text-text-muted hover:text-text-main',
                     )}
                   >
-                    <Icon name={option.icon} className="text-[18px]" />
-                    <span className="text-xs capitalize sm:text-sm">{option.label}</span>
+                    <Icon name={option.icon} className="text-[15px]" />
+                    {option.label}
                   </button>
                 ))}
               </div>
-            </div>
+            }
+          />
 
-            <div className="flex flex-col gap-3 border-t border-border pt-4">
-              <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-medium text-text-main sm:text-base">Database Location</p>
-                  <p className="break-all font-mono text-xs text-text-muted sm:text-sm">
-                    {'~/.kinerouter/db/data.sqlite'} <span className="opacity-60">(or $DATA_DIR/db/data.sqlite)</span>
-                  </p>
-                </div>
+          <div className="border-t border-border px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                  Database
+                </p>
+                <p className="mt-0.5 break-all font-mono text-xs text-text-main">
+                  {'~/.kinerouter/db/data.sqlite'}
+                  <span className="ml-1.5 text-text-muted">(or $DATA_DIR/db/data.sqlite)</span>
+                </p>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="secondary"
-                  className="w-full sm:w-auto"
+                  size="sm"
                   disabled={dbLoading}
                   onClick={() => setDbAuth({ open: true, mode: 'export', password: '' })}
                 >
-                  <Icon name="download" /> Download Backup
+                  <Icon name="download" /> Download
                 </Button>
                 <Button
-                  variant="outline"
-                  className="w-full sm:w-auto"
+                  variant="ghost"
+                  size="sm"
                   disabled={dbLoading}
                   onClick={() => importFileRef.current?.click()}
                 >
-                  <Icon name="upload" /> Import Backup
+                  <Icon name="upload" /> Import
                 </Button>
                 <input
                   ref={importFileRef}
@@ -623,124 +669,120 @@ export default function SettingsPage() {
                   }}
                 />
               </div>
+            </div>
+            <div className="mt-2">
               <Notice status={dbStatus} />
             </div>
           </div>
+        </Section>
 
-          {/* Language */}
-          <Section icon="language" iconClass="bg-info/10 text-info" title="Language">
-            {/* ponytail: locale persists server-side; no bundled translation
-                catalogue yet. Add a message table when strings exist to translate. */}
-            <button
-              onClick={() => setLangOpen(true)}
-              className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-border bg-bg p-3 transition-colors hover:border-primary/50"
-            >
-              <span className="text-sm text-text-muted">Display language</span>
-              <span className="text-2xl">{currentLocale.flag}</span>
-            </button>
-          </Section>
+        <Section icon="language" title="Language">
+          {/* ponytail: locale persists server-side; no bundled translation
+              catalogue yet. Add a message table when strings exist to translate. */}
+          <Row
+            title={currentLocale.name}
+            desc="Display language for the dashboard."
+            right={
+              <button
+                onClick={() => setLangOpen(true)}
+                className="flex cursor-pointer items-center gap-2 rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:opacity-80"
+              >
+                <span className="text-base leading-none">{currentLocale.flag}</span>
+                Change
+              </button>
+            }
+          />
+        </Section>
 
-          {/* Security */}
-          <Section icon="shield" iconClass="bg-primary/10 text-primary" title="Security">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4 sm:items-center">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-text-main sm:text-base">Require login</p>
-                  <p className="text-xs text-text-muted sm:text-sm">
-                    When ON, dashboard requires password. When OFF, access without login.
-                  </p>
+        <Section icon="shield" title="Security" subtitle="Dashboard access and password.">
+          <Row
+            title="Require login"
+            desc="When ON, the dashboard asks for a password. When OFF, anyone with access gets in."
+            right={<Switch checked={requireLogin} onCheckedChange={(v) => void saveRequireLogin(v)} />}
+          />
+
+          {requireLogin && (
+            <form onSubmit={changePassword} className="border-t border-border px-5 py-4">
+              <div className="flex flex-col gap-4">
+                {settings.hasPassword && (
+                  <Field label="Current password">
+                    <TextInput
+                      type="password"
+                      placeholder="Enter current password"
+                      value={passwords.current}
+                      onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+                      required
+                    />
+                  </Field>
+                )}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="New password">
+                    <TextInput
+                      type="password"
+                      placeholder="Enter new password"
+                      value={passwords.next}
+                      onChange={(e) => setPasswords({ ...passwords, next: e.target.value })}
+                      required
+                    />
+                  </Field>
+                  <Field label="Confirm new password">
+                    <TextInput
+                      type="password"
+                      placeholder="Confirm new password"
+                      value={passwords.confirm}
+                      onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                      required
+                    />
+                  </Field>
                 </div>
-                <Switch checked={requireLogin} onCheckedChange={(v) => void saveRequireLogin(v)} />
+                <Notice status={passStatus} />
+                <div>
+                  <Button type="submit" size="sm" disabled={passLoading}>
+                    {settings.hasPassword ? 'Update password' : 'Set password'}
+                  </Button>
+                </div>
               </div>
-
-              {requireLogin && (
-                <form onSubmit={changePassword} className="flex flex-col gap-4 border-t border-border/50 pt-4">
-                  {settings.hasPassword && (
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-medium sm:text-sm">Current Password</label>
-                      <Input
-                        type="password"
-                        placeholder="Enter current password"
-                        value={passwords.current}
-                        onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
-                        required
-                      />
-                    </div>
-                  )}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-medium sm:text-sm">New Password</label>
-                      <Input
-                        type="password"
-                        placeholder="Enter new password"
-                        value={passwords.next}
-                        onChange={(e) => setPasswords({ ...passwords, next: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-medium sm:text-sm">Confirm New Password</label>
-                      <Input
-                        type="password"
-                        placeholder="Confirm new password"
-                        value={passwords.confirm}
-                        onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <Notice status={passStatus} />
-                  <div className="pt-2">
-                    <Button type="submit" disabled={passLoading} className="w-full sm:w-auto">
-                      {settings.hasPassword ? 'Update Password' : 'Set Password'}
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </Section>
+            </form>
+          )}
+        </Section>
 
           {/* SSO */}
-          <div className="rounded-xl border border-border bg-surface p-5">
+          <section className="overflow-hidden rounded-xl bg-surface">
             <button
               type="button"
               onClick={() => setSsoExpanded((v) => !v)}
-              className="flex w-full cursor-pointer items-center gap-3 text-left"
+              className="flex w-full cursor-pointer items-center gap-3 px-5 py-4 text-left"
             >
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500">
-                <Icon name="lock_open" className="text-[20px]" />
-              </div>
+              <Icon name="lock_open" className="text-[18px] text-text-muted" />
               <div className="min-w-0 flex-1">
-                <h3 className="text-base font-semibold text-text-main sm:text-lg">Single Sign-On (SSO)</h3>
-                <p className="text-xs text-text-muted">
+                <h2 className="text-sm font-semibold text-text-main">Single Sign-On</h2>
+                <p className="mt-0.5 text-xs text-text-muted">
                   {ssoActive
-                    ? `${settings.ssoType === 'saml' ? 'SAML 2.0' : 'OIDC'} SSO active`
+                    ? `${settings.ssoType === 'saml' ? 'SAML 2.0' : 'OIDC'} active — password login is off`
                     : settings.authMode === 'both'
                       ? `Password + ${settings.ssoType === 'saml' ? 'SAML 2.0' : 'OIDC'} active`
-                      : 'Optional SSO via Okta, Entra ID, Keycloak, or OIDC'}
+                      : 'Optional via Okta, Entra ID, Keycloak, or any OIDC provider'}
                 </p>
               </div>
-              <Icon name={ssoExpanded ? 'expand_less' : 'expand_more'} className="shrink-0 text-text-muted" />
+              <Icon
+                name={ssoExpanded ? 'expand_less' : 'expand_more'}
+                className="shrink-0 text-[18px] text-text-muted"
+              />
             </button>
 
             {ssoExpanded && (
-              <div className="mt-4 flex flex-col gap-4">
-                <p className="text-xs text-text-muted sm:text-sm">
-                  Configure enterprise Single Sign-On (SSO) for dashboard access using SAML 2.0 or OIDC.
-                </p>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium sm:text-base">SSO Protocol</label>
-                  <div className="flex rounded-lg border border-border bg-black/5 p-1 dark:bg-white/5">
+              <div>
+                <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
+                  <div className="inline-flex items-center gap-0.5 rounded-lg bg-surface-2 p-1">
                     {(['saml', 'oidc'] as const).map((tab) => (
                       <button
                         key={tab}
                         type="button"
                         onClick={() => setSsoTab(tab)}
                         className={cn(
-                          'flex-1 cursor-pointer rounded-md px-3 py-1.5 text-center text-xs font-medium transition-all sm:text-sm',
+                          'cursor-pointer rounded-md px-3 py-1 text-xs font-medium transition-colors',
                           ssoTab === tab
-                            ? 'bg-white text-text-main shadow-sm dark:bg-white/10'
+                            ? 'bg-card text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.08)]'
                             : 'text-text-muted hover:text-text-main',
                         )}
                       >
@@ -748,11 +790,7 @@ export default function SettingsPage() {
                       </button>
                     ))}
                   </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium sm:text-base">Auth Mode</label>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <div className="inline-flex items-center gap-0.5 rounded-lg bg-surface-2 p-1">
                     {(Object.keys(AuthModeCard) as (keyof typeof AuthModeCard)[]).map((mode) => {
                       const active =
                         mode === 'password'
@@ -765,17 +803,15 @@ export default function SettingsPage() {
                           key={mode}
                           type="button"
                           onClick={() => setAuthMode(mode)}
+                          title={AuthModeCard[mode].desc}
                           className={cn(
-                            'cursor-pointer rounded-lg border p-3 text-left transition-colors',
+                            'cursor-pointer rounded-md px-3 py-1 text-xs font-medium transition-colors',
                             active
-                              ? 'border-primary bg-primary/5'
-                              : 'border-border bg-bg hover:bg-black/5 dark:hover:bg-white/5',
+                              ? 'bg-card text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.08)]'
+                              : 'text-text-muted hover:text-text-main',
                           )}
                         >
-                          <p className="text-sm font-medium text-text-main sm:text-base">
-                            {mode === 'sso' ? `${ssoTab === 'saml' ? 'SAML' : 'OIDC'} only` : AuthModeCard[mode].title}
-                          </p>
-                          <p className="mt-1 text-xs text-text-muted sm:text-sm">{AuthModeCard[mode].desc}</p>
+                          {mode === 'sso' ? `${ssoTab === 'saml' ? 'SAML' : 'OIDC'} only` : AuthModeCard[mode].title}
                         </button>
                       )
                     })}
@@ -783,53 +819,60 @@ export default function SettingsPage() {
                 </div>
 
                 {ssoTab === 'saml' ? (
-                  <div className="flex flex-col gap-4 border-t border-border/50 pt-2">
-                    <div className="overflow-hidden rounded-lg border border-border bg-bg/80">
+                  <div className="space-y-4 border-t border-border px-5 py-4">
+                    <div className="overflow-hidden rounded-lg bg-surface-2">
                       <button
                         type="button"
                         onClick={() => setSamlGuide((v) => !v)}
-                        className="flex w-full cursor-pointer items-center justify-between gap-2 p-3 text-left transition-colors hover:bg-surface/50"
+                        className="flex w-full cursor-pointer items-center justify-between gap-2 p-3 text-left"
                       >
-                        <div className="flex items-center gap-2">
-                          <Icon name="menu_book" className="text-lg text-primary" />
+                        <div className="flex items-center gap-2.5">
+                          <Icon name="menu_book" className="text-[16px] text-text-muted" />
                           <div>
-                            <p className="text-xs font-semibold text-text-main sm:text-sm">
-                              IdP Setup Guidelines &amp; Provider Configuration Instructions
-                            </p>
+                            <p className="text-xs font-medium text-text-main">IdP setup guidelines</p>
                             <p className="text-[11px] text-text-muted">
-                              Click to view setup steps for AWS IAM Identity Center, Okta, Entra ID, Keycloak, &amp; Authentik
+                              Steps for AWS IAM Identity Center, Entra ID, Okta, Keycloak, Authentik
                             </p>
                           </div>
                         </div>
                         <Icon
                           name="expand_more"
-                          className={cn('text-lg text-text-muted transition-transform', samlGuide && 'rotate-180')}
+                          className={cn('text-[16px] text-text-muted transition-transform', samlGuide && 'rotate-180')}
                         />
                       </button>
                       {samlGuide && (
-                        <div className="flex flex-col gap-3 border-t border-border bg-surface/30 p-4 text-xs text-text-main">
-                          <div className="rounded border border-primary/20 bg-primary/5 p-2.5 text-xs text-primary">
-                            <p className="mb-1 font-semibold">🔑 Required Service Provider (SP) Values for your IdP Setup:</p>
-                            <ul className="list-disc space-y-1 pl-4 font-mono text-[11px]">
-                              <li><b>Assertion Consumer Service (ACS) URL:</b> <code className="break-all rounded bg-bg px-1 py-0.5">{samlAcsUrl}</code></li>
-                              <li><b>SP Entity ID / Audience URI:</b> <code className="break-all rounded bg-bg px-1 py-0.5">{samlForm.issuer || 'urn:kinerouter:sp'}</code></li>
-                              <li><b>NameID Format:</b> <code className="rounded bg-bg px-1 py-0.5">EmailAddress</code> or <code className="rounded bg-bg px-1 py-0.5">Unspecified</code></li>
+                        <div className="space-y-3 border-t border-border p-3 text-xs text-text-main">
+                          <div className="rounded-md bg-surface p-3">
+                            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                              Service provider values
+                            </p>
+                            <ul className="space-y-1 text-[11px] text-text-muted">
+                              <li>
+                                ACS URL <code className="break-all font-mono text-text-main">{samlAcsUrl}</code>
+                              </li>
+                              <li>
+                                Entity ID <code className="break-all font-mono text-text-main">{samlForm.issuer || 'urn:kinerouter:sp'}</code>
+                              </li>
+                              <li>
+                                NameID <code className="font-mono text-text-main">EmailAddress</code> or{' '}
+                                <code className="font-mono text-text-main">Unspecified</code>
+                              </li>
                             </ul>
                           </div>
-                          <div className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-2">
-                            <div className="flex flex-col gap-1.5 rounded border border-border bg-bg/50 p-3">
-                              <p className="flex items-center gap-1.5 font-semibold text-text-main"><span>☁️</span> AWS IAM Identity Center</p>
-                              <ol className="list-decimal space-y-1 pl-4 text-text-muted">
+                          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                            <div className="flex flex-col gap-1.5 rounded-md bg-surface p-3">
+                              <p className="text-xs font-medium text-text-main">AWS IAM Identity Center</p>
+                              <ol className="list-decimal space-y-1 pl-4 text-[11px] text-text-muted">
                                 <li>Applications → <b>Add application</b> → <b>Add custom SAML 2.0 application</b>.</li>
                                 <li>Set <b>Application ACS URL</b> to <code className="font-mono text-text-main">{samlAcsUrl}</code>.</li>
                                 <li>Set <b>Application SAML audience</b> to <code className="font-mono text-text-main">{samlForm.issuer || 'urn:kinerouter:sp'}</code>.</li>
                                 <li>Map <code className="font-mono text-text-main">Subject</code> or <code className="font-mono text-text-main">email</code> to <code className="font-mono text-text-main">{'${user:email}'}</code>.</li>
-                                <li>Download the <b>IAM Identity Center SAML metadata XML</b> and use 1-Click Import below.</li>
+                                <li>Download the <b>IAM Identity Center SAML metadata XML</b> and import it below.</li>
                               </ol>
                             </div>
-                            <div className="flex flex-col gap-1.5 rounded border border-border bg-bg/50 p-3">
-                              <p className="flex items-center gap-1.5 font-semibold text-text-main"><span>🔷</span> Microsoft Entra ID (Azure AD)</p>
-                              <ol className="list-decimal space-y-1 pl-4 text-text-muted">
+                            <div className="flex flex-col gap-1.5 rounded-md bg-surface p-3">
+                              <p className="text-xs font-medium text-text-main">Microsoft Entra ID</p>
+                              <ol className="list-decimal space-y-1 pl-4 text-[11px] text-text-muted">
                                 <li>Enterprise Applications → <b>New application</b> → <b>Create your own application</b>.</li>
                                 <li>Select <b>Single sign-on</b> → <b>SAML</b>.</li>
                                 <li><b>Identifier (Entity ID):</b> <code className="font-mono text-text-main">{samlForm.issuer || 'urn:kinerouter:sp'}</code></li>
@@ -837,9 +880,9 @@ export default function SettingsPage() {
                                 <li>Download <b>Federation Metadata XML</b> and import or copy the X.509 certificate.</li>
                               </ol>
                             </div>
-                            <div className="flex flex-col gap-1.5 rounded border border-border bg-bg/50 p-3">
-                              <p className="flex items-center gap-1.5 font-semibold text-text-main"><span>🟢</span> Okta / Auth0</p>
-                              <ol className="list-decimal space-y-1 pl-4 text-text-muted">
+                            <div className="flex flex-col gap-1.5 rounded-md bg-surface p-3">
+                              <p className="text-xs font-medium text-text-main">Okta / Auth0</p>
+                              <ol className="list-decimal space-y-1 pl-4 text-[11px] text-text-muted">
                                 <li>Applications → <b>Create App Integration</b> → <b>SAML 2.0</b>.</li>
                                 <li><b>Single Sign-On URL:</b> <code className="font-mono text-text-main">{samlAcsUrl}</code></li>
                                 <li><b>Audience URI (SP Entity ID):</b> <code className="font-mono text-text-main">{samlForm.issuer || 'urn:kinerouter:sp'}</code></li>
@@ -847,13 +890,13 @@ export default function SettingsPage() {
                                 <li>Download the IdP metadata XML or copy the X.509 cert.</li>
                               </ol>
                             </div>
-                            <div className="flex flex-col gap-1.5 rounded border border-border bg-bg/50 p-3">
-                              <p className="flex items-center gap-1.5 font-semibold text-text-main"><span>🛡️</span> Keycloak / Authentik</p>
-                              <ol className="list-decimal space-y-1 pl-4 text-text-muted">
+                            <div className="flex flex-col gap-1.5 rounded-md bg-surface p-3">
+                              <p className="text-xs font-medium text-text-main">Keycloak / Authentik</p>
+                              <ol className="list-decimal space-y-1 pl-4 text-[11px] text-text-muted">
                                 <li>Clients → <b>Create client</b> → Select <b>SAML</b>.</li>
                                 <li><b>Client ID:</b> <code className="font-mono text-text-main">{samlForm.issuer || 'urn:kinerouter:sp'}</code></li>
                                 <li><b>Master SAML Processing URL:</b> <code className="font-mono text-text-main">{samlAcsUrl}</code></li>
-                                <li>Export the SAML Descriptor XML or copy the IDP certificate PEM.</li>
+                                <li>Export the SAML Descriptor XML or copy the IdP certificate PEM.</li>
                               </ol>
                             </div>
                           </div>
@@ -861,18 +904,18 @@ export default function SettingsPage() {
                       )}
                     </div>
 
-                    <div className="flex flex-col items-stretch justify-between gap-3 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3 sm:flex-row sm:items-center">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2.5">
                       <div>
-                        <p className="text-sm font-medium text-text-main">1-Click IdP Metadata XML Import</p>
-                        <p className="text-xs text-text-muted">Auto-fill SSO URL, Issuer &amp; Cert from XML metadata</p>
+                        <p className="text-xs font-medium text-text-main">Import IdP metadata</p>
+                        <p className="text-[11px] text-text-muted">Fills SSO URL, issuer, and certificate from XML</p>
                       </div>
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         onClick={() => idpFileRef.current?.click()}
                       >
-                        <Icon name="upload_file" /> Upload Metadata XML
+                        <Icon name="upload_file" /> Upload XML
                       </Button>
                       <input
                         ref={idpFileRef}
@@ -888,191 +931,184 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="grid grid-cols-1 gap-4">
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium sm:text-base">Single Sign-On Service URL (samlEntryPoint)</label>
-                        <Input
+                      <Field label="Single Sign-On Service URL">
+                        <TextInput
                           placeholder="https://idp.example.com/app/saml/sso/..."
                           value={samlForm.entryPoint}
                           onChange={(e) => setSamlForm((p) => ({ ...p, entryPoint: e.target.value }))}
                           disabled={samlLoading}
                         />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium sm:text-base">SP Entity ID / Audience (samlIssuer)</label>
-                        <Input
+                      </Field>
+                      <Field label="SP Entity ID / Audience">
+                        <TextInput
                           placeholder="urn:kinerouter:sp"
                           value={samlForm.issuer}
                           onChange={(e) => setSamlForm((p) => ({ ...p, issuer: e.target.value }))}
                           disabled={samlLoading}
                         />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-sm font-medium sm:text-base">IdP X.509 Certificate (samlCert)</label>
-                          <Button type="button" variant="outline" size="sm" onClick={() => certFileRef.current?.click()}>
-                            <Icon name="file_upload" /> Upload Certificate
-                          </Button>
-                          <input
-                            ref={certFileRef}
-                            type="file"
-                            accept=".crt,.pem,.cer,text/plain"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              e.target.value = ''
-                              readText(file, (text) => {
-                                setSamlForm((p) => ({ ...p, cert: text.trim() }))
-                                setSamlStatus({ type: 'success', message: 'Certificate file loaded into configuration.' })
-                              })
-                            }}
-                          />
-                        </div>
+                      </Field>
+                      <Field
+                        label="IdP X.509 Certificate"
+                        hint="Paste a raw Base64 certificate or a PEM block."
+                        action={
+                          <button
+                            type="button"
+                            onClick={() => certFileRef.current?.click()}
+                            className="cursor-pointer text-[11px] font-medium text-text-muted underline-offset-2 hover:text-text-main hover:underline"
+                          >
+                            Upload file
+                          </button>
+                        }
+                      >
                         <textarea
                           rows={4}
                           placeholder={'-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----'}
                           value={samlForm.cert}
                           onChange={(e) => setSamlForm((p) => ({ ...p, cert: e.target.value }))}
-                          className="w-full rounded-lg border border-border bg-bg p-2.5 font-mono text-xs text-text-main focus:border-primary focus:outline-none"
+                          className="w-full resize-y rounded-lg border-0 bg-surface-2 p-2.5 font-mono text-[11px] text-text-main outline-none placeholder:text-text-muted focus-visible:ring-1 focus-visible:ring-ring"
                           disabled={samlLoading}
                         />
-                        <p className="text-xs text-text-muted">Paste raw Base64 certificate or PEM block.</p>
-                      </div>
+                        <input
+                          ref={certFileRef}
+                          type="file"
+                          accept=".crt,.pem,.cer,text/plain"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            e.target.value = ''
+                            readText(file, (text) => {
+                              setSamlForm((p) => ({ ...p, cert: text.trim() }))
+                              setSamlStatus({ type: 'success', message: 'Certificate file loaded into configuration.' })
+                            })
+                          }}
+                        />
+                      </Field>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <div className="flex flex-col gap-2">
-                          <label className="text-sm font-medium sm:text-base">Login Button Label</label>
-                          <Input
+                        <Field label="Login button label">
+                          <TextInput
                             placeholder="Sign in with SAML SSO"
                             value={samlForm.loginLabel}
                             onChange={(e) => setSamlForm((p) => ({ ...p, loginLabel: e.target.value }))}
                           />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <label className="text-sm font-medium sm:text-base">Email Claim Attribute</label>
-                          <Input
+                        </Field>
+                        <Field label="Email claim">
+                          <TextInput
                             placeholder="email"
                             value={samlForm.attributeEmail}
                             onChange={(e) => setSamlForm((p) => ({ ...p, attributeEmail: e.target.value }))}
                           />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <label className="text-sm font-medium sm:text-base">Display Name Claim</label>
-                          <Input
+                        </Field>
+                        <Field label="Display name claim">
+                          <TextInput
                             placeholder="name"
                             value={samlForm.attributeName}
                             onChange={(e) => setSamlForm((p) => ({ ...p, attributeName: e.target.value }))}
                           />
-                        </div>
+                        </Field>
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg p-3 text-xs text-text-muted sm:text-sm">
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="font-medium text-text-main">ACS Callback URL</p>
-                          <code className="block break-all font-mono text-xs">{samlAcsUrl}</code>
+                    <div className="divide-y divide-border rounded-lg bg-surface-2 px-3">
+                      <div className="flex items-center justify-between gap-2 py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-[11px] uppercase tracking-wide text-text-muted">ACS callback URL</p>
+                          <code className="block break-all font-mono text-[11px] text-text-main">{samlAcsUrl}</code>
                         </div>
-                        <Button
+                        <button
                           type="button"
-                          variant="outline"
-                          size="sm"
                           onClick={() => {
                             void navigator.clipboard.writeText(samlAcsUrl)
                             setSamlStatus({ type: 'success', message: 'ACS URL copied to clipboard!' })
                           }}
+                          className="shrink-0 cursor-pointer rounded-md px-2 py-1 text-[11px] font-medium text-text-muted transition-colors hover:bg-surface hover:text-text-main"
                         >
-                          <Icon name="content_copy" /> Copy
-                        </Button>
+                          Copy
+                        </button>
                       </div>
-                      <div className="flex items-center justify-between gap-2 border-t border-border/50 pt-2">
-                        <div>
-                          <p className="font-medium text-text-main">SP XML Metadata</p>
-                          <code className="block break-all font-mono text-xs">{samlMetadataUrl}</code>
+                      <div className="flex items-center justify-between gap-2 py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-[11px] uppercase tracking-wide text-text-muted">SP XML metadata</p>
+                          <code className="block break-all font-mono text-[11px] text-text-main">{samlMetadataUrl}</code>
                         </div>
                         <a
                           href={samlMetadataUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           download="kinerouter-sp-metadata.xml"
-                          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                          className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-text-muted transition-colors hover:bg-surface hover:text-text-main"
                         >
-                          <Icon name="download" className="text-[16px]" /> Download XML
+                          Download
                         </a>
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-2 border-t border-border/50 pt-2 sm:flex-row">
-                      <Button type="button" disabled={samlLoading} onClick={() => void saveSaml()} className="w-full sm:w-auto">
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" disabled={samlLoading} onClick={() => void saveSaml()}>
                         Save SAML settings
                       </Button>
-                      <Button type="button" variant="outline" disabled={samlTestLoading} onClick={() => void testSaml()} className="w-full sm:w-auto">
-                        Test SAML settings
+                      <Button type="button" variant="ghost" size="sm" disabled={samlTestLoading} onClick={() => void testSaml()}>
+                        Test settings
                       </Button>
                     </div>
                     <Notice status={samlTestStatus} />
                     <Notice status={samlStatus} />
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-4 border-t border-border/50 pt-2">
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium sm:text-base">Issuer URL</label>
-                        <Input
+                  <div className="space-y-4 border-t border-border px-5 py-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <Field label="Issuer URL" hint="Discovery document base of the provider.">
+                        <TextInput
                           placeholder="https://auth.example.com/application/o/kinerouter/"
                           value={oidcForm.issuerUrl}
                           onChange={(e) => setOidcForm((p) => ({ ...p, issuerUrl: e.target.value }))}
                           disabled={oidcLoading}
                         />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium sm:text-base">Client ID</label>
-                        <Input
+                      </Field>
+                      <Field label="Client ID">
+                        <TextInput
                           placeholder="kinerouter-dashboard"
                           value={oidcForm.clientId}
                           onChange={(e) => setOidcForm((p) => ({ ...p, clientId: e.target.value }))}
                           disabled={oidcLoading}
                         />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium sm:text-base">Client Secret</label>
-                        <Input
+                      </Field>
+                      <Field label="Client secret" hint="Write-only after saving.">
+                        <TextInput
                           type="password"
-                          placeholder="Leave blank to keep existing secret"
+                          placeholder="Leave blank to keep existing"
                           value={oidcSecret}
                           onChange={(e) => setOidcSecret(e.target.value)}
                           disabled={oidcLoading}
                         />
-                        <p className="text-xs text-text-muted sm:text-sm">This value is write-only after saving.</p>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium sm:text-base">Scopes</label>
-                        <Input
+                      </Field>
+                      <Field label="Scopes">
+                        <TextInput
                           placeholder="openid profile email"
                           value={oidcForm.scopes}
                           onChange={(e) => setOidcForm((p) => ({ ...p, scopes: e.target.value }))}
                           disabled={oidcLoading}
                         />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium sm:text-base">Login Button Label</label>
-                        <Input
+                      </Field>
+                      <Field label="Login button label">
+                        <TextInput
                           placeholder="Sign in with OIDC"
                           value={oidcForm.loginLabel}
                           onChange={(e) => setOidcForm((p) => ({ ...p, loginLabel: e.target.value }))}
                           disabled={oidcLoading}
                         />
-                      </div>
+                      </Field>
                     </div>
 
-                    <div className="rounded-lg border border-border bg-bg p-3 text-xs text-text-muted sm:text-sm">
-                      <p className="mb-1 font-medium text-text-main">Redirect URI</p>
-                      <code className="block break-all font-mono">{oidcRedirectUri}</code>
+                    <div className="rounded-lg bg-surface-2 px-3 py-2.5">
+                      <p className="text-[11px] uppercase tracking-wide text-text-muted">Redirect URI</p>
+                      <code className="block break-all font-mono text-[11px] text-text-main">{oidcRedirectUri}</code>
                     </div>
 
-                    <div className="flex flex-col gap-2 border-t border-border/50 pt-2 sm:flex-row">
-                      <Button type="button" disabled={oidcLoading} onClick={() => void saveOidc()} className="w-full sm:w-auto">
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" disabled={oidcLoading} onClick={() => void saveOidc()}>
                         Save OIDC settings
                       </Button>
-                      <Button type="button" variant="outline" disabled={oidcTestLoading} onClick={() => void testOidc()} className="w-full sm:w-auto">
+                      <Button type="button" variant="ghost" size="sm" disabled={oidcTestLoading} onClick={() => void testOidc()}>
                         Test connection
                       </Button>
                     </div>
@@ -1082,181 +1118,173 @@ export default function SettingsPage() {
                 )}
 
                 {ssoActive && (
-                  <p className="text-xs text-warning sm:text-sm">
-                    SSO login ({settings.ssoType === 'saml' ? 'SAML 2.0' : 'OIDC'}) is currently active. Password login is disabled until you switch back.
+                  <p className="border-t border-border px-5 py-3 text-[11px] text-warning">
+                    {settings.ssoType === 'saml' ? 'SAML 2.0' : 'OIDC'} login is active. Password login is
+                    disabled until you switch back.
                   </p>
                 )}
                 {settings.authMode === 'both' && (
-                  <p className="text-xs text-warning sm:text-sm">
-                    Password and SSO login ({settings.ssoType === 'saml' ? 'SAML 2.0' : 'OIDC'}) are both active.
+                  <p className="border-t border-border px-5 py-3 text-[11px] text-warning">
+                    Password and {settings.ssoType === 'saml' ? 'SAML 2.0' : 'OIDC'} login are both active.
                   </p>
                 )}
               </div>
             )}
-          </div>
+          </section>
 
           {/* Routing strategy */}
-          <Section icon="route" iconClass="bg-info/10 text-info" title="Routing Strategy">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4 sm:items-center">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-text-main sm:text-base">Round Robin</p>
-                  <p className="text-xs text-text-muted sm:text-sm">Cycle through accounts to distribute load</p>
-                </div>
+          <Section icon="route" title="Routing Strategy" subtitle="How requests pick an account or combo model.">
+            <Row
+              title="Round robin"
+              desc="Cycle through accounts to spread load."
+              right={
                 <Switch
                   checked={fallbackRR}
                   onCheckedChange={(v) => void patch({ fallbackStrategy: v ? 'round-robin' : 'fill-first' })}
                 />
+              }
+            />
+
+            {fallbackRR && (
+              <div className="flex items-center justify-between gap-4 border-t border-border bg-surface-2/50 px-5 py-3">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-text-main">Sticky limit</p>
+                  <p className="mt-0.5 text-[11px] text-text-muted">Calls per account before switching</p>
+                </div>
+                <TextInput
+                  type="number"
+                  min={1}
+                  max={10}
+                  defaultValue={sticky}
+                  className="w-16 shrink-0 text-center font-mono"
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10)
+                    if (!Number.isNaN(n) && n >= 1) void patch({ stickyRoundRobinLimit: n })
+                  }}
+                />
               </div>
+            )}
 
-              {fallbackRR && (
-                <div className="flex items-start justify-between gap-4 border-t border-border/50 pt-2 sm:items-center">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-text-main sm:text-base">Sticky Limit</p>
-                    <p className="text-xs text-text-muted sm:text-sm">Calls per account before switching</p>
-                  </div>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={10}
-                    defaultValue={sticky}
-                    className="w-16 shrink-0 text-center sm:w-20"
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10)
-                      if (!Number.isNaN(n) && n >= 1) void patch({ stickyRoundRobinLimit: n })
-                    }}
-                  />
-                </div>
-              )}
-
-              <div className="flex items-start justify-between gap-4 border-t border-border/50 pt-4 sm:items-center">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-text-main sm:text-base">Combo Round Robin</p>
-                  <p className="text-xs text-text-muted sm:text-sm">
-                    Cycle through providers in combos instead of always starting with first
-                  </p>
-                </div>
+            <Row
+              title="Combo round robin"
+              desc="Rotate through combo providers instead of always starting with the first."
+              className="mt-0"
+              right={
                 <Switch
                   checked={comboRR}
                   onCheckedChange={(v) => void patch({ comboStrategy: v ? 'round-robin' : 'fallback' })}
                 />
-              </div>
+              }
+            />
 
-              {comboRR && (
-                <div className="flex items-center justify-between border-t border-border/50 pt-2">
-                  <div>
-                    <p className="font-medium">Combo Sticky Limit</p>
-                    <p className="text-sm text-text-muted">Calls per combo model before switching</p>
-                  </div>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={100}
-                    defaultValue={comboSticky}
-                    className="w-20 text-center"
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10)
-                      if (!Number.isNaN(n) && n >= 1) void patch({ comboStickyRoundRobinLimit: n })
-                    }}
-                  />
+            {comboRR && (
+              <div className="flex items-center justify-between gap-4 border-t border-border bg-surface-2/50 px-5 py-3">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-text-main">Combo sticky limit</p>
+                  <p className="mt-0.5 text-[11px] text-text-muted">Calls per combo model before switching</p>
                 </div>
-              )}
+                <TextInput
+                  type="number"
+                  min={1}
+                  max={100}
+                  defaultValue={comboSticky}
+                  className="w-16 shrink-0 text-center font-mono"
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10)
+                    if (!Number.isNaN(n) && n >= 1) void patch({ comboStickyRoundRobinLimit: n })
+                  }}
+                />
+              </div>
+            )}
 
-              <p className="border-t border-border/50 pt-2 text-xs italic text-text-muted">
-                {fallbackRR
-                  ? `Currently distributing requests across all available accounts with ${sticky} calls per account.`
-                  : 'Currently using accounts in priority order (Fill First).'}
-                {comboRR
-                  ? ` Combos rotate after ${comboSticky} call${comboSticky === 1 ? '' : 's'} per model.`
-                  : ' Combos always start with their first model.'}
-              </p>
-            </div>
+            <p className="border-t border-border px-5 py-3 text-[11px] leading-relaxed text-text-muted">
+              {fallbackRR
+                ? `Distributing across all accounts, ${sticky} call${sticky === 1 ? '' : 's'} per account.`
+                : 'Using accounts in priority order (fill first).'}
+              {comboRR
+                ? ` Combos rotate after ${comboSticky} call${comboSticky === 1 ? '' : 's'} per model.`
+                : ' Combos always start with their first model.'}
+            </p>
           </Section>
 
           {/* Network */}
-          <Section icon="wifi" iconClass="bg-purple-500/10 text-purple-500" title="Network">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4 sm:items-center">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-text-main sm:text-base">Outbound Proxy</p>
-                  <p className="text-xs text-text-muted sm:text-sm">Enable proxy for OAuth + provider outbound requests.</p>
-                </div>
+          <Section icon="wifi" title="Network" subtitle="Outbound traffic from the gateway.">
+            <Row
+              title="Outbound proxy"
+              desc="Route OAuth and provider requests through a proxy."
+              right={
                 <Switch
                   checked={settings.outboundProxyEnabled === true}
                   disabled={proxyLoading}
                   onCheckedChange={(v) => void toggleProxy(v)}
                 />
-              </div>
+              }
+            />
 
-              {settings.outboundProxyEnabled === true && (
-                <form onSubmit={applyProxy} className="flex flex-col gap-4 border-t border-border/50 pt-2">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium sm:text-base">Proxy URL</label>
-                    <Input
-                      placeholder="http://127.0.0.1:7897"
-                      value={proxyForm.url}
-                      onChange={(e) => setProxyForm((p) => ({ ...p, url: e.target.value }))}
-                      disabled={proxyLoading}
-                    />
-                    <p className="text-xs text-text-muted sm:text-sm">Leave empty to inherit existing env proxy (if any).</p>
-                  </div>
-
-                  <div className="flex flex-col gap-2 border-t border-border/50 pt-2">
-                    <label className="text-sm font-medium sm:text-base">No Proxy</label>
-                    <Input
-                      placeholder="localhost,127.0.0.1"
-                      value={proxyForm.noProxy}
-                      onChange={(e) => setProxyForm((p) => ({ ...p, noProxy: e.target.value }))}
-                      disabled={proxyLoading}
-                    />
-                    <p className="text-xs text-text-muted sm:text-sm">Comma-separated hostnames/domains to bypass the proxy.</p>
-                  </div>
-
-                  <div className="flex flex-col items-stretch gap-2 border-t border-border/50 pt-2 sm:flex-row sm:items-center">
-                    <Button type="button" variant="secondary" disabled={proxyTestLoading || proxyLoading} onClick={() => void testProxy()} className="w-full sm:w-auto">
-                      Test proxy URL
-                    </Button>
-                    <Button type="submit" disabled={proxyLoading} className="w-full sm:w-auto">Apply</Button>
-                  </div>
-                </form>
-              )}
-
-              {proxyStatus.message && (
-                <div className="border-t border-border/50 pt-2">
-                  <Notice status={proxyStatus} />
+            {settings.outboundProxyEnabled === true && (
+              <form onSubmit={applyProxy} className="space-y-3 border-t border-border px-5 py-4">
+                <Field label="Proxy URL" hint="Leave empty to inherit the env proxy, if any.">
+                  <TextInput
+                    placeholder="http://127.0.0.1:7897"
+                    value={proxyForm.url}
+                    onChange={(e) => setProxyForm((p) => ({ ...p, url: e.target.value }))}
+                    disabled={proxyLoading}
+                  />
+                </Field>
+                <Field label="No proxy" hint="Comma-separated hosts that bypass the proxy.">
+                  <TextInput
+                    placeholder="localhost,127.0.0.1"
+                    value={proxyForm.noProxy}
+                    onChange={(e) => setProxyForm((p) => ({ ...p, noProxy: e.target.value }))}
+                    disabled={proxyLoading}
+                  />
+                </Field>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button type="submit" size="sm" disabled={proxyLoading}>
+                    Apply
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" disabled={proxyTestLoading || proxyLoading} onClick={() => void testProxy()}>
+                    Test URL
+                  </Button>
                 </div>
-              )}
-            </div>
+              </form>
+            )}
+
+            {proxyStatus.message && (
+              <div className="border-t border-border px-5 py-3">
+                <Notice status={proxyStatus} />
+              </div>
+            )}
           </Section>
 
           {/* Observability */}
-          <Section icon="monitoring" iconClass="bg-orange-500/10 text-orange-500" title="Observability">
-            <div className="flex items-start justify-between gap-4 sm:items-center">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-text-main sm:text-base">Enable Observability</p>
-                <p className="text-xs text-text-muted sm:text-sm">Record request details for inspection in the logs view</p>
-              </div>
-              <Switch
-                checked={settings.enableObservability === true}
-                onCheckedChange={(v) => void patch({ enableObservability: v })}
-              />
-            </div>
+          <Section icon="monitoring" title="Observability">
+            <Row
+              title="Record request details"
+              desc="Store request bodies and timings for the logs view."
+              right={
+                <Switch
+                  checked={settings.enableObservability === true}
+                  onCheckedChange={(v) => void patch({ enableObservability: v })}
+                />
+              }
+            />
           </Section>
 
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => setShutdownOpen(true)}
-              className="w-full border-danger/30 text-danger hover:bg-danger/10 hover:border-danger/50"
+              className="text-danger hover:bg-danger/10"
             >
               <Icon name="power_settings_new" /> Shutdown
             </Button>
-            <Button variant="outline" onClick={() => void handleLogout()} className="w-full">
+            <Button variant="ghost" onClick={() => void handleLogout()}>
               <Icon name="logout" /> Logout
             </Button>
           </div>
 
-          <div className="py-4 text-center text-xs text-text-muted sm:text-sm">
+          <div className="pt-2 text-center text-[11px] text-text-muted">
             <p>KineRouter{version ? ` v${version}` : ''}</p>
             <p className="mt-1">
               {['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
@@ -1265,7 +1293,6 @@ export default function SettingsPage() {
             </p>
           </div>
         </div>
-      </div>
 
       {/* Language picker */}
       <Modal isOpen={langOpen} onClose={() => setLangOpen(false)} title="Select Language" size="full">
@@ -1280,13 +1307,13 @@ export default function SettingsPage() {
                 className={cn(
                   'flex w-full cursor-pointer flex-col items-center justify-start gap-1 rounded-lg px-2 py-3 text-xs font-medium transition-colors',
                   active
-                    ? 'bg-primary/15 text-primary ring-2 ring-primary'
-                    : 'text-text-main hover:bg-black/5 dark:hover:bg-white/5',
+                    ? 'bg-surface-2 text-text-main ring-1 ring-ring'
+                    : 'text-text-main hover:bg-surface-2',
                 )}
               >
                 <span className="text-2xl">{item.flag}</span>
                 <span className="flex h-8 items-center text-center leading-tight">{item.name}</span>
-                {active && <Icon name="check" className="text-sm" />}
+                {active && <Icon name="check" className="text-[14px] text-text-muted" />}
               </button>
             )
           })}

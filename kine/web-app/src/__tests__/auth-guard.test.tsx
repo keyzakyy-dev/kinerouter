@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { AuthProvider } from '@/lib/auth'
 import App from '@/App'
@@ -51,5 +51,24 @@ describe('auth guard', () => {
       expect(screen.getByText('No keys yet')).toBeTruthy()
     })
     expect(screen.queryByLabelText(/dashboard password/i)).toBeNull()
+  })
+
+  it('toggles the rail on Cmd/Ctrl+B, from Animate UI\'s sidebar provider', async () => {
+    vi.stubGlobal('fetch', mockFetch({
+      '/api/auth/status': { authenticated: true, requireLogin: true },
+      '/api/keys': { keys: [], machineId: 'm-1' },
+      '/api/version': { version: '0.1.0', latest: '0.1.0' },
+    }))
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/endpoint']}>
+        <AuthProvider><App /></AuthProvider>
+      </MemoryRouter>,
+    )
+
+    const rail = await screen.findByRole('navigation', { name: 'Dashboard' })
+    const before = rail.getAttribute('data-collapsed')
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true })
+    await waitFor(() => expect(rail.getAttribute('data-collapsed')).not.toBe(before))
   })
 })

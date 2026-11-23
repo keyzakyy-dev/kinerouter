@@ -261,8 +261,8 @@ export default function PxpipePage() {
             <AreaChart data={stats.timeline} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="gradPxpipe" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  <stop offset="5%" stopColor="var(--chart-3)" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="var(--chart-3)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
@@ -279,7 +279,7 @@ export default function PxpipePage() {
               <Area
                 type="monotone"
                 dataKey="tokensSavedEst"
-                stroke="#10b981"
+                stroke="var(--chart-3)"
                 fill="url(#gradPxpipe)"
                 strokeWidth={2}
               />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
 import { PageHeader } from '@/components/layout'
 import { Modal } from '@/components/modal'
@@ -250,7 +250,6 @@ export default function MitmPage() {
             tool={tool}
             status={status}
             serverRunning={!!running}
-            canRunWithoutPassword={canRunWithoutPassword}
             withPassword={withPassword}
             onChanged={load}
           />
@@ -323,14 +322,12 @@ function MitmToolCard({
   tool,
   status,
   serverRunning,
-  canRunWithoutPassword,
   withPassword,
   onChanged,
 }: {
   tool: MitmTool
   status: MitmStatus | null
   serverRunning: boolean
-  canRunWithoutPassword: boolean
   withPassword: (fn: (pwd: string) => Promise<void>) => void
   onChanged: () => void
 }) {

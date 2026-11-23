@@ -2,9 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type RequestDetail, type RequestDetailsPagination } from '@/lib/api'
 import { fmtInt as fmt } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/modal'
+import { Icon } from '@/components/icon'
 
 function tokens(rec: unknown): Record<string, number> {
   return (rec && typeof rec === 'object' ? rec : {}) as Record<string, number>
@@ -24,34 +23,35 @@ function CollapsibleSection({
 }: { title: string; children: React.ReactNode; defaultOpen?: boolean; icon?: string }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="overflow-hidden rounded-lg border border-border/60">
+    <div className="overflow-hidden rounded-xl bg-surface-2">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between bg-black/[0.02] p-3 transition-colors hover:bg-black/[0.04] dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
+        className="flex w-full cursor-pointer items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
       >
-        <div className="flex items-center gap-2">
-          {icon && <span className="material-symbols-outlined text-[18px] text-text-muted">{icon}</span>}
-          <span className="text-sm font-semibold text-text-main">{title}</span>
-        </div>
-        <span className={cn('material-symbols-outlined text-[20px] text-text-muted transition-transform duration-200', open && 'rotate-90')}>
-          chevron_right
+        <span className="flex items-center gap-2">
+          {icon && <Icon name={icon} className="text-[15px] text-text-muted" />}
+          <span className="text-xs font-semibold text-text-main">{title}</span>
         </span>
+        <Icon name={open ? 'expand_less' : 'expand_more'} className="text-[16px] text-text-muted" />
       </button>
-      {open && <div className="border-t border-border/60 p-4">{children}</div>}
+      {open && <div className="border-t border-border p-3">{children}</div>}
     </div>
   )
 }
 
 function Pre({ children }: { children: React.ReactNode }) {
   return (
-    <pre className="max-h-[300px] max-w-full overflow-auto rounded-lg border border-border/60 bg-black/5 p-3 font-mono text-xs text-text-main sm:p-4 dark:bg-white/5">
+    <pre className="custom-scrollbar max-h-[300px] max-w-full overflow-auto rounded-lg bg-card p-3 font-mono text-[11px] leading-relaxed text-text-main">
       {children}
     </pre>
   )
 }
 
 const PAGE_SIZES = [10, 20, 50, 100]
+
+const iconBtn =
+  'flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main disabled:pointer-events-none disabled:opacity-30'
 
 /** Paginated request history with filters and a detail drawer. */
 export function RequestDetailsTab() {
@@ -99,132 +99,175 @@ export function RequestDetailsTab() {
   useEffect(() => { void fetchDetails() }, [fetchDetails])
 
   const hasFilters = !!(filters.provider || filters.startDate || filters.endDate)
-  const inputCls = 'h-9 w-full min-w-0 rounded-lg border border-border bg-surface px-3 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20'
+  const fieldCls =
+    'h-9 w-full min-w-0 cursor-pointer rounded-lg border-0 bg-surface-2 px-3 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-ring'
+  const labelCls = 'text-[11px] font-medium uppercase tracking-wide text-text-muted'
+
+  const from = pagination.totalItems ? (pagination.page - 1) * pagination.pageSize + 1 : 0
+  const to = Math.min(pagination.page * pagination.pageSize, pagination.totalItems)
 
   return (
-    <div className="flex min-w-0 flex-col gap-6">
-      <Card className="p-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex min-w-0 flex-col gap-2">
-            <label htmlFor="provider-filter" className="text-sm font-medium text-text-main">Provider</label>
+    <div className="flex min-w-0 flex-col gap-2">
+      <section className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-surface">
+        <div className="flex items-center gap-2 px-4 py-3">
+          <Icon name="tune" className="text-[15px] text-text-muted" />
+          <h2 className="text-sm font-semibold text-text-main">Filters</h2>
+          <button
+            type="button"
+            onClick={() => setFilters({ provider: '', startDate: '', endDate: '' })}
+            disabled={!hasFilters}
+            className="ml-auto cursor-pointer rounded-md px-2 py-1 text-[11px] font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main disabled:pointer-events-none disabled:opacity-40"
+          >
+            Clear
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-3 border-t border-border px-4 py-4 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="flex min-w-0 flex-col gap-1.5">
+            <span className={labelCls}>Provider</span>
             <select
-              id="provider-filter"
               value={filters.provider}
               onChange={(e) => setFilters({ ...filters, provider: e.target.value })}
-              className={cn(inputCls, 'cursor-pointer')}
+              className={fieldCls}
             >
               <option value="">All Providers</option>
               {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-          </div>
-          <div className="flex min-w-0 flex-col gap-2">
-            <label htmlFor="start-date-filter" className="text-sm font-medium text-text-main">Start Date</label>
+          </label>
+          <label className="flex min-w-0 flex-col gap-1.5">
+            <span className={labelCls}>Start date</span>
             <input
-              id="start-date-filter" type="datetime-local" value={filters.startDate}
-              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })} className={inputCls}
+              type="datetime-local" value={filters.startDate}
+              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+              className={fieldCls}
             />
-          </div>
-          <div className="flex min-w-0 flex-col gap-2">
-            <label htmlFor="end-date-filter" className="text-sm font-medium text-text-main">End Date</label>
+          </label>
+          <label className="flex min-w-0 flex-col gap-1.5">
+            <span className={labelCls}>End date</span>
             <input
-              id="end-date-filter" type="datetime-local" value={filters.endDate}
-              onChange={(e) => setFilters({ ...filters, endDate: e.target.value })} className={inputCls}
+              type="datetime-local" value={filters.endDate}
+              onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+              className={fieldCls}
             />
-          </div>
-          <div className="flex min-w-0 flex-col gap-2 sm:col-span-2 lg:col-span-1">
-            <span className="hidden text-sm font-medium opacity-0 lg:block" aria-hidden="true">Clear</span>
-            <Button variant="ghost" onClick={() => setFilters({ provider: '', startDate: '', endDate: '' })} disabled={!hasFilters} className="w-full">
-              Clear Filters
-            </Button>
-          </div>
+          </label>
         </div>
-      </Card>
+      </section>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px]">
-            <thead>
-              <tr className="border-b border-border/60 text-sm font-semibold text-text-main">
-                <th className="p-4 text-left">Timestamp</th>
-                <th className="p-4 text-left">Model</th>
-                <th className="p-4 text-left">Provider</th>
-                <th className="p-4 text-right">Input Tokens</th>
-                <th className="p-4 text-right">Cached</th>
-                <th className="p-4 text-right">Cache Creation</th>
-                <th className="p-4 text-right">Output Tokens</th>
-                <th className="p-4 text-left">Latency</th>
-                <th className="p-4 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={9} className="p-8 text-center text-text-muted">
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
-                      Loading...
-                    </div>
-                  </td>
+      <section className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-surface">
+        <div className="flex items-center gap-2 px-4 py-3">
+          <Icon name="receipt_long" className="text-[15px] text-text-muted" />
+          <h2 className="text-sm font-semibold text-text-main">Request details</h2>
+          <span className="ml-auto font-mono text-[11px] text-text-muted">{fmt(pagination.totalItems)}</span>
+        </div>
+
+        <div className="min-w-0 px-2 pb-2">
+          <div className="min-w-0 overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left">
+              <thead className="text-[11px] uppercase tracking-wide text-text-muted">
+                <tr className="border-b border-border">
+                  <th className="whitespace-nowrap px-3 py-2 font-medium">Timestamp</th>
+                  <th className="px-3 py-2 font-medium">Model</th>
+                  <th className="px-3 py-2 font-medium">Provider</th>
+                  <th className="px-3 py-2 text-right font-medium">Input</th>
+                  <th className="px-3 py-2 text-right font-medium">Cached</th>
+                  <th className="px-3 py-2 text-right font-medium">Cache write</th>
+                  <th className="px-3 py-2 text-right font-medium">Output</th>
+                  <th className="px-3 py-2 font-medium">Latency</th>
+                  <th className="px-3 py-2" />
                 </tr>
-              ) : details.length === 0 ? (
-                <tr><td colSpan={9} className="p-8 text-center text-text-muted">No request details found</td></tr>
-              ) : details.map((d, i) => {
-                const t = tokens(d.tokens)
-                return (
-                  <tr key={`${d.id}-${i}`} className="border-b border-border/60 transition-colors last:border-b-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
-                    <td className="whitespace-nowrap p-4 text-sm text-text-main">{new Date(d.timestamp).toLocaleString()}</td>
-                    <td className="max-w-[260px] truncate p-4 font-mono text-sm text-text-main">{d.model}</td>
-                    <td className="max-w-[180px] truncate p-4 text-sm"><span className="font-medium">{nameById[d.provider] || d.provider}</span></td>
-                    <td className="p-4 text-right font-mono text-sm text-text-main">{fmt(inputOf(t))}</td>
-                    <td className="p-4 text-right font-mono text-sm text-text-main">{cachedOf(t) > 0 ? fmt(cachedOf(t)) : '—'}</td>
-                    <td className="p-4 text-right font-mono text-sm text-text-main">{cacheCreateOf(t) > 0 ? fmt(cacheCreateOf(t)) : '—'}</td>
-                    <td className="p-4 text-right font-mono text-sm text-text-main">{fmt(outputOf(t))}</td>
-                    <td className="p-4 text-sm text-text-muted">
-                      <div className="flex flex-col gap-0.5">
-                        <div>TTFT: <span className="font-mono">{d.latency?.ttft || 0}ms</span></div>
-                        <div>Total: <span className="font-mono">{d.latency?.total || 0}ms</span></div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="p-2">
+                      <div className="flex items-center justify-center gap-2 rounded-lg bg-surface-2 py-10 text-xs text-text-muted">
+                        <Icon name="progress_activity" className="animate-spin text-[16px]" />
+                        Loading requests…
                       </div>
                     </td>
-                    <td className="p-4 text-center">
-                      <Button variant="outline" size="sm" onClick={() => setSelected(d)}>Detail</Button>
+                  </tr>
+                ) : details.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-2">
+                      <div className="flex flex-col items-center justify-center gap-2 rounded-lg bg-surface-2 py-10 text-center text-xs text-text-muted">
+                        <Icon name="receipt_long" className="text-[24px] text-text-muted/60" />
+                        <span>No request details found for this range.</span>
+                      </div>
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                ) : details.map((d, i) => {
+                  const t = tokens(d.tokens)
+                  return (
+                    <tr key={`${d.id}-${i}`} className="group transition-colors hover:bg-surface-2">
+                      <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[11px] text-text-muted">
+                        {new Date(d.timestamp).toLocaleString()}
+                      </td>
+                      <td className="max-w-[220px] truncate px-3 py-2.5 font-mono text-xs text-text-main" title={d.model}>
+                        {d.model}
+                      </td>
+                      <td className="max-w-[160px] truncate px-3 py-2.5 text-xs text-text-main" title={nameById[d.provider] || d.provider}>
+                        {nameById[d.provider] || d.provider}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-text-main">{fmt(inputOf(t))}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-text-muted">{cachedOf(t) > 0 ? fmt(cachedOf(t)) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-text-muted">{cacheCreateOf(t) > 0 ? fmt(cacheCreateOf(t)) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-text-main">{fmt(outputOf(t))}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[10px] leading-tight text-text-muted">
+                        <div>TTFT {d.latency?.ttft || 0}ms</div>
+                        <div>Total {d.latency?.total || 0}ms</div>
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setSelected(d)}
+                          aria-label="Open request details"
+                          className={cn(iconBtn, 'ml-auto')}
+                        >
+                          <Icon name="arrow_forward" className="text-[15px]" />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {!loading && details.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 p-4 text-sm">
-            <div className="flex items-center gap-2 text-text-muted">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-text-muted">
+            <div className="flex items-center gap-2">
               <span>Rows</span>
               <select
                 value={pagination.pageSize}
                 onChange={(e) => setPagination((p) => ({ ...p, pageSize: Number(e.target.value), page: 1 }))}
-                className="h-8 cursor-pointer rounded-md border border-border bg-surface px-2 text-sm"
+                className="h-7 cursor-pointer rounded-md border-0 bg-surface-2 px-2 font-mono text-[11px] text-text-main focus:outline-none"
               >
                 {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
-              <span>
-                {(pagination.page - 1) * pagination.pageSize + 1}–
-                {Math.min(pagination.page * pagination.pageSize, pagination.totalItems)} of {fmt(pagination.totalItems)}
-              </span>
+              <span className="font-mono text-[11px]">{from}–{to} of {fmt(pagination.totalItems)}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled={pagination.page <= 1} onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}>
-                Prev
-              </Button>
-              <span className="text-text-muted">{pagination.page} / {Math.max(1, pagination.totalPages)}</span>
-              <Button variant="outline" size="sm" disabled={pagination.page >= pagination.totalPages} onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}>
-                Next
-              </Button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button" aria-label="Previous page" disabled={pagination.page <= 1}
+                onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
+                className={iconBtn}
+              >
+                <Icon name="chevron_left" className="text-[16px]" />
+              </button>
+              <span className="px-1 font-mono text-[11px]">{pagination.page} / {Math.max(1, pagination.totalPages)}</span>
+              <button
+                type="button" aria-label="Next page" disabled={pagination.page >= pagination.totalPages}
+                onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
+                className={iconBtn}
+              >
+                <Icon name="chevron_right" className="text-[16px]" />
+              </button>
             </div>
           </div>
         )}
-      </Card>
+      </section>
 
-      <Modal isOpen={!!selected} onClose={() => setSelected(null)} title="Request Details" size="full">
+      <Modal isOpen={!!selected} onClose={() => setSelected(null)} title="Request details" size="full">
         {selected && <DetailBody detail={selected} nameById={nameById} />}
       </Modal>
     </div>
@@ -235,80 +278,95 @@ function DetailBody({ detail, nameById }: { detail: RequestDetail; nameById: Rec
   const t = tokens(detail.tokens)
   const response = (detail.response || {}) as { content?: string; thinking?: string; error?: string }
   const rows: [string, React.ReactNode][] = [
-    ['ID', <span className="break-all font-mono text-text-main">{detail.id}</span>],
+    ['ID', <span className="break-all font-mono text-[11px]">{detail.id}</span>],
     ['Timestamp', new Date(detail.timestamp).toLocaleString()],
-    ['Provider', <span className="font-medium">{nameById[detail.provider] || detail.provider}</span>],
-    ['Model', <span className="font-mono">{detail.model}</span>],
-    ['Status', <span className={detail.status === 'success' ? 'font-medium text-success' : 'font-medium text-danger'}>{detail.status}</span>],
-    ['Latency', <span className="font-mono">TTFT {detail.latency?.ttft || 0}ms / Total {detail.latency?.total || 0}ms</span>],
-    ['Input Tokens', <span className="font-mono">{fmt(inputOf(t))}</span>],
+    ['Provider', nameById[detail.provider] || detail.provider],
+    ['Model', <span className="font-mono text-[11px]">{detail.model}</span>],
+    [
+      'Status',
+      <span className={detail.status === 'success' ? 'font-medium text-success' : 'font-medium text-danger'}>
+        {detail.status}
+      </span>,
+    ],
+    ['Latency', <span className="font-mono text-[11px]">TTFT {detail.latency?.ttft || 0}ms · total {detail.latency?.total || 0}ms</span>],
+    ['Input tokens', <span className="font-mono text-[11px] tabular-nums">{fmt(inputOf(t))}</span>],
   ]
-  if (cachedOf(t) > 0) rows.push(['Cached Tokens', <span className="font-mono">{fmt(cachedOf(t))}</span>])
-  if (cacheCreateOf(t) > 0) rows.push(['Cache Creation', <span className="font-mono">{fmt(cacheCreateOf(t))}</span>])
-  rows.push(['Output Tokens', <span className="font-mono">{fmt(outputOf(t))}</span>])
+  if (cachedOf(t) > 0) rows.push(['Cached tokens', <span className="font-mono text-[11px] tabular-nums">{fmt(cachedOf(t))}</span>])
+  if (cacheCreateOf(t) > 0) rows.push(['Cache write', <span className="font-mono text-[11px] tabular-nums">{fmt(cacheCreateOf(t))}</span>])
+  rows.push(['Output tokens', <span className="font-mono text-[11px] tabular-nums">{fmt(outputOf(t))}</span>])
 
   const pxpipe = detail.pxpipe
 
   return (
-    <div className="space-y-6">
-      <div className="grid min-w-0 grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-xl bg-surface-2 p-4 sm:grid-cols-2">
         {rows.map(([k, v]) => (
-          <div key={k}>
-            <span className="text-text-muted">{k}:</span> <span className="text-text-main">{v}</span>
+          <div key={k} className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-text-muted">{k}</span>
+            <span className="min-w-0 text-xs text-text-main">{v}</span>
           </div>
         ))}
       </div>
 
       {pxpipe && (
-        <div className="rounded-lg border border-border/60 p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px] text-text-muted">image</span>
-            <span className="text-sm font-semibold text-text-main">PXPIPE</span>
-            <span className={cn('rounded px-2 py-0.5 text-xs', pxpipe.applied ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning')}>
+        <div className="rounded-xl bg-surface-2 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Icon name="image" className="text-[15px] text-text-muted" />
+            <span className="text-xs font-semibold text-text-main">PXPIPE</span>
+            <span className="ml-auto rounded-md bg-card px-2 py-0.5 text-[10px] font-medium text-text-muted shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
               {pxpipe.applied ? 'Activated' : 'Skipped'}
             </span>
           </div>
           {pxpipe.applied ? (
-            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-              <div><span className="block text-xs text-text-muted">Original (est.)</span><span className="font-mono">{fmt(pxpipe.tokensBeforeEst)} tokens</span></div>
-              <div><span className="block text-xs text-text-muted">Compressed (est.)</span><span className="font-mono">{fmt(pxpipe.tokensAfterEst)} tokens</span></div>
-              <div><span className="block text-xs text-text-muted">Saved</span><span className="font-mono text-success">{pxpipe.savedPct || 0}%</span></div>
-              <div><span className="block text-xs text-text-muted">Images</span><span className="font-mono">{pxpipe.imageCount || 0} ({pxpipe.durationMs || 0}ms)</span></div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                ['Original (est.)', `${fmt(pxpipe.tokensBeforeEst)} tokens`],
+                ['Compressed (est.)', `${fmt(pxpipe.tokensAfterEst)} tokens`],
+                ['Saved', `${pxpipe.savedPct || 0}%`],
+                ['Images', `${pxpipe.imageCount || 0} · ${pxpipe.durationMs || 0}ms`],
+              ].map(([k, v]) => (
+                <div key={k} className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-text-muted">{k}</span>
+                  <span className="font-mono text-[11px] text-text-main">{v}</span>
+                </div>
+              ))}
             </div>
           ) : (
-            <p className="text-sm text-text-muted">
-              Reason: <span className="font-mono">{pxpipe.reason}</span>
+            <p className="text-xs text-text-muted">
+              Reason: <span className="font-mono text-[11px] text-text-main">{pxpipe.reason}</span>
               {pxpipe.detail ? ` — ${pxpipe.detail}` : ''}
             </p>
           )}
         </div>
       )}
 
-      <div className="space-y-4">
-        <CollapsibleSection title="1. Client Request (Input)" defaultOpen icon="input">
+      <div className="flex flex-col gap-2">
+        <CollapsibleSection title="1. Client request (input)" defaultOpen icon="input">
           <Pre>{JSON.stringify(detail.request, null, 2)}</Pre>
         </CollapsibleSection>
         {!!detail.providerRequest && (
-          <CollapsibleSection title="2. Provider Request (Translated)" icon="translate">
+          <CollapsibleSection title="2. Provider request (translated)" icon="translate">
             <Pre>{JSON.stringify(detail.providerRequest, null, 2)}</Pre>
           </CollapsibleSection>
         )}
         {!!detail.providerResponse && (
-          <CollapsibleSection title="3. Provider Response (Raw)" icon="data_object">
+          <CollapsibleSection title="3. Provider response (raw)" icon="data_object">
             <Pre>{typeof detail.providerResponse === 'object' ? JSON.stringify(detail.providerResponse, null, 2) : String(detail.providerResponse)}</Pre>
           </CollapsibleSection>
         )}
-        <CollapsibleSection title="4. Client Response (Final)" defaultOpen icon="output">
+        <CollapsibleSection title="4. Client response (final)" defaultOpen icon="output">
           {response.thinking && (
-            <div className="mb-4">
-              <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-main opacity-70">
-                <span className="material-symbols-outlined text-[16px]">psychology</span>
-                Thinking Process
+            <div className="mb-3">
+              <h4 className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-text-muted">
+                <Icon name="psychology" className="text-[14px]" />
+                Thinking process
               </h4>
-              <pre className="max-h-[200px] max-w-full overflow-auto rounded-lg border border-warning/40 bg-warning/10 p-3 font-mono text-xs sm:p-4">{response.thinking}</pre>
+              <pre className="custom-scrollbar max-h-[200px] max-w-full overflow-auto rounded-lg bg-card p-3 font-mono text-[11px] leading-relaxed text-text-main">
+                {response.thinking}
+              </pre>
             </div>
           )}
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-main opacity-70">Content</h4>
+          <h4 className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-text-muted">Content</h4>
           <Pre>{response.content || response.error || '[No content]'}</Pre>
         </CollapsibleSection>
       </div>

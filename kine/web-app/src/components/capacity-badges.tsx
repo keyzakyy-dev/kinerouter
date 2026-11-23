@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils'
  * are surfaced — the reference's CAPACITY_META table has exactly these keys.
  */
 const CAPACITY_META = {
-  vision: { icon: 'visibility', label: 'Vision', desc: 'Supports image input', color: 'text-blue-500' },
-  reasoning: { icon: 'neurology', label: 'Reasoning', desc: 'Reasoning / thinking model', color: 'text-amber-500' },
+  vision: { icon: 'visibility', label: 'Vision', desc: 'Supports image input', color: 'text-sky-600 dark:text-sky-400' },
+  reasoning: { icon: 'neurology', label: 'Reasoning', desc: 'Reasoning / thinking model', color: 'text-violet-600 dark:text-violet-400' },
 } as const
 
 export type Caps = {

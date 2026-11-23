@@ -217,7 +217,7 @@ export function Segmented<T extends string>({
 }) {
   return (
     <div
-      className={`grid items-center gap-1 rounded-lg border border-border bg-bg-alt p-1 ${className ?? ''}`}
+      className={`grid items-center gap-1 rounded-lg bg-surface-2 p-1 ${className ?? ''}`}
       style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
     >
       {options.map((o) => (
@@ -225,12 +225,12 @@ export function Segmented<T extends string>({
           key={o.value}
           onClick={() => onChange(o.value)}
           disabled={disabled}
-          className={`rounded-md font-medium transition-colors disabled:opacity-60 ${
-            size === 'sm' ? 'px-2.5 py-0.5 text-xs' : 'px-3 py-1 text-sm'
+          className={`cursor-pointer rounded-md font-medium transition-colors disabled:opacity-60 ${
+            size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3 py-1 text-sm'
           } ${
             value === o.value
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-text-muted hover:bg-surface-2 hover:text-text-main'
+              ? 'bg-card text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.06)]'
+              : 'text-text-muted hover:text-text-main'
           }`}
         >
           {o.label}

@@ -63,21 +63,33 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2">
+      <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-full max-w-[22rem] flex-col gap-2">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="slide-in-right pointer-events-auto flex items-start gap-2 rounded-xl border border-border bg-surface p-3 shadow-[var(--shadow-elev)]"
+            className="slide-in-right pointer-events-auto flex items-start gap-2.5 rounded-lg bg-surface p-3 shadow-[var(--shadow-elevated)]"
           >
-            <Icon name={STYLES[toast.type].icon} className={cn('text-[18px]', STYLES[toast.type].className)} />
+            <Icon
+              name={STYLES[toast.type].icon}
+              className={cn('mt-px shrink-0 text-[16px]', STYLES[toast.type].className)}
+            />
             <div className="min-w-0 flex-1">
-              {toast.title && <p className="text-xs font-semibold text-text-main">{toast.title}</p>}
-              <p className="whitespace-pre-line break-words text-xs text-text-main">{toast.message}</p>
+              {toast.title && (
+                <p className="mb-0.5 text-xs font-medium text-text-main">{toast.title}</p>
+              )}
+              <p
+                className={cn(
+                  'whitespace-pre-line break-words text-xs leading-relaxed',
+                  toast.title ? 'text-text-muted' : 'text-text-main',
+                )}
+              >
+                {toast.message}
+              </p>
             </div>
             <button
               onClick={() => remove(toast.id)}
               aria-label="Dismiss"
-              className="cursor-pointer rounded p-0.5 text-text-muted hover:text-text-main"
+              className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded p-1 text-text-muted transition-colors hover:text-text-main"
             >
               <Icon name="close" className="text-[14px]" />
             </button>

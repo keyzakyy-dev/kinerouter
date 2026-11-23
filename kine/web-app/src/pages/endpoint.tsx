@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Cloud, Eye, EyeOff, ExternalLink, Plus, Power, Trash2 } from 'lucide-react'
 import { api, type ApiKey, type TunnelStatus } from '@/lib/api'
 import { maskSecret } from '@/lib/format'
 import { PageHeader } from '@/components/layout'
 import { CopyButton } from '@/components/copy-button'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Icon } from '@/components/icon'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle,
@@ -52,37 +50,51 @@ async function pollUntil(probe: () => Promise<boolean>, live: () => boolean): Pr
  */
 function RouteTile({
   label,
+  icon,
   action,
   url,
   status,
+  enabled,
 }: {
   label: string
+  icon: string
   action?: React.ReactNode
   url?: string
   status?: React.ReactNode
+  enabled: boolean
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-text-main">{label}</span>
+    <div className="flex flex-col gap-2.5 rounded-lg bg-surface-2 p-3.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Icon name={icon} className="shrink-0 text-[16px] text-text-muted" />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="truncate text-sm font-medium text-text-main">{label}</span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] leading-none text-text-muted">
+              <span aria-hidden className={enabled ? 'size-1.5 rounded-full bg-success' : 'size-1.5 rounded-full bg-text-muted/40'} />
+              {enabled ? 'Connected' : 'Not enabled'}
+            </span>
+          </div>
+        </div>
         <div className="flex shrink-0 items-center gap-1.5">{action}</div>
       </div>
-      {url ? (
-        <div className="flex items-center gap-1">
-          <code className="min-w-0 flex-1 truncate font-mono text-xs text-text-muted">{url}/v1</code>
-          <CopyButton value={`${url}/v1`} label={`Copy ${label} URL`} />
-        </div>
-      ) : (
-        // Same height as the code row so the two tiles stay the same shape.
-        <div className="flex min-h-8 items-center text-xs text-muted-foreground">{status}</div>
-      )}
+      <div className="flex min-h-7 items-center">
+        {url ? (
+          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-md bg-card px-2 py-1">
+            <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-muted">{url}/v1</code>
+            <CopyButton value={`${url}/v1`} label={`Copy ${label} URL`} />
+          </div>
+        ) : (
+          <div className="flex items-center text-[11px] text-text-muted">{status}</div>
+        )}
+      </div>
     </div>
   )
 }
 
 function Spinner({ children }: { children: React.ReactNode }) {
   return (
-    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+    <span className="flex items-center gap-1.5 text-[11px] text-text-muted">
       <span className="size-3 animate-spin rounded-full border border-current border-t-transparent" />
       {children}
     </span>
@@ -91,11 +103,14 @@ function Spinner({ children }: { children: React.ReactNode }) {
 
 function SecurityWarning({ message, action }: { message: string; action?: { label: string; href: string } }) {
   return (
-    <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-warning">
-      <AlertTriangle className="mt-px size-3.5 shrink-0" />
+    <div className="slide-in-top flex items-center gap-2.5 rounded-lg bg-surface-2 px-3 py-2 text-[11px] text-text-muted">
+      <Icon name="warning" className="size-4 shrink-0 animate-pulse text-warning" />
       <span className="flex-1">{message}</span>
       {action && (
-        <a href={action.href} className="shrink-0 font-medium underline underline-offset-2 hover:opacity-80">
+        <a
+          href={action.href}
+          className="shrink-0 rounded-md bg-card px-2.5 py-1 text-[11px] font-medium text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-colors hover:bg-surface-3"
+        >
           {action.label}
         </a>
       )}
@@ -317,6 +332,8 @@ function TunnelSection() {
       <div className="grid gap-3 sm:grid-cols-2">
         <RouteTile
           label="Cloudflare Tunnel"
+          icon="cloud"
+          enabled={tunnelEnabled}
           url={tunnelEnabled && !tunnelBusy ? tunnelUrl : undefined}
           status={
             tunnelBusy ? (
@@ -334,38 +351,52 @@ function TunnelSection() {
           }
           action={
             tunnelBusy ? (
-              <Button variant="ghost" size="icon" title="Stop" className="text-danger" onClick={() => setTunnelBusy(false)}>
-                <Power className="size-3.5" />
-              </Button>
+              <button
+                title="Stop"
+                className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-3 hover:text-danger"
+                onClick={() => setTunnelBusy(false)}
+              >
+                <Icon name="power_off" className="text-[16px]" />
+              </button>
             ) : tunnelEnabled ? (
-              <Button variant="ghost" size="icon" title="Disable tunnel" className="text-danger" onClick={disableTunnel}>
-                <Power className="size-3.5" />
-              </Button>
+              <button
+                title="Disable tunnel"
+                className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-3 hover:text-danger"
+                onClick={disableTunnel}
+              >
+                <Icon name="power_off" className="text-[16px]" />
+              </button>
             ) : checking ? undefined : (
-              <Button size="sm" onClick={enableTunnel}>
-                <Cloud className="size-3.5" /> Enable
+              <Button size="sm" variant="ghost" onClick={enableTunnel}>
+                <Icon name="cloud" /> Enable
               </Button>
             )
           }
         />
         <RouteTile
           label="Tailscale"
+          icon="globe"
+          enabled={tsEnabled}
           url={tsEnabled && !tsBusy ? tsUrl : undefined}
           status={tsBusy ? <Spinner>{tsProgress}</Spinner> : 'Not enabled'}
           action={
             <>
               {tsAuthUrl && !tsBusy && (
-                <Button size="sm" variant="outline" onClick={() => window.open(tsAuthUrl, 'tailscale_auth', 'width=600,height=700,noopener,noreferrer')}>
+                <Button size="sm" variant="ghost" onClick={() => window.open(tsAuthUrl, 'tailscale_auth', 'width=600,height=700,noopener,noreferrer')}>
                   Open login page
                 </Button>
               )}
               {tsEnabled ? (
-                <Button variant="ghost" size="icon" title="Disable Tailscale" className="text-danger" onClick={disableTailscale}>
-                  <Power className="size-3.5" />
-                </Button>
+                <button
+                  title="Disable Tailscale"
+                  className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-3 hover:text-danger"
+                  onClick={disableTailscale}
+                >
+                  <Icon name="power_off" className="text-[16px]" />
+                </button>
               ) : tsBusy ? undefined : (
-                <Button size="sm" onClick={openTailscale}>
-                  <ExternalLink className="size-3.5" /> Enable
+                <Button size="sm" variant="ghost" onClick={openTailscale}>
+                  <Icon name="open_in_new" /> Enable
                 </Button>
               )}
             </>
@@ -374,10 +405,10 @@ function TunnelSection() {
       </div>
 
       {tunnelError && !tunnelEnabled && (
-        <div className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-xs text-danger">{tunnelError}</div>
+        <div className="slide-in-top rounded-lg bg-surface-2 px-3 py-2 text-[11px] text-danger">{tunnelError}</div>
       )}
       {tsError && (
-        <div className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-xs text-danger">{tsError}</div>
+        <div className="slide-in-top rounded-lg bg-surface-2 px-3 py-2 text-[11px] text-danger">{tsError}</div>
       )}
 
       {loginUnsafe && !exposed && (
@@ -403,9 +434,9 @@ function TunnelSection() {
               }}
             />
           )}
-          <div className="flex items-center gap-3 border-t border-border pt-3">
+          <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
+            <span className="text-xs text-text-main">Allow dashboard access via tunnel</span>
             <Switch checked={dashAccess} onCheckedChange={setDashAccessAndSave} />
-            <span className="text-sm font-medium">Allow dashboard access via tunnel</span>
           </div>
         </div>
       )}
@@ -421,17 +452,17 @@ function TunnelSection() {
             <Input
               id="ts-sudo"
               type="password"
-              className="mt-1.5"
+              className="mt-1.5 border-0 bg-surface-2 shadow-none"
               autoFocus
               value={sudoPassword}
               onChange={(e) => setSudoPassword(e.target.value)}
             />
-            <p className="mt-1.5 text-[11px] text-muted-foreground">
+            <p className="mt-1.5 text-[11px] text-text-muted">
               Sent once to the local server for the install step; never stored in the browser.
             </p>
           </div>
           {installLog.length > 0 && (
-            <pre className="mt-3 max-h-40 overflow-y-auto rounded-md border border-border bg-muted/40 p-2 font-mono text-[11px]">
+            <pre className="mt-3 max-h-40 overflow-y-auto rounded-lg bg-surface-2 p-2 font-mono text-[11px]">
               {installLog.join('\n')}
             </pre>
           )}
@@ -477,33 +508,33 @@ function KeyAccessControls({
         onClick={() => (restricted ? onChange({ restricted: false, allow }) : onRequestRestrict())}
         title={restricted ? 'Let this key call every model again' : 'Limit this key to chosen combos or models'}
         className={
-          'inline-flex cursor-pointer items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors ' +
+          'inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium transition-colors ' +
           (restricted
-            ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
-            : 'border-border text-muted-foreground hover:border-border hover:text-text-main')
+            ? 'bg-card text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.06)]'
+            : 'bg-surface-2 text-text-muted hover:bg-surface-3 hover:text-text-main')
         }
       >
-        <Icon name={restricted ? 'lock' : 'lock_open'} className="text-[14px]" />
+        <Icon name={restricted ? 'lock' : 'lock_open'} className="text-[13px]" />
         {restricted ? `${allow.length} allowed` : 'All models'}
       </button>
       {restricted && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {allow.length === 0 && (
-            <span className="text-xs text-warning">No combos or models allowed — this key can call nothing.</span>
+            <span className="text-[11px] text-warning">No combos or models allowed — this key can call nothing.</span>
           )}
           {allow.map((entry) => (
-            <span key={entry} className="flex items-center gap-1 rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-text-main">
+            <span key={entry} className="flex items-center gap-1 rounded bg-card px-1.5 py-0.5 font-mono text-[10px] text-text-main">
               {entry}
-              <button onClick={() => remove(entry)} className="cursor-pointer rounded text-muted-foreground hover:text-danger" title={`Remove ${entry}`}>
+              <button onClick={() => remove(entry)} className="cursor-pointer rounded text-text-muted hover:text-danger" title={`Remove ${entry}`}>
                 <Icon name="close" className="text-[12px]" />
               </button>
             </span>
           ))}
           <button
             onClick={() => setPickerOpen(true)}
-            className="flex cursor-pointer items-center gap-0.5 rounded-md border border-dashed border-border px-1.5 py-0.5 text-xs font-medium text-primary hover:border-primary/50"
+            className="flex cursor-pointer items-center gap-0.5 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-text-muted transition-colors hover:bg-surface-3 hover:text-text-main"
           >
-            <Icon name="add" className="text-[14px]" />
+            <Icon name="add" className="text-[13px]" />
             Add
           </button>
         </div>
@@ -612,49 +643,51 @@ export default function EndpointPage() {
 
   return (
     <>
-      <PageHeader
-        title="Endpoint & Keys"
-        description="Point any OpenAI-compatible client at this server. Authenticate with an API key."
-      />
+      <PageHeader title="Endpoint & Keys" />
 
-      <Card className="mb-5">
-        <CardHeader className="pb-2">
-          <CardTitle>Base URL</CardTitle>
-          <CardDescription>Paste into any client as its OpenAI base_url (or Anthropic/Gemini base URL).</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {/* The local address is what most visits are for: give it the width
-              and the weight, and let remote access sit below as options. */}
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-            <code className="min-w-0 flex-1 truncate font-mono text-sm text-text-main">{baseUrl}/v1</code>
-            <CopyButton value={`${baseUrl}/v1`} label="Copy base URL" size="sm" />
+      <section className="mb-4 overflow-hidden rounded-xl bg-surface">
+        <div className="px-4 py-3">
+          <h2 className="text-sm font-semibold text-text-main">Base URL</h2>
+          <p className="mt-0.5 text-[11px] text-text-muted">Copy into your client's base_url.</p>
+        </div>
+        <div className="border-t border-border px-4 py-3">
+          <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2">
+            <code className="min-w-0 flex-1 truncate font-mono text-[13px] leading-none text-text-main">
+              {baseUrl}/v1
+            </code>
+            <CopyButton value={`${baseUrl}/v1`} label="Copy base URL" className="-mr-1.5 size-7" />
           </div>
-          <div className="flex flex-col gap-2">
-            <p className="text-xs text-muted-foreground">Reach it from elsewhere</p>
-            <TunnelSection />
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <Card id="require-api-key">
-        <CardHeader className="flex-row items-center justify-between gap-3">
-          <div>
-            <CardTitle>API keys</CardTitle>
-            <CardDescription>
-              Send as <code className="font-mono">Authorization: Bearer &lt;key&gt;</code>.
-            </CardDescription>
+      <section className="mb-4 overflow-hidden rounded-xl bg-surface">
+        <div className="px-4 py-3">
+          <h2 className="text-sm font-semibold text-text-main">Remote access</h2>
+          <p className="mt-0.5 text-[11px] text-text-muted">Reach this server from outside your network.</p>
+        </div>
+        <div className="border-t border-border px-4 py-3">
+          <TunnelSection />
+        </div>
+      </section>
+
+      <section id="require-api-key" className="overflow-hidden rounded-xl bg-surface">
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-sm font-semibold text-text-main">API keys</h2>
+              <span className="font-mono text-[11px] text-text-muted">{keys.length}</span>
+            </div>
+            <p className="mt-0.5 text-[11px] text-text-muted">Send the key as a Bearer token.</p>
           </div>
-          <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus /> New key
+          <Button size="sm" variant="ghost" onClick={() => setCreating(true)}>
+            <Icon name="add" /> New key
           </Button>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {/* The gate is one setting, not a section: a single strip keeps it out
-              of the way of the keys it guards. */}
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+        </div>
+        <div className="flex flex-col gap-3 border-t border-border px-4 py-3">
+          <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
             <div className="min-w-0">
               <p className="text-xs font-medium text-text-main">Require API key</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-text-muted">
                 {requireApiKey ? 'Requests without a valid key are rejected.' : 'Requests without a key are accepted.'}
               </p>
             </div>
@@ -663,63 +696,67 @@ export default function EndpointPage() {
           {isRemoteHost && !requireApiKey && (
             <SecurityWarning message="Endpoint is exposed without an API key." />
           )}
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-[11px] text-danger">{error}</p>}
           {loading ? (
-            <p className="py-8 text-center text-xs text-muted-foreground">Loading keys…</p>
+            <p className="py-8 text-center text-[11px] text-text-muted">Loading keys…</p>
           ) : keys.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-border px-4 py-8 text-center">
-              <Icon name="vpn_key" className="text-[28px] text-muted-foreground/50" />
-              <p className="mt-1 text-sm font-medium text-text-main">No keys yet</p>
-              <p className="text-xs text-muted-foreground">
-                Requests are matched to a key by its secret. Create one to start attributing usage.
-              </p>
-              <Button size="sm" variant="outline" className="mt-2" onClick={() => setCreating(true)}>
-                <Plus /> Create a key
+            <div className="flex flex-col items-start gap-1 rounded-lg bg-surface-2 px-4 py-4 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                <Icon name="vpn_key" className="shrink-0 text-[16px] text-text-muted" />
+                <div className="min-w-0">
+                  <p className="text-sm text-text-main">No keys yet</p>
+                  <p className="text-[11px] text-text-muted">
+                    Requests are matched to a key by its secret. Create one to start attributing usage.
+                  </p>
+                </div>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setCreating(true)}>
+                <Icon name="add" /> Create a key
               </Button>
             </div>
           ) : (
-            <ul className="divide-y divide-border-subtle overflow-hidden rounded-lg border border-border">
+            <ul className="flex flex-col gap-2">
               {keys.map((k) => (
-                <li key={k.id} className="flex flex-col gap-2 px-3 py-3">
+                <li key={k.id} className="flex flex-col gap-2 rounded-lg bg-surface-2 px-3 py-2.5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="truncate text-sm font-medium text-text-main">{k.name || 'Unnamed key'}</span>
-                        {/* Clicking the dot pauses or resumes the key; the dot is
-                            the real state, so it carries the colour, not a badge. */}
                         <button
                           onClick={() => toggleActive(k)}
                           title={k.isActive ? 'Pause this key' : 'Resume this key'}
-                          className="inline-flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-text-main"
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 text-[11px] text-text-muted transition-colors hover:text-text-main"
                         >
-                          <span className={`size-1.5 rounded-full ${k.isActive ? 'bg-success' : 'bg-muted-foreground'}`} />
+                          <span className={`size-1.5 rounded-full ${k.isActive ? 'bg-success' : 'bg-text-muted/40'}`} />
                           {k.isActive ? 'active' : 'paused'}
                         </button>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <code className="font-mono text-xs text-muted-foreground">
+                        <code className="font-mono text-[11px] text-text-muted">
                           {visible.has(k.id) ? k.key : maskSecret(k.key)}
                         </code>
-                        <span className="text-[10px] text-muted-foreground/60">·</span>
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-[10px] text-text-muted/60">·</span>
+                        <span className="text-[11px] text-text-muted">
                           created {new Date(k.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-0.5">
-                      <Button variant="ghost" size="icon" title="Show key" onClick={() => toggleVisible(k.id)}>
-                        {visible.has(k.id) ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                      </Button>
+                      <button
+                        title={visible.has(k.id) ? 'Hide key' : 'Show key'}
+                        className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-card hover:text-text-main"
+                        onClick={() => toggleVisible(k.id)}
+                      >
+                        <Icon name={visible.has(k.id) ? 'visibility_off' : 'visibility'} className="text-[16px]" />
+                      </button>
                       <CopyButton value={k.key} label="Copy key" />
-                      <Button
-                        variant="ghost"
-                        size="icon"
+                      <button
                         title="Delete key"
-                        className="text-muted-foreground hover:text-danger"
+                        className="flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-card hover:text-danger"
                         onClick={() => setConfirmDelete(k)}
                       >
-                        <Trash2 className="size-3.5" />
-                      </Button>
+                        <Icon name="delete" className="text-[16px]" />
+                      </button>
                     </div>
                   </div>
                   <KeyAccessControls
@@ -731,8 +768,8 @@ export default function EndpointPage() {
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent>
@@ -742,7 +779,7 @@ export default function EndpointPage() {
             <Label htmlFor="key-name">Name</Label>
             <Input
               id="key-name"
-              className="mt-1.5"
+              className="mt-1.5 border-0 bg-surface-2 shadow-none"
               autoFocus
               value={newName}
               placeholder="Default"
@@ -762,7 +799,7 @@ export default function EndpointPage() {
           <DialogTitle>Key created</DialogTitle>
           <DialogDescription>Copy it now — this is the only time it is shown in full here.</DialogDescription>
           <div className="mt-4 flex items-center gap-2">
-            <code className="min-w-0 flex-1 break-all rounded-md border border-border bg-muted/40 px-3 py-2 font-mono text-xs">
+            <code className="min-w-0 flex-1 break-all rounded-lg bg-surface-2 px-3 py-2 font-mono text-xs">
               {created?.key}
             </code>
             <CopyButton value={created?.key ?? ''} label="Copy key" />

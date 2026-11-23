@@ -240,7 +240,7 @@ var (
 // copied verbatim from the upstream dashboard's provider display table.
 const (
 	RiskNotice     = "RISK_NOTICE"
-	RiskNoticeText = "⚠️ Risk Notice: This provider uses a subscription/OAuth session not officially licensed for proxy/router use. Account may be restricted or banned. Use at your own risk."
+	RiskNoticeText = "Risk Notice: This provider uses a subscription/OAuth session not officially licensed for proxy/router use. Account may be restricted or banned. Use at your own risk."
 )
 
 type file struct {

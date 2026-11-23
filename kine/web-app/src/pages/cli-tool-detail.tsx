@@ -3,11 +3,11 @@ import { Link, useParams } from 'react-router-dom'
 import { Icon } from '@/components/icon'
 import { ManualConfigModal, McpMarketplaceModal, type McpPick } from '@/components/cli-tool-modals'
 import { PageHeader } from '@/components/layout'
-import { ConfirmModal } from '@/components/modal'
+import { ConfirmModal, Modal } from '@/components/modal'
 import { ModelSelectModal } from '@/components/model-select-modal'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input, Label } from '@/components/ui/input'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api, type ApiKey, type CliToolStatus, type CodexProfile, type Combo } from '@/lib/api'
 import { CLAUDE_MODEL_KEYS, cliTool, type CliNote, type CliTool } from '@/lib/cli-tools'
 import { cn } from '@/lib/utils'
@@ -52,6 +52,10 @@ const INSTALL_COMMANDS: Record<string, string> = {
   codewhale: 'cargo install codewhale',
 }
 
+const SELECT_CLS =
+  'h-9 w-full cursor-pointer rounded-lg border-0 bg-surface-2 px-3 text-sm text-text-main shadow-none focus:ring-1 focus:ring-ring'
+const INPUT_CLS = 'border-0 bg-surface-2 shadow-none'
+
 export default function CliToolDetailPage() {
   const { toolId = '' } = useParams()
   const tool = cliTool(toolId)
@@ -70,9 +74,9 @@ function BackLink() {
   return (
     <Link
       to="/dashboard/cli-tools"
-      className="inline-flex w-fit items-center gap-1 text-sm text-text-muted hover:text-primary"
+      className="inline-flex w-fit items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-main"
     >
-      <Icon name="arrow_back" className="text-[18px]" /> Back to CLI Tools
+      <Icon name="arrow_back" className="text-[15px]" /> Back to CLI Tools
     </Link>
   )
 }
@@ -99,7 +103,7 @@ function ToolDetail({ tool }: { tool: CliTool }) {
   const [selected, setSelected] = useState<string[]>([])
   const [claudeModels, setClaudeModels] = useState<Record<string, string>>({})
   const [endpoints, setEndpoints] = useState<{ label: string; url: string }[]>([])
-  const [endpointMode, setEndpointMode] = useState('local')
+  const [endpointMode, setEndpointMode] = useState('0')
   const [endpointPresets, setEndpointPresets] = useState<EndpointPreset[]>(readEndpointPresets)
   const [keyPresets, setKeyPresets] = useState<KeyPreset[]>(readKeyPresets)
 
@@ -326,8 +330,8 @@ function ToolDetail({ tool }: { tool: CliTool }) {
           <>
             <BadgeState status={status} loading={loading} guide={tool.form === 'guide'} />
             {tool.form !== 'guide' && status?.installed !== false && (
-              <Button variant="outline" size="sm" onClick={() => setConfirmReset(true)} disabled={busy}>
-                <Icon name="restart_alt" className="text-[16px]" /> Reset
+              <Button variant="ghost" size="sm" onClick={() => setConfirmReset(true)} disabled={busy}>
+                <Icon name="restart_alt" className="text-[15px]" /> Reset
               </Button>
             )}
           </>
@@ -335,31 +339,29 @@ function ToolDetail({ tool }: { tool: CliTool }) {
       />
 
       {tool.form !== 'guide' && status?.installed === false && (
-        <div className="flex flex-col gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
-          <div className="flex items-start gap-3">
-            <Icon name="warning" className="text-warning" />
-            <div className="flex-1">
-              <p className="font-medium text-warning">{tool.name} not detected locally</p>
-              <p className="text-sm text-text-muted">
+        <div className="flex flex-col gap-2.5 rounded-xl bg-surface px-4 py-3.5">
+          <div className="flex items-start gap-2.5">
+            <Icon name="warning" className="mt-0.5 shrink-0 text-[16px] text-warning" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-text-main">{tool.name} not detected locally</p>
+              <p className="text-[11px] text-text-muted">
                 Manual configuration is still available if this server runs on a remote machine.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 pl-9">
-            <Button variant="secondary" size="sm" onClick={() => setManualOpen(true)}>
-              <Icon name="content_copy" className="text-[18px]" /> Manual Config
+          <div className="flex items-center gap-1.5 pl-7">
+            <Button variant="ghost" size="sm" onClick={() => setManualOpen(true)}>
+              <Icon name="content_copy" className="text-[15px]" /> Manual Config
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowInstall(!showInstall)}>
-              <Icon name={showInstall ? 'expand_less' : 'help'} className="text-[18px]" />
+            <Button variant="ghost" size="sm" onClick={() => setShowInstall(!showInstall)}>
+              <Icon name={showInstall ? 'expand_less' : 'help'} className="text-[15px]" />
               {showInstall ? 'Hide' : 'How to Install'}
             </Button>
           </div>
           {showInstall && (
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <h4 className="mb-2 font-medium">Installation Guide</h4>
-              <p className="mb-1 text-sm text-text-muted">macOS / Linux / Windows:</p>
-              <code className="block rounded bg-surface-2 px-3 py-2 font-mono text-xs">{installCommand}</code>
-            </div>
+            <code className="rounded-lg bg-surface-2 px-3 py-2 font-mono text-[11px] text-text-main">
+              {installCommand}
+            </code>
           )}
         </div>
       )}
@@ -377,46 +379,37 @@ function ToolDetail({ tool }: { tool: CliTool }) {
           )}
         />
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Route {tool.name} through this server</CardTitle>
-            <CardDescription>
+        <section className="overflow-hidden rounded-xl bg-surface">
+          <div className="px-4 py-3">
+            <h2 className="text-sm font-semibold text-text-main">Route {tool.name} through this server</h2>
+            <p className="mt-0.5 text-[11px] text-text-muted">
               Writes {configPath(tool, status)}. The key is stored in the tool&apos;s own config file.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 border-t border-border px-4 py-3.5">
             <Notes notes={tool.notes} />
-            <Field label="Server URL">
-              <div className="flex flex-col gap-1.5">
-                <select
-                  className="h-9 w-full rounded-md border border-border bg-transparent px-2 text-sm"
-                  value={endpointMode}
-                  onChange={(e) => {
-                    const mode = e.target.value
-                    setEndpointMode(mode)
-                    const preset = endpointPresets.find((p) => `preset:${p.name}` === mode)
-                    const pick = endpoints[Number(mode)]
-                    setBaseUrl(preset ? preset.baseUrl : mode.startsWith('preset:') || mode === '__custom' ? '' : (pick?.url ?? ''))
-                  }}
-                >
-                  {endpoints.map((opt, i) =>
-                    opt.label === 'Custom URL…' ? (
-                      <option key="__custom" value="__custom">Custom URL…</option>
-                    ) : (
-                      <option key={opt.label} value={String(i)}>{opt.label}</option>
-                    ),
+            <Field
+              label="Server URL"
+              action={
+                <div className="flex items-center gap-1">
+                  {endpointMode.startsWith('preset:') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-1.5 text-[11px] text-text-muted hover:text-danger"
+                      onClick={() => {
+                        deleteEndpointPreset(endpointMode.slice('preset:'.length))
+                        setEndpointMode('0')
+                        setEndpointPresets(readEndpointPresets())
+                      }}
+                    >
+                      <Icon name="delete" className="text-[13px]" /> Delete
+                    </Button>
                   )}
-                  {endpointPresets.map((p) => (
-                    <option key={`preset:${p.name}`} value={`preset:${p.name}`}>Saved · {p.name}</option>
-                  ))}
-                </select>
-                {(endpointMode === '__custom' || endpointMode.startsWith('preset:')) && (
-                  <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder={origin} />
-                )}
-                <div className="flex flex-wrap items-center gap-2">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
+                    className="h-6 px-1.5 text-[11px]"
                     onClick={() => {
                       const name = window.prompt('Preset name', '')
                       if (!name?.trim()) return
@@ -424,47 +417,62 @@ function ToolDetail({ tool }: { tool: CliTool }) {
                       setEndpointPresets(readEndpointPresets())
                     }}
                   >
-                    <Icon name="bookmark_add" className="text-[16px]" /> Save current as…
+                    <Icon name="bookmark_add" className="text-[13px]" /> Save as…
                   </Button>
-                  {endpointMode.startsWith('preset:') && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        deleteEndpointPreset(endpointMode.slice('preset:'.length))
-                        setEndpointMode('local')
-                        setEndpointPresets(readEndpointPresets())
-                      }}
-                    >
-                      <Icon name="delete" className="text-[16px]" /> Delete preset
-                    </Button>
-                  )}
                 </div>
+              }
+            >
+              <div className="flex flex-col gap-2">
+                <Dropdown
+                  value={endpointMode}
+                  onChange={(mode) => {
+                    setEndpointMode(mode)
+                    const preset = endpointPresets.find((p) => `preset:${p.name}` === mode)
+                    const pick = endpoints[Number(mode)]
+                    setBaseUrl(preset ? preset.baseUrl : mode.startsWith('preset:') || mode === '__custom' ? '' : (pick?.url ?? ''))
+                  }}
+                  options={[
+                    ...endpoints.map((opt, i) =>
+                      opt.label === 'Custom URL…'
+                        ? { value: '__custom', label: opt.label }
+                        : { value: String(i), label: opt.label },
+                    ),
+                    ...endpointPresets.map((p) => ({ value: `preset:${p.name}`, label: `Saved · ${p.name}` })),
+                  ]}
+                />
+                {(endpointMode === '__custom' || endpointMode.startsWith('preset:')) && (
+                  <Input
+                    className={INPUT_CLS}
+                    value={baseUrl}
+                    onChange={(e) => setBaseUrl(e.target.value)}
+                    placeholder={origin}
+                  />
+                )}
               </div>
             </Field>
 
             {tool.form !== 'baseUrl' && (
-              <Field label="API key">
-                <div className="flex flex-col gap-1.5">
-                  <select
-                    className="h-9 w-full rounded-md border border-border bg-transparent px-2 text-sm"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                  >
-                    <option value="">sk_kinerouter (placeholder)</option>
-                    {keys.map((k) => (
-                      <option key={k.id} value={k.key}>
-                        {k.name || k.key.slice(0, 12)}
-                      </option>
-                    ))}
-                    {keyPresets.map((p) => (
-                      <option key={`preset:${p.name}`} value={p.key}>Saved · {p.name}</option>
-                    ))}
-                  </select>
-                  <div className="flex flex-wrap items-center gap-2">
+              <Field
+                label="API key"
+                action={
+                  <div className="flex items-center gap-1">
+                    {keyPresets.some((p) => p.key === apiKey) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1.5 text-[11px] text-text-muted hover:text-danger"
+                        onClick={() => {
+                          deleteKeyPreset(keyPresets.find((p) => p.key === apiKey)!.name)
+                          setKeyPresets(readKeyPresets())
+                        }}
+                      >
+                        <Icon name="delete" className="text-[13px]" /> Delete
+                      </Button>
+                    )}
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
+                      className="h-6 px-1.5 text-[11px]"
                       disabled={!apiKey}
                       onClick={() => {
                         const name = window.prompt('Preset name', '')
@@ -473,88 +481,92 @@ function ToolDetail({ tool }: { tool: CliTool }) {
                         setKeyPresets(readKeyPresets())
                       }}
                     >
-                      <Icon name="bookmark_add" className="text-[16px]" /> Save current as…
+                      <Icon name="bookmark_add" className="text-[13px]" /> Save as…
                     </Button>
-                    {keyPresets.some((p) => p.key === apiKey) && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          deleteKeyPreset(keyPresets.find((p) => p.key === apiKey)!.name)
-                          setKeyPresets(readKeyPresets())
-                        }}
-                      >
-                        <Icon name="delete" className="text-[16px]" /> Delete preset
-                      </Button>
-                    )}
                   </div>
-                </div>
+                }
+              >
+                <Dropdown
+                  value={apiKey || NONE}
+                  onChange={(v) => setApiKey(v === NONE ? '' : v)}
+                  options={[
+                    { value: NONE, label: 'sk_kinerouter (placeholder)' },
+                    ...keys.map((k) => ({ value: k.key, label: k.name || k.key.slice(0, 12) })),
+                    ...keyPresets.map((p) => ({ value: p.key, label: `Saved · ${p.name}` })),
+                  ]}
+                />
               </Field>
             )}
 
             {tool.form === 'env' ? (
               <>
-                {CLAUDE_MODEL_KEYS.map((k) => (
-                  <Field key={k.env} label={k.alias}>
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Input
-                          className="pr-7 font-mono text-xs"
-                          value={claudeModels[k.env] ?? ''}
-                          onChange={(e) => setClaudeModels((prev) => ({ ...prev, [k.env]: e.target.value }))}
-                          placeholder="provider/model-id"
-                        />
-                        {claudeModels[k.env] && (
-                          <button
-                            className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-0.5 text-text-muted hover:text-danger"
-                            onClick={() => setClaudeModels((prev) => ({ ...prev, [k.env]: '' }))}
-                            title="Clear"
-                          >
-                            <Icon name="close" className="text-[14px]" />
-                          </button>
-                        )}
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => setPickerFor(k.env)}>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Model mapping</span>
+                  {CLAUDE_MODEL_KEYS.map((k) => (
+                    <div key={k.env} className="flex items-center gap-1.5 rounded-lg bg-surface-2 pl-3 pr-1 py-1">
+                      <span className="w-14 shrink-0 text-[10px] font-medium uppercase tracking-wide text-text-muted">
+                        {k.alias}
+                      </span>
+                      <Input
+                        className="h-8 flex-1 truncate border-0 bg-transparent px-1 font-mono text-[11px] shadow-none focus-visible:ring-0"
+                        value={claudeModels[k.env] ?? ''}
+                        onChange={(e) => setClaudeModels((prev) => ({ ...prev, [k.env]: e.target.value }))}
+                        placeholder="provider/model-id"
+                      />
+                      {claudeModels[k.env] && (
+                        <button
+                          className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded text-text-muted hover:text-danger"
+                          onClick={() => setClaudeModels((prev) => ({ ...prev, [k.env]: '' }))}
+                          title="Clear"
+                        >
+                          <Icon name="close" className="text-[13px]" />
+                        </button>
+                      )}
+                      <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setPickerFor(k.env)}>
                         Select
                       </Button>
                     </div>
-                  </Field>
-                ))}
+                  ))}
+                </div>
 
                 <Field label="Auto-compact">
-                  <select
-                    className="h-9 w-full rounded-md border border-border bg-transparent px-2 text-sm"
-                    value={autoCompact}
-                    onChange={(e) => setAutoCompact(e.target.value)}
-                  >
-                    {CONTEXT_OPTIONS.map((o) => (
-                      <option key={o.label} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
+                  <Dropdown
+                    value={autoCompact || NONE}
+                    onChange={(v) => setAutoCompact(v === NONE ? '' : v)}
+                    options={CONTEXT_OPTIONS.map((o) => ({ value: o.value || NONE, label: o.label }))}
+                  />
                 </Field>
 
-                <label className="flex cursor-pointer items-center gap-2 text-xs text-text-muted">
-                  <input type="checkbox" checked={oneM} onChange={(e) => toggleOneM(e.target.checked)} />
-                  <span>
-                    1M context — append <code className="font-mono">[1m]</code> to every mapped model name.
-                    Claude Code otherwise assumes 200K, which clamps the auto-compact window.
-                  </span>
-                </label>
-
-                <label className="flex cursor-pointer items-center gap-2 text-xs text-text-muted">
-                  <input type="checkbox" checked={ccFilterNaming} onChange={(e) => toggleFilterNaming(e.target.checked)} />
-                  <span>
-                    Filter naming requests — answer Claude Code&apos;s topic-naming calls locally to save tokens.
-                  </span>
-                </label>
-
-                <label className="flex cursor-pointer items-center gap-2 text-xs text-text-muted">
-                  <input type="checkbox" checked={exaMcp} onChange={(e) => setExaMcp(e.target.checked)} />
-                  <span>
-                    Exa MCP — inject web search into <code className="font-mono">~/.claude.json</code> for non-Claude
-                    models. Restart Claude Code after Apply.
-                  </span>
-                </label>
+                <div className="flex flex-col gap-1.5">
+                  <ToggleRow
+                    checked={oneM}
+                    onChange={toggleOneM}
+                    title="1M context"
+                    desc={
+                      <>
+                        Append <code className="font-mono text-[10px]">[1m]</code> to every mapped model name. Claude Code
+                        otherwise assumes 200K, which clamps the auto-compact window.
+                      </>
+                    }
+                  />
+                  <ToggleRow
+                    checked={ccFilterNaming}
+                    onChange={toggleFilterNaming}
+                    title="Filter naming requests"
+                    desc="Answer Claude Code's topic-naming calls locally to save tokens."
+                  />
+                  <ToggleRow
+                    checked={exaMcp}
+                    onChange={setExaMcp}
+                    title="Exa MCP"
+                    desc={
+                      <>
+                        Inject web search into <code className="font-mono text-[10px]">~/.claude.json</code> for non-Claude
+                        models. Restart Claude Code after Apply.
+                      </>
+                    }
+                  />
+                </div>
               </>
             ) : tool.form === 'multi' ? (
               tool.id === 'cowork' ? (
@@ -575,17 +587,18 @@ function ToolDetail({ tool }: { tool: CliTool }) {
                 />
               ) : (
                 <Field label={`Models (${selected.length} selected)`}>
-                  <div className="custom-scrollbar max-h-56 overflow-y-auto rounded-md border border-border p-1">
+                  <div className="custom-scrollbar flex max-h-56 flex-col gap-0.5 overflow-y-auto rounded-lg bg-surface-2 p-1">
                     {models.length === 0 && (
-                      <p className="p-3 text-xs text-text-muted">No models — add a provider connection first.</p>
+                      <p className="p-3 text-[11px] text-text-muted">No models — add a provider connection first.</p>
                     )}
                     {models.map((m) => (
                       <label
                         key={m}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs hover:bg-surface-2"
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[11px] transition-colors hover:bg-surface-3"
                       >
                         <input
                           type="checkbox"
+                          className="size-3.5 accent-[var(--text-main)]"
                           checked={selected.includes(m)}
                           onChange={() =>
                             setSelected((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]))
@@ -600,25 +613,23 @@ function ToolDetail({ tool }: { tool: CliTool }) {
             ) : (
               <>
                 <Field label="Model">
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        className="pr-7 font-mono text-xs"
-                        value={selected[0] ?? ''}
-                        onChange={(e) => setSelected([e.target.value])}
-                        placeholder="provider/model"
-                      />
-                      {selected[0] && (
-                        <button
-                          className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-0.5 text-text-muted hover:text-danger"
-                          onClick={() => setSelected([])}
-                          title="Clear"
-                        >
-                          <Icon name="close" className="text-[14px]" />
-                        </button>
-                      )}
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setPickerFor('__main__')}>
+                  <div className="flex items-center gap-1 rounded-lg bg-surface-2 pl-3 pr-1 py-1">
+                    <Input
+                      className="h-8 flex-1 border-0 bg-transparent px-0 font-mono text-[11px] shadow-none focus-visible:ring-0"
+                      value={selected[0] ?? ''}
+                      onChange={(e) => setSelected([e.target.value])}
+                      placeholder="provider/model"
+                    />
+                    {selected[0] && (
+                      <button
+                        className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded text-text-muted hover:text-danger"
+                        onClick={() => setSelected([])}
+                        title="Clear"
+                      >
+                        <Icon name="close" className="text-[13px]" />
+                      </button>
+                    )}
+                    <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setPickerFor('__main__')}>
                       Select
                     </Button>
                   </div>
@@ -627,25 +638,23 @@ function ToolDetail({ tool }: { tool: CliTool }) {
                 {tool.id === 'codex' && (
                   <>
                     <Field label="Subagent model">
-                      <div className="flex items-center gap-2">
-                        <div className="relative flex-1">
-                          <Input
-                            className="pr-7 font-mono text-xs"
-                            value={subagentModel}
-                            onChange={(e) => setSubagentModel(e.target.value)}
-                            placeholder="falls back to the main model"
-                          />
-                          {subagentModel && (
-                            <button
-                              className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-0.5 text-text-muted hover:text-danger"
-                              onClick={() => setSubagentModel('')}
-                              title="Clear"
-                            >
-                              <Icon name="close" className="text-[14px]" />
-                            </button>
-                          )}
-                        </div>
-                        <Button variant="outline" size="sm" onClick={() => setPickerFor('__subagent__')}>
+                      <div className="flex items-center gap-1 rounded-lg bg-surface-2 pl-3 pr-1 py-1">
+                        <Input
+                          className="h-8 flex-1 border-0 bg-transparent px-0 font-mono text-[11px] shadow-none focus-visible:ring-0"
+                          value={subagentModel}
+                          onChange={(e) => setSubagentModel(e.target.value)}
+                          placeholder="falls back to the main model"
+                        />
+                        {subagentModel && (
+                          <button
+                            className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded text-text-muted hover:text-danger"
+                            onClick={() => setSubagentModel('')}
+                            title="Clear"
+                          >
+                            <Icon name="close" className="text-[13px]" />
+                          </button>
+                        )}
+                        <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setPickerFor('__subagent__')}>
                           Select
                         </Button>
                       </div>
@@ -671,25 +680,23 @@ function ToolDetail({ tool }: { tool: CliTool }) {
                   <>
                     {GROK_SUBAGENTS.map((sub) => (
                       <Field key={sub.id} label={sub.label}>
-                        <div className="flex items-center gap-2">
-                          <div className="relative flex-1">
-                            <Input
-                              className="pr-7 font-mono text-xs"
-                              value={grokSubagents[sub.id] ?? ''}
-                              onChange={(e) => setGrokSubagents((p) => ({ ...p, [sub.id]: e.target.value }))}
-                              placeholder="falls back to the main model"
-                            />
-                            {grokSubagents[sub.id] && (
-                              <button
-                                className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-0.5 text-text-muted hover:text-danger"
-                                onClick={() => setGrokSubagents((p) => ({ ...p, [sub.id]: '' }))}
-                                title="Clear"
-                              >
-                                <Icon name="close" className="text-[14px]" />
-                              </button>
-                            )}
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => setPickerFor(`grok:${sub.id}`)}>
+                        <div className="flex items-center gap-1 rounded-lg bg-surface-2 pl-3 pr-1 py-1">
+                          <Input
+                            className="h-8 flex-1 border-0 bg-transparent px-0 font-mono text-[11px] shadow-none focus-visible:ring-0"
+                            value={grokSubagents[sub.id] ?? ''}
+                            onChange={(e) => setGrokSubagents((p) => ({ ...p, [sub.id]: e.target.value }))}
+                            placeholder="falls back to the main model"
+                          />
+                          {grokSubagents[sub.id] && (
+                            <button
+                              className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded text-text-muted hover:text-danger"
+                              onClick={() => setGrokSubagents((p) => ({ ...p, [sub.id]: '' }))}
+                              title="Clear"
+                            >
+                              <Icon name="close" className="text-[13px]" />
+                            </button>
+                          )}
+                          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setPickerFor(`grok:${sub.id}`)}>
                             Select
                           </Button>
                         </div>
@@ -699,28 +706,28 @@ function ToolDetail({ tool }: { tool: CliTool }) {
                 )}
               </>
             )}
+          </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Button size="sm" onClick={submit} disabled={busy || !baseUrl}>
-                {busy ? 'Applying…' : 'Apply'}
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-border px-4 py-3">
+            <Button size="sm" onClick={submit} disabled={busy || !baseUrl}>
+              {busy ? 'Applying…' : 'Apply'}
+            </Button>
+            {tool.form === 'env' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => copy(preview, 'preview')}
+                title="Copy the env block"
+              >
+                <Icon name={copied === 'preview' ? 'check' : 'content_copy'} className="text-[15px]" />
+                Copy env
               </Button>
-              {tool.form === 'env' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copy(preview, 'preview')}
-                  title="Copy the env block"
-                >
-                  <Icon name={copied === 'preview' ? 'check' : 'content_copy'} className="text-[16px]" />
-                  Copy env
-                </Button>
-              )}
-              <Button variant="ghost" size="sm" onClick={() => setManualOpen(true)}>
-                <Icon name="content_copy" className="text-[16px]" /> Manual Config
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => setManualOpen(true)}>
+              <Icon name="content_copy" className="text-[15px]" /> Manual Config
+            </Button>
+          </div>
+        </section>
       )}
 
       <ManualConfigModal
@@ -826,22 +833,24 @@ function CoworkFields({
   return (
     <>
       <Field label="Models">
-        <div className="flex flex-col gap-1.5">
-          <div className="flex flex-wrap gap-1.5 rounded-md border border-border bg-surface px-2 py-1.5">
-            {models.length === 0 && <span className="text-xs text-text-muted">No models selected</span>}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-1.5 rounded-lg bg-surface-2 px-3 py-2">
+            {models.length === 0 && <span className="text-[11px] text-text-muted">No models selected</span>}
             {models.map((m) => (
-              <span key={m} className="inline-flex items-center gap-1 rounded bg-surface-2 px-2 py-0.5 text-xs">
+              <span key={m} className="inline-flex items-center gap-1 rounded bg-card px-1.5 py-0.5 font-mono text-[10px] text-text-main">
                 {m}
-                <button className="hover:text-danger" onClick={() => setModels((prev) => prev.filter((x) => x !== m))}>
+                <button className="text-text-muted hover:text-danger" onClick={() => setModels((prev) => prev.filter((x) => x !== m))}>
                   <Icon name="close" className="text-[12px]" />
                 </button>
               </span>
             ))}
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onCombo}>+ Combo</Button>
+          <div className="flex items-center gap-1.5">
+            <Button variant="ghost" size="sm" onClick={onCombo}>
+              <Icon name="add" className="text-[15px]" /> Combo
+            </Button>
             <select
-              className="h-8 flex-1 rounded-md border border-border bg-transparent px-2 text-xs"
+              className={SELECT_CLS + ' h-8 flex-1 text-[11px]'}
               value=""
               onChange={(e) => {
                 const v = e.target.value
@@ -856,55 +865,59 @@ function CoworkFields({
       </Field>
 
       <Field label="MCP">
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5">
           {plugins.filter((p) => p.name !== 'exa').map((p) => (
-            <div key={p.name} className="flex items-center gap-2 rounded border border-border bg-surface px-2 py-1">
-              <span className="shrink-0 truncate text-xs font-medium">{p.title || p.name}</span>
-              {p.oauth && <span className="shrink-0 text-[8px] text-warning">OAuth</span>}
+            <div key={p.name} className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-1.5">
+              <span className="shrink-0 truncate text-[11px] font-medium text-text-main">{p.title || p.name}</span>
+              {p.oauth && <span className="shrink-0 text-[9px] text-warning">OAuth</span>}
               <div className="flex flex-1 flex-wrap gap-1 overflow-hidden">
                 {(p.toolNames ?? []).slice(0, 6).map((t) => (
-                  <span key={t} className="whitespace-nowrap rounded bg-surface-2 px-1 py-0.5 text-[9px] text-text-muted">{t}</span>
+                  <span key={t} className="whitespace-nowrap rounded bg-card px-1 py-0.5 font-mono text-[9px] text-text-muted">{t}</span>
                 ))}
                 {(p.toolNames?.length ?? 0) > 6 && (
-                  <span className="rounded bg-surface-2 px-1 py-0.5 text-[9px] text-text-muted">
+                  <span className="rounded bg-card px-1 py-0.5 font-mono text-[9px] text-text-muted">
                     +{(p.toolNames?.length ?? 0) - 6}
                   </span>
                 )}
               </div>
               <button
-                className="ml-auto shrink-0 hover:text-danger"
+                className="ml-auto flex size-6 shrink-0 items-center justify-center rounded text-text-muted hover:text-danger"
                 onClick={() => setPlugins((prev) => prev.filter((x) => x.name !== p.name))}
               >
-                <Icon name="close" className="text-[12px]" />
+                <Icon name="close" className="text-[13px]" />
               </button>
             </div>
           ))}
           {customPlugins.map((p) => (
-            <div key={p.name} className="flex items-center gap-2 rounded border border-border bg-surface px-2 py-1">
-              <span className="shrink-0 truncate text-xs font-medium">{p.name}</span>
-              <span className="shrink-0 rounded bg-primary/10 px-1 py-0.5 text-[8px] text-primary">custom</span>
-              <span className="flex-1 truncate text-[9px] text-text-muted">{p.url}</span>
+            <div key={p.name} className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-1.5">
+              <span className="shrink-0 truncate text-[11px] font-medium text-text-main">{p.name}</span>
+              <span className="shrink-0 rounded bg-card px-1 py-0.5 text-[9px] text-text-muted">custom</span>
+              <span className="flex-1 truncate font-mono text-[9px] text-text-muted">{p.url}</span>
               <button
-                className="ml-auto shrink-0 hover:text-danger"
+                className="ml-auto flex size-6 shrink-0 items-center justify-center rounded text-text-muted hover:text-danger"
                 onClick={() => setCustomPlugins((prev) => prev.filter((x) => x.name !== p.name))}
               >
-                <Icon name="close" className="text-[12px]" />
+                <Icon name="close" className="text-[13px]" />
               </button>
             </div>
           ))}
           {plugins.filter((p) => p.name !== 'exa').length === 0 && customPlugins.length === 0 && (
-            <div className="rounded border border-border bg-surface px-2 py-1.5 text-xs text-text-muted">No MCPs added</div>
+            <div className="rounded-lg bg-surface-2 px-3 py-2 text-[11px] text-text-muted">No MCPs added</div>
           )}
-          <div className="mt-0.5 flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onBrowse}>+ Browse</Button>
-            <Button variant="ghost" size="sm" onClick={onCustom}>+ Custom</Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={onBrowse}>
+              <Icon name="add" className="text-[15px]" /> Browse
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onCustom}>
+              <Icon name="add" className="text-[15px]" /> Custom
+            </Button>
             <a
               href="https://mcp.so"
               target="_blank"
               rel="noreferrer"
-              className="ml-auto text-[10px] text-text-muted underline hover:text-primary"
+              className="ml-auto text-[10px] text-text-muted hover:text-text-main"
             >
-              Find MCPs →
+              Find MCPs
             </a>
           </div>
         </div>
@@ -913,61 +926,47 @@ function CoworkFields({
       <Field label="Tools">
         <div className="flex flex-col gap-1.5">
           {exa && (
-            <label className="flex cursor-pointer items-start gap-2 rounded border border-border bg-surface px-2 py-1.5">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={exaEnabled}
-                onChange={(e) =>
-                  setPlugins((prev) =>
-                    e.target.checked ? [...prev.filter((p) => p.name !== 'exa'), exa] : prev.filter((p) => p.name !== 'exa'),
-                  )
-                }
-              />
-              <span className="flex-1">
-                <span className="block text-xs font-medium">Web Search &amp; Fetch (Exa)</span>
-                <span className="block text-[10px] leading-snug text-text-muted">
-                  Replaces built-in WebSearch/WebFetch.
-                </span>
-              </span>
-            </label>
+            <ToggleRow
+              checked={exaEnabled}
+              onChange={(v) =>
+                setPlugins((prev) =>
+                  v ? [...prev.filter((p) => p.name !== 'exa'), exa] : prev.filter((p) => p.name !== 'exa'),
+                )
+              }
+              title="Web Search & Fetch (Exa)"
+              desc="Replaces built-in WebSearch/WebFetch."
+            />
           )}
           {browser && (
-            <label className="flex cursor-pointer items-start gap-2 rounded border border-border bg-surface px-2 py-1.5">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={localPlugins.includes('browsermcp')}
-                onChange={(e) =>
-                  setLocalPlugins((prev) =>
-                    e.target.checked ? [...prev, 'browsermcp'] : prev.filter((n) => n !== 'browsermcp'),
-                  )
-                }
-              />
-              <span className="flex-1">
-                <span className="block text-xs font-medium">Browser Control (Browser MCP)</span>
-                <span className="block text-[10px] leading-snug text-text-muted">
+            <ToggleRow
+              checked={localPlugins.includes('browsermcp')}
+              onChange={(v) =>
+                setLocalPlugins((prev) => (v ? [...prev, 'browsermcp'] : prev.filter((n) => n !== 'browsermcp')))
+              }
+              title="Browser Control (Browser MCP)"
+              desc={
+                <>
                   Controls your running Chrome.{' '}
                   {browser.extensionUrl && (
-                    <a href={browser.extensionUrl} target="_blank" rel="noreferrer" className="text-primary underline">
+                    <a href={browser.extensionUrl} target="_blank" rel="noreferrer" className="text-text-main underline">
                       Install Chrome extension
                     </a>
                   )}
-                </span>
-              </span>
-            </label>
+                </>
+              }
+            />
           )}
         </div>
       </Field>
 
       {others.length > 0 && (
         <Field label="Local Plugins">
-          <div className="flex flex-col gap-1.5 rounded border border-border bg-surface px-2 py-1.5">
+          <div className="flex flex-col divide-y divide-border rounded-lg bg-surface-2 px-3">
             {others.map((p) => (
-              <label key={p.name} className="flex cursor-pointer items-start gap-2">
+              <label key={p.name} className="flex cursor-pointer items-start gap-2.5 py-2">
                 <input
                   type="checkbox"
-                  className="mt-0.5"
+                  className="mt-0.5 size-3.5 shrink-0 accent-[var(--text-main)]"
                   checked={localPlugins.includes(p.name)}
                   onChange={(e) =>
                     setLocalPlugins((prev) =>
@@ -977,10 +976,10 @@ function CoworkFields({
                 />
                 <span className="flex-1">
                   <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-xs font-medium">{p.title}</span>
-                    <span className="text-[8px] text-warning">stdio</span>
+                    <span className="text-xs font-medium text-text-main">{p.title}</span>
+                    <span className="font-mono text-[9px] text-text-muted">stdio</span>
                   </span>
-                  <span className="block text-[10px] leading-snug text-text-muted">{p.description}</span>
+                  <span className="block text-[11px] leading-snug text-text-muted">{p.description}</span>
                 </span>
               </label>
             ))}
@@ -1007,27 +1006,27 @@ function CodexProfiles({
   copy: (text: string, key?: string) => void
 }) {
   return (
-    <div className="mt-2 flex flex-col gap-3 border-t border-border pt-3">
+    <div className="flex flex-col gap-2.5 border-t border-border pt-4">
       <div className="flex items-center gap-2">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-text-main">
-          <Icon name="layers" className="text-[16px] text-primary" /> Additional Models
+        <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
+          <Icon name="layers" className="text-[15px]" /> Additional models
         </span>
         {profiles.length > 0 && (
-          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{profiles.length}</span>
+          <span className="font-mono text-[11px] text-text-muted">{profiles.length}</span>
         )}
       </div>
 
-      <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface-2/40 p-2.5">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[10rem_1fr_auto_auto] sm:items-center">
+      <div className="flex flex-col gap-1.5 rounded-lg bg-surface-2 p-2">
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[10rem_1fr_auto_auto] sm:items-center">
           <Input
-            className="font-mono text-xs"
+            className={INPUT_CLS + ' font-mono text-[11px]'}
             value={alias}
             onChange={(e) => setAlias(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
             placeholder="Alias (e.g. claude)"
             onKeyDown={(e) => e.key === 'Enter' && onAdd()}
           />
           <Input
-            className="font-mono text-xs"
+            className={INPUT_CLS + ' font-mono text-[11px]'}
             value={model}
             onChange={(e) => {
               const v = e.target.value
@@ -1042,7 +1041,7 @@ function CodexProfiles({
             placeholder="provider/model-id"
             onKeyDown={(e) => e.key === 'Enter' && onAdd()}
           />
-          <Button variant="outline" size="sm" onClick={onPickModel}>Select Model</Button>
+          <Button variant="ghost" size="sm" onClick={onPickModel}>Select Model</Button>
           <Button size="sm" onClick={onAdd} disabled={!alias.trim() || !model.trim() || busy}>
             <Icon name="add" className="text-[15px]" /> Add
           </Button>
@@ -1050,42 +1049,40 @@ function CodexProfiles({
       </div>
 
       {profiles.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface/30 p-4 text-center">
-          <Icon name="terminal" className="mb-1 text-[20px] text-text-muted" />
-          <p className="text-xs text-text-muted">
-            Only the main model is active. Add an alias above to configure more models for Codex CLI.
-          </p>
+        <div className="rounded-lg bg-surface-2 px-3 py-3 text-[11px] text-text-muted">
+          Only the main model is active. Add an alias above to configure more models for Codex CLI.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {profiles.map((p) => (
             <div
               key={p.name}
-              className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-2.5 py-2"
+              className="group flex items-center justify-between gap-2 rounded-lg bg-surface-2 px-3 py-2"
             >
               <div className="flex min-w-0 flex-col">
-                <span className="truncate text-xs font-medium text-text-main">{p.name}</span>
-                <span className="truncate font-mono text-[11px] text-text-muted">{p.model}</span>
+                <span className="truncate text-[11px] font-medium text-text-main">{p.name}</span>
+                <span className="truncate font-mono text-[10px] text-text-muted">{p.model}</span>
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   onClick={() => copy(p.command, p.name)}
-                  className={`flex items-center gap-1 rounded border px-2 py-1 font-mono text-[11px] ${
+                  className={cn(
+                    'flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors',
                     copied === p.name
-                      ? 'border-success/30 bg-success/10 text-success'
-                      : 'border-border bg-surface text-text-muted hover:text-text-main'
-                  }`}
+                      ? 'bg-card text-text-main'
+                      : 'text-text-muted hover:bg-card hover:text-text-main',
+                  )}
                   title="Click to copy command"
                 >
-                  <Icon name={copied === p.name ? 'check' : 'terminal'} className="text-[13px]" />
+                  <Icon name={copied === p.name ? 'check' : 'terminal'} className="text-[12px]" />
                   {p.command}
                 </button>
                 <button
                   onClick={() => onDelete(p.name)}
-                  className="rounded p-1 text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                  className="flex size-6 items-center justify-center rounded text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                   title="Delete model"
                 >
-                  <Icon name="close" className="text-[15px]" />
+                  <Icon name="close" className="text-[14px]" />
                 </button>
               </div>
             </div>
@@ -1105,19 +1102,11 @@ function AddCustomMcpModal({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div
-        className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Add Custom MCP</h3>
-          <button className="text-text-muted hover:text-text-main" onClick={onClose}>
-            <Icon name="close" className="text-[18px]" />
-          </button>
-        </div>
+    <Modal isOpen onClose={onClose} title="Add Custom MCP" size="sm">
+      <div className="flex flex-col gap-4">
         <Field label="Name">
           <Input
+            className={INPUT_CLS}
             placeholder="my-mcp"
             value={value.name}
             onChange={(e) => onChange({ ...value, name: e.target.value.replace(/\s+/g, '-').toLowerCase() })}
@@ -1125,17 +1114,18 @@ function AddCustomMcpModal({
         </Field>
         <Field label="SSE URL">
           <Input
+            className={INPUT_CLS + ' font-mono text-[11px]'}
             placeholder="https://your-mcp-server.com/sse"
             value={value.url}
             onChange={(e) => onChange({ ...value, url: e.target.value })}
           />
         </Field>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-          <Button size="sm" onClick={onAdd}>Add</Button>
-        </div>
       </div>
-    </div>
+      <div className="mt-5 flex justify-end gap-1.5">
+        <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+        <Button size="sm" onClick={onAdd}>Add</Button>
+      </div>
+    </Modal>
   )
 }
 
@@ -1168,62 +1158,65 @@ function CoworkComboModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-        <div
-          className="flex w-full max-w-md flex-col gap-3 rounded-xl border border-border bg-surface p-5 shadow-xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Create Cowork Combo</h3>
-            <button className="text-text-muted hover:text-text-main" onClick={onClose}>
-              <Icon name="close" className="text-[18px]" />
-            </button>
-          </div>
-          <Field label="Combo Name">
-            <div className="flex items-stretch">
-              <span className="inline-flex items-center rounded-l border border-r-0 border-border bg-surface-2 px-2 font-mono text-sm text-text-muted">
+      <Modal isOpen onClose={onClose} title="Create Cowork Combo" size="md">
+        <div className="flex flex-col gap-4">
+          <Field label="Combo name">
+            <div className="flex items-stretch gap-1.5">
+              <span className="inline-flex items-center rounded-lg bg-surface-2 px-2.5 font-mono text-[11px] text-text-muted">
                 claude-
               </span>
               <Input
-                className="rounded-l-none font-mono"
+                className={INPUT_CLS + ' font-mono'}
                 placeholder="my-combo"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
-            <p className="mt-0.5 text-[10px] text-text-muted">
-              {valid ? 'Only letters, numbers, -, _ and . allowed' : 'Invalid name'}
+            <p className={cn('mt-1 text-[11px]', valid ? 'text-text-muted' : 'text-danger')}>
+              {valid ? 'Letters, numbers, - _ . only' : 'Invalid name'}
             </p>
           </Field>
-          <div>
-            <Label>Models</Label>
-            <div className="mt-1 flex flex-wrap gap-1.5 rounded-md border border-border bg-surface px-2 py-1.5">
-              {models.length === 0 && <span className="text-xs text-text-muted">No models added yet</span>}
-              {models.map((m) => (
-                <span key={m} className="inline-flex items-center gap-1 rounded bg-surface-2 px-2 py-0.5 text-xs">
-                  {m}
-                  <button className="hover:text-danger" onClick={() => setModels((p) => p.filter((x) => x !== m))}>
-                    <Icon name="close" className="text-[12px]" />
-                  </button>
-                </span>
-              ))}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Models</span>
+              <span className="font-mono text-[11px] text-text-muted">{models.length} added</span>
             </div>
-            <button
-              className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-border py-2 text-xs font-medium text-primary hover:border-primary/50"
-              onClick={() => setPick(true)}
-            >
-              <Icon name="add" className="text-[16px]" /> Add Model
-            </button>
-          </div>
-          {error && <p className="text-[11px] text-danger">{error}</p>}
-          <div className="flex gap-2 pt-1">
-            <Button variant="ghost" size="sm" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button size="sm" className="flex-1" onClick={create} disabled={!name.trim() || !valid || models.length === 0 || busy}>
-              {busy ? 'Creating…' : 'Create'}
+            {models.length === 0 ? (
+              <div className="rounded-lg bg-surface-2 px-3 py-3 text-[11px] text-text-muted">No models added yet</div>
+            ) : (
+              <div className="flex flex-col divide-y divide-border rounded-lg bg-surface-2 px-2">
+                {models.map((m, i) => (
+                  <div key={m} className="flex items-center gap-2 py-1.5">
+                    <span className="w-4 shrink-0 font-mono text-[10px] text-text-muted">{i + 1}</span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-main">{m}</span>
+                    <button
+                      className="flex size-6 shrink-0 items-center justify-center rounded text-text-muted hover:text-danger"
+                      onClick={() => setModels((p) => p.filter((x) => x !== m))}
+                    >
+                      <Icon name="close" className="text-[13px]" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button variant="ghost" size="sm" className="self-start" onClick={() => setPick(true)}>
+              <Icon name="add" className="text-[15px]" /> Add model
             </Button>
           </div>
+          {error && <p className="text-[11px] text-danger">{error}</p>}
         </div>
-      </div>
+        <div className="mt-5 flex justify-end gap-1.5">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button
+            size="sm"
+            className="min-w-20"
+            onClick={create}
+            disabled={!name.trim() || !valid || models.length === 0 || busy}
+          >
+            {busy ? 'Creating…' : 'Create'}
+          </Button>
+        </div>
+      </Modal>
       <ModelSelectModal
         isOpen={pick}
         onClose={() => setPick(false)}
@@ -1315,33 +1308,33 @@ function GuideCard({
   const canShowGuide = !tool.requiresExternalUrl || hasExternalUrl
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Setup</CardTitle>
-        <CardDescription>
+    <section className="overflow-hidden rounded-xl bg-surface">
+      <div className="px-4 py-3">
+        <h2 className="text-sm font-semibold text-text-main">Setup</h2>
+        <p className="mt-0.5 text-[11px] text-text-muted">
           {tool.guideSteps
             ? 'This client has no config file the router can write. Follow these steps in its own settings.'
             : 'This client has no config file the router can write. Paste these values into its settings.'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+        </p>
+      </div>
+      <div className="flex flex-col gap-4 border-t border-border px-4 py-4">
         <Notes notes={tool.notes} hideCloudCheck={hasExternalUrl} />
 
         {!tool.guideSteps && (
           <>
             <Field label="Base URL">
-              <div className="flex gap-2">
-                <Input readOnly value={baseUrl} />
-                <Button variant="outline" size="sm" onClick={() => copy(baseUrl, 'url')}>
-                  <Icon name={copied === 'url' ? 'check' : 'content_copy'} className="text-[16px]" />
+              <div className="flex gap-1.5">
+                <Input readOnly value={baseUrl} className={INPUT_CLS + ' font-mono text-[11px]'} />
+                <Button variant="ghost" size="icon" onClick={() => copy(baseUrl, 'url')}>
+                  <Icon name={copied === 'url' ? 'check' : 'content_copy'} className="text-[15px]" />
                 </Button>
               </div>
             </Field>
             <Field label="API key">
-              <div className="flex gap-2">
-                <Input readOnly value={apiKey} />
-                <Button variant="outline" size="sm" onClick={() => copy(apiKey, 'key')}>
-                  <Icon name={copied === 'key' ? 'check' : 'content_copy'} className="text-[16px]" />
+              <div className="flex gap-1.5">
+                <Input readOnly value={apiKey} className={INPUT_CLS + ' font-mono text-[11px]'} />
+                <Button variant="ghost" size="icon" onClick={() => copy(apiKey, 'key')}>
+                  <Icon name={copied === 'key' ? 'check' : 'content_copy'} className="text-[15px]" />
                 </Button>
               </div>
             </Field>
@@ -1353,23 +1346,20 @@ function GuideCard({
             const copyKey = `${item.step}-${item.title}`
             return (
               <div key={item.step} className="flex items-start gap-3">
-                <span
-                  className="flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-                  style={{ backgroundColor: tool.color }}
-                >
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-2 font-mono text-[11px] font-semibold text-text-main">
                   {item.step}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-text-main">{item.title}</p>
-                  {item.desc && <p className="mt-0.5 text-xs text-text-muted">{item.desc}</p>}
+                  {item.desc && <p className="mt-0.5 text-[11px] text-text-muted">{item.desc}</p>}
                   {item.docsUrl && (
                     <a
                       href={item.docsUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-1 inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+                      className="mt-1 inline-flex w-fit items-center gap-1 text-[11px] text-text-muted hover:text-text-main"
                     >
-                      <Icon name="open_in_new" className="text-[14px]" /> docs
+                      <Icon name="open_in_new" className="text-[13px]" /> docs
                     </a>
                   )}
                   {item.type === 'apiKeySelector' && (
@@ -1379,7 +1369,7 @@ function GuideCard({
                         value={apiKey}
                         onChange={(e) => onApiKey(e.target.value)}
                         placeholder="sk_kinerouter"
-                        className="font-mono text-xs"
+                        className={INPUT_CLS + ' font-mono text-[11px]'}
                       />
                       <datalist id={`guide-keys-${tool.id}`}>
                         {keys.map((k) => (
@@ -1391,23 +1381,23 @@ function GuideCard({
                     </div>
                   )}
                   {item.type === 'modelSelector' && (
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="mt-2 flex items-center gap-1.5">
                       <Input
                         value={model}
                         onChange={(e) => setModel(e.target.value)}
                         placeholder="provider/model-id"
-                        className="font-mono text-xs"
+                        className={INPUT_CLS + ' font-mono text-[11px]'}
                       />
-                      <Button variant="outline" size="sm" onClick={() => setPicker(true)} disabled={models.length === 0}>
+                      <Button variant="ghost" size="sm" onClick={() => setPicker(true)} disabled={models.length === 0}>
                         Select Model
                       </Button>
                       {model && (
                         <>
-                          <Button variant="ghost" size="sm" onClick={() => copy(model, `m-${copyKey}`)} title="Copy">
-                            <Icon name={copied === `m-${copyKey}` ? 'check' : 'content_copy'} className="text-[16px]" />
+                          <Button variant="ghost" size="icon" onClick={() => copy(model, `m-${copyKey}`)} title="Copy">
+                            <Icon name={copied === `m-${copyKey}` ? 'check' : 'content_copy'} className="text-[15px]" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setModel('')} title="Clear">
-                            <Icon name="close" className="text-[16px]" />
+                          <Button variant="ghost" size="icon" onClick={() => setModel('')} title="Clear">
+                            <Icon name="close" className="text-[15px]" />
                           </Button>
                         </>
                       )}
@@ -1415,12 +1405,12 @@ function GuideCard({
                   )}
                   {item.value && (
                     <div className="mt-2 flex gap-2">
-                      <code className="min-w-0 flex-1 truncate rounded border border-border bg-surface-2 px-3 py-2 font-mono text-xs">
+                      <code className="min-w-0 flex-1 truncate rounded-lg bg-surface-2 px-3 py-2 font-mono text-[11px] text-text-main">
                         {replaceVars(item.value)}
                       </code>
                       {item.copyable && (
-                        <Button variant="outline" size="sm" onClick={() => copy(item.value!, copyKey)}>
-                          <Icon name={copied === copyKey ? 'check' : 'content_copy'} className="text-[16px]" />
+                        <Button variant="ghost" size="icon" onClick={() => copy(item.value!, copyKey)}>
+                          <Icon name={copied === copyKey ? 'check' : 'content_copy'} className="text-[15px]" />
                         </Button>
                       )}
                     </div>
@@ -1439,7 +1429,7 @@ function GuideCard({
                 {copied === 'codeblock' ? 'Copied!' : 'Copy'}
               </Button>
             </div>
-            <pre className="custom-scrollbar overflow-x-auto rounded border border-border bg-surface-2 p-3 font-mono text-xs">
+            <pre className="custom-scrollbar overflow-x-auto rounded-lg bg-surface-2 p-3 font-mono text-[11px] text-text-main">
               {replaceVars(tool.codeBlock.code)}
             </pre>
           </div>
@@ -1450,12 +1440,12 @@ function GuideCard({
             href={tool.docsUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+            className="inline-flex w-fit items-center gap-1 text-[11px] text-text-muted hover:text-text-main"
           >
-            <Icon name="open_in_new" className="text-[14px]" /> Documentation
+            <Icon name="open_in_new" className="text-[13px]" /> Documentation
           </a>
         )}
-      </CardContent>
+      </div>
 
       <ModelSelectModal
         isOpen={picker}
@@ -1467,7 +1457,7 @@ function GuideCard({
         selectedModel={model}
         title="Select Model"
       />
-    </Card>
+    </section>
   )
 }
 
@@ -1479,17 +1469,17 @@ function Notes({ notes, hideCloudCheck }: { notes?: CliNote[]; hideCloudCheck?: 
   return (
     <div className="flex flex-col gap-2">
       {shown.map((n, i) => {
-        const style =
+        const tone =
           n.type === 'warning'
-            ? 'border-warning/30 bg-warning/10 text-warning'
+            ? 'text-warning'
             : n.type === 'error' || n.type === 'cloudCheck'
-              ? 'border-danger/30 bg-danger/10 text-danger'
-              : 'border-primary/30 bg-primary/10 text-primary'
+              ? 'text-danger'
+              : 'text-text-muted'
         const icon = n.type === 'warning' ? 'warning' : n.type === 'info' ? 'info' : 'error'
         return (
-          <div key={i} className={cn('flex items-start gap-2 rounded-lg border px-3 py-2', style)}>
-            <Icon name={icon} className="mt-0.5 shrink-0 text-[16px]" />
-            <p className="text-xs leading-relaxed">{n.text}</p>
+          <div key={i} className="flex items-start gap-2 rounded-lg bg-surface-2 px-3 py-2">
+            <Icon name={icon} className={cn('mt-0.5 shrink-0 text-[15px]', tone)} />
+            <p className="text-[11px] leading-relaxed text-text-muted">{n.text}</p>
           </div>
         )
       })}
@@ -1497,12 +1487,81 @@ function Notes({ notes, hideCloudCheck }: { notes?: CliNote[]; hideCloudCheck?: 
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/** Radix select value cannot be empty, so empty states use this sentinel. */
+const NONE = '__none'
+
+/** Borderless dropdown matching the tinted inputs; native selects look foreign here. */
+function Dropdown({
+  value,
+  onChange,
+  options,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+}) {
   return (
-    <div className="flex flex-col gap-1">
-      <Label className="text-xs text-text-muted">{label}</Label>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="h-9 w-full cursor-pointer rounded-lg border-0 bg-surface-2 px-3 text-sm text-text-main shadow-none focus:ring-1 focus:ring-ring">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="custom-scrollbar rounded-lg border-0 bg-card shadow-lg">
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value} className="rounded-md text-[13px]">
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function Field({
+  label,
+  action,
+  children,
+}: {
+  label: string
+  /** Right side of the label row: keeps actions next to the control they act on. */
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex min-h-6 items-center justify-between gap-2">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">{label}</span>
+        {action}
+      </div>
       {children}
     </div>
+  )
+}
+
+/** Tinted row + native checkbox; the checkbox keeps keyboard and mobile behaviour. */
+function ToggleRow({
+  checked,
+  onChange,
+  title,
+  desc,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  title: string
+  desc: React.ReactNode
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2.5 rounded-lg bg-surface-2 px-3 py-2 transition-colors hover:bg-surface-3">
+      <input
+        type="checkbox"
+        className="mt-0.5 size-3.5 shrink-0 accent-[var(--text-main)]"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span className="min-w-0">
+        <span className="block text-xs font-medium text-text-main">{title}</span>
+        <span className="mt-0.5 block text-[11px] leading-relaxed text-text-muted">{desc}</span>
+      </span>
+    </label>
   )
 }
 
@@ -1516,14 +1575,20 @@ function BadgeState({
   guide: boolean
 }) {
   const { label, cls } = (() => {
-    if (guide) return { label: 'Guide', cls: 'bg-muted/60 text-text-muted' }
-    if (loading) return { label: 'Loading', cls: 'bg-muted/60 text-text-muted' }
-    if (!status) return { label: 'Unknown', cls: 'bg-muted/60 text-text-muted' }
-    if (status.installed === false) return { label: 'Not installed', cls: 'bg-muted/60 text-text-muted' }
-    if (status.hasKineRouter) return { label: 'Connected', cls: 'bg-success/15 text-success' }
-    return { label: 'Not configured', cls: 'bg-warning/15 text-warning' }
+    if (guide) return { label: 'Guide', cls: 'border border-border text-text-muted' }
+    if (loading) return { label: 'Loading', cls: 'bg-surface-2 text-text-muted' }
+    if (!status) return { label: 'Unknown', cls: 'bg-surface-2 text-text-muted/70' }
+    if (status.installed === false) return { label: 'Not installed', cls: 'bg-surface-2 text-text-muted' }
+    if (status.hasKineRouter)
+      return { label: 'Connected', cls: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400' }
+    return { label: 'Not configured', cls: 'bg-amber-500/12 text-amber-700 dark:text-amber-400' }
   })()
-  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${cls}`}>{label}</span>
+  return (
+    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0 text-[10px] font-medium leading-tight ${cls}`}>
+      {label === 'Connected' && <span aria-hidden className="size-1 rounded-full bg-current" />}
+      {label}
+    </span>
+  )
 }
 
 function withV1(url: string) {
