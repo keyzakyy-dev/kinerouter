@@ -194,26 +194,35 @@ go build -tags tray -o kinerouter-tray ./cmd/kinerouter-tray
 Starting `kinerouter` with no arguments from a terminal opens a launcher menu:
 
 ```
-  1) Web UI  — open the dashboard in a browser
-  2) CLI    — configure local coding tools
-  3) Hide to tray — keep serving in the background
-  4) Continue without the menu
-  5) Update to vX.Y.Z (current vA.B.C)   # only when a newer release exists
+  1) Update to vX.Y.Z (current vA.B.C)   # only when a newer release exists
+  2) Web UI (Open in Browser)
+  3) Terminal UI (Interactive CLI)
+  4) Hide to Tray (Background)
+  5) Exit
 ```
 
-Option 3 hands the gateway to a detached process in a new session (same flow as
-9Router's `--tray` mode), then stops the foreground copy so the child can claim
-the port. Closing the terminal leaves the gateway and the tray icon running;
-only the tray's Quit stops the gateway it started. macOS keeps the process in
-the login session instead, because a fully detached status item does not render
-there.
-
-Option 5 prints the update command for **the way this copy was installed**
+Update prints the command for **the way this copy was installed**
 (`npm i -g kinerouter@latest --prefer-online` or the install script) and stops
 the server first, because Windows locks a running `.exe` and every platform
-would otherwise keep serving the old binary.
+would otherwise keep serving the old binary. Exit stops the gateway this
+process owns.
 
-A second `kinerouter` on a busy port attaches to the running instance instead of
+Hide to Tray does three things, like 9Router: install the OS login entry
+(`~/.config/autostart`, `~/Library/LaunchAgents`, or the Windows Startup
+folder), hand the gateway to a detached process in a new session
+(`kinerouter --tray`, null stdio), then stop the foreground copy so the child
+can claim the port. Closing the terminal leaves the gateway and the tray icon
+running. macOS keeps the process in the login session instead, because a fully
+detached status item does not render there.
+
+The tray menu is the same four entries: status, Open Dashboard, Enable/✓
+Auto-start, Quit. Quit stops the gateway it belongs to; if the gateway dies
+first, the tray exits on its own instead of leaving a ghost icon.
+
+One instance per machine. `<data dir>/launcher.pid` records the gateway and tray
+PIDs, so the next launch stops exactly those processes and takes over the port,
+the same fast path 9Router keeps in `launcher.pid`. With no record (an older
+build), a second `kinerouter` attaches to the running instance instead of
 failing with `bind: address already in use`. Non-interactive starts (Docker,
 systemd, piped output) skip the menu.
 

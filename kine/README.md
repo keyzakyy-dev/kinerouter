@@ -105,9 +105,12 @@ in the binary) but required for the dashboard.
 
 Defaults: listen `0.0.0.0:20128`, data dir `~/.kinerouter`. In a terminal, a
 launcher menu offers the web dashboard, CLI setup, tray mode or a plain start;
-non-TTY runs skip it. "Hide to tray" re-executes the binary detached
+non-TTY runs skip it. Menu entries follow 9Router: Update (when available), Web
+UI, Terminal UI, Hide to Tray, Exit — Exit stops the gateway this process owns.
+"Hide to Tray" adds the OS login entry, re-executes the binary detached
 (`kinerouter --tray`, new session, null stdio) and stops the foreground copy, so
-closing the terminal does not take the gateway with it.
+closing the terminal does not take the gateway with it. `<data dir>/launcher.pid`
+records both PIDs, so the next launch stops that exact instance.
 
 Open http://localhost:20128/ and log in with `INITIAL_PASSWORD` (default
 `123456`, local sign-in only — set `INITIAL_PASSWORD` or change it in Settings before remote access works).

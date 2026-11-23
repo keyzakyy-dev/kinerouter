@@ -4,10 +4,16 @@ package main
 
 import (
 	_ "embed"
+	"fmt"
+	"os"
 	"runtime"
+	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/getlantern/systray"
+
+	"github.com/keyzakyy-dev/kinerouter/internal/autostart"
 )
 
 // Windows takes an .ico; everywhere else systray decodes the PNG.
@@ -34,70 +40,79 @@ func runGUI() error {
 func onReady() {
 	systray.SetIcon(trayIcon())
 	systray.SetTitle("KineRouter")
-	systray.SetTooltip("KineRouter — " + baseURL)
+	systray.SetTooltip(fmt.Sprintf("KineRouter - Port %d", port))
 
-	status := systray.AddMenuItem("Checking…", "Gateway status")
+	// Same four entries as 9Router's buildMenuItems: status, dashboard,
+	// autostart toggle, quit.
+	status := systray.AddMenuItem(fmt.Sprintf("KineRouter (Port %d)", port), "Server is running")
 	status.Disable()
-	systray.AddSeparator()
-	start := systray.AddMenuItem("Start Gateway", "Run the gateway on "+baseURL)
-	stop := systray.AddMenuItem("Stop Gateway", "Stop the gateway this tray started")
-	systray.AddSeparator()
-	dash := systray.AddMenuItem("Open Dashboard", baseURL)
-	systray.AddSeparator()
-	quit := systray.AddMenuItem("Quit Tray", "Remove the icon (leaves a running gateway alone)")
+	dash := systray.AddMenuItem("Open Dashboard", "Open in browser")
+	autostartItem := systray.AddMenuItem(autostartLabel(), "Run on OS startup")
+	quit := systray.AddMenuItem("Quit", "Stop server and exit")
 
 	// One select loop for every channel: systray delivers each click once, so a
 	// second reader of the same ClickedCh would steal events at random.
-	tick := time.NewTicker(time.Second)
+	tick := time.NewTicker(2 * time.Second)
 	defer tick.Stop()
 
 	refresh := func() {
-		st := probeState()
-		mine := startedByTray()
-		switch st {
-		case stateRunning:
-			status.SetTitle("Running — " + baseURL)
-		case stateStopped:
-			status.SetTitle("Stopped")
-		default:
-			status.SetTitle("Unknown — no answer on " + baseURL)
+		if autostart.Enabled() {
+			autostartItem.SetTitle("✓ Auto-start Enabled")
+		} else {
+			autostartItem.SetTitle("Enable Auto-start")
 		}
-		// Start is pointless when something already answers; Stop is offered only
-		// for a gateway this tray started, never for one the user launched.
-		setEnabled(start, st != stateRunning)
-		setEnabled(stop, mine)
+	}
+
+	// The tray belongs to one gateway. If that gateway dies (crash, Ctrl+C in
+	// the terminal it came from), the icon must not linger as a ghost.
+	owner := 0
+	if v := os.Getenv("KINEROUTER_OWNER_PID"); v != "" {
+		owner, _ = strconv.Atoi(v)
 	}
 
 	refresh()
 	for {
 		select {
 		case <-tick.C:
-			refresh()
-		case <-start.ClickedCh:
-			if err := startGateway(); err != nil {
-				systray.SetTooltip("KineRouter — " + err.Error())
-			}
-			refresh()
-		case <-stop.ClickedCh:
-			if err := stopGateway(); err != nil {
-				systray.SetTooltip("KineRouter — " + err.Error())
+			if owner > 0 && !ownerAlive(owner) {
+				systray.Quit()
+				return
 			}
 			refresh()
 		case <-dash.ClickedCh:
 			_ = openBrowser(urlFor("/"))
+		case <-autostartItem.ClickedCh:
+			if autostart.Enabled() {
+				autostart.Disable()
+			} else if exe, err := gatewayPath(); err == nil {
+				autostart.Enable(exe)
+			}
+			refresh()
 		case <-quit.ClickedCh:
-			// Releases the icon only. Rule C4: quitting the tray must not stop a
-			// running gateway, which may be serving requests.
+			// 9Router's Quit stops the gateway it belongs to; a tray that only
+			// removed its icon would leave an orphan server behind.
+			stopOwner()
 			systray.Quit()
 			return
 		}
 	}
 }
 
-func setEnabled(item *systray.MenuItem, on bool) {
-	if on {
-		item.Enable()
+func autostartLabel() string {
+	if autostart.Enabled() {
+		return "✓ Auto-start Enabled"
+	}
+	return "Enable Auto-start"
+}
+
+// stopOwner asks the gateway that spawned this tray to shut down cleanly.
+func stopOwner() {
+	v := os.Getenv("KINEROUTER_OWNER_PID")
+	pid, err := strconv.Atoi(v)
+	if err != nil || pid <= 0 {
 		return
 	}
-	item.Disable()
+	if p, err := os.FindProcess(pid); err == nil {
+		_ = p.Signal(syscall.SIGTERM)
+	}
 }

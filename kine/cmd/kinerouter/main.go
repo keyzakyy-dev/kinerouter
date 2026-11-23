@@ -16,6 +16,7 @@ import (
 
 	"github.com/keyzakyy-dev/kinerouter/internal/config"
 	"github.com/keyzakyy-dev/kinerouter/internal/gateway"
+	"github.com/keyzakyy-dev/kinerouter/internal/launcherpid"
 	"github.com/keyzakyy-dev/kinerouter/internal/logbuf"
 	"github.com/keyzakyy-dev/kinerouter/internal/oauth"
 	"github.com/keyzakyy-dev/kinerouter/internal/store"
@@ -51,14 +52,19 @@ func main() {
 	}
 	if trayMode {
 		// The launcher spawns this copy and then stops, so wait for its
-		// listener to close rather than attaching to a process that is exiting.
+		// listener to close rather than stopping a process that is already
+		// exiting.
 		if !waitPortFree(cfg.Port, 20*time.Second) {
 			log.Fatalf("port %d is still in use; cannot take over", cfg.Port)
 		}
+	} else if pid := launcherpid.Stop(cfg.DataDir, os.Getpid()); pid != 0 {
+		// One instance per machine, like 9Router: the record names the exact
+		// previous process, so a fresh launch replaces it instead of leaving
+		// two servers that update on their own schedules.
+		log.Printf("stopped previous instance (PID %d)", pid)
 	} else if v := runningVersion(cfg.Port); v != "" {
-		// A second `kinerouter` must not die with "bind: address already in
-		// use". If the port already serves KineRouter, attach the launcher to
-		// it; anything else is a genuine conflict for ListenAndServe to report.
+		// No record means an older build (or a manually started copy) owns the
+		// port; attaching to it beats dying with "bind: address already in use".
 		log.Printf("KineRouter %s is already running on port %d", v, cfg.Port)
 		runLauncher(cfg.Port, false)
 		return
@@ -68,6 +74,11 @@ func main() {
 		log.Fatalf("database: %v", err)
 	}
 	defer st.Close()
+
+	// Lets the next launch stop exactly this process (9Router's launcher.pid).
+	self, _ := os.Executable()
+	_ = launcherpid.Write(cfg.DataDir, launcherpid.Record{PID: os.Getpid(), Port: cfg.Port, Exe: self})
+	defer launcherpid.RemoveIfOwner(cfg.DataDir, os.Getpid())
 
 	static, err := web.Handler()
 	if err != nil {
@@ -110,9 +121,19 @@ func main() {
 				log.Printf("tray: gateway did not become ready")
 				return
 			}
-			if !startTray() {
+			pid, ok := startTray()
+			if !ok {
 				log.Printf("tray: companion binary not found next to %s", os.Args[0])
+				return
 			}
+			// Record the tray too: the next launch stops both, so no orphan icon
+			// survives the gateway it belongs to.
+			self, _ := os.Executable()
+			trayExe, _ := trayBinary()
+			_ = launcherpid.Write(cfg.DataDir, launcherpid.Record{
+				PID: os.Getpid(), Port: cfg.Port, Exe: self,
+				TrayPID: pid, TrayExe: trayExe,
+			})
 		}()
 		// No controlling terminal, but a stray HUP from a launcher wrapper must
 		// not stop the gateway either.

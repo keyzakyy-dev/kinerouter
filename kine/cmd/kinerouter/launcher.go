@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/keyzakyy-dev/kinerouter/internal/autostart"
 	"github.com/keyzakyy-dev/kinerouter/internal/gateway"
 )
 
@@ -44,50 +45,61 @@ func runLauncher(port int, ownsServer bool) {
 
 	base := "http://127.0.0.1:" + strconv.Itoa(port)
 	in := bufio.NewReader(os.Stdin)
+
+	// Same five entries, same order as 9Router's showInterfaceMenu: update (only
+	// when one exists), Web UI, Terminal UI, Hide to Tray, Exit.
+	type item struct{ label, action string }
+	var opts []item
+	if hasUpdate {
+		opts = append(opts, item{fmt.Sprintf("Update to v%s (current v%s)", latest, gateway.Version), "update"})
+	}
+	opts = append(opts, item{"Web UI (Open in Browser)", "web"})
+	opts = append(opts, item{"Terminal UI (Interactive CLI)", "terminal"})
+	if ownsServer {
+		opts = append(opts, item{"Hide to Tray (Background)", "hide"})
+	}
+	opts = append(opts, item{"Exit", "exit"})
+
 	for {
 		if ownsServer {
-			fmt.Printf("\nKineRouter %s is running at %s\n", gateway.Version, base)
+			fmt.Printf("\nKineRouter %s\n  Server: %s\n", gateway.Version, base)
 		} else {
-			fmt.Printf("\nKineRouter is already running at %s\n", base)
+			fmt.Printf("\nKineRouter %s\n  Server: %s (started outside this terminal)\n", gateway.Version, base)
 		}
-		fmt.Println("  1) Web UI  — open the dashboard in a browser")
-		fmt.Println("  2) CLI    — configure local coding tools")
-		if ownsServer {
-			fmt.Println("  3) Hide to tray — keep serving in the background")
-			fmt.Println("  4) Continue without the menu")
-		} else {
-			fmt.Println("  4) Exit")
+		for i, o := range opts {
+			fmt.Printf("  %d) %s\n", i+1, o.label)
 		}
-		if hasUpdate {
-			fmt.Printf("  5) Update to v%s (current v%s)\n", latest, gateway.Version)
-		}
-		fmt.Print("\nChoose [1-5]: ")
+		fmt.Printf("\nChoose Interface [1-%d]: ", len(opts))
 
 		line, err := in.ReadString('\n')
 		if err != nil {
 			fmt.Println()
 			return
 		}
-		switch strings.TrimSpace(line) {
-		case "1":
+		n, convErr := strconv.Atoi(strings.TrimSpace(line))
+		if convErr != nil || n < 1 || n > len(opts) {
+			return
+		}
+		switch opts[n-1].action {
+		case "update":
+			showUpdate(latest, ownsServer, in)
+		case "web":
 			if err := openBrowser(base + "/dashboard"); err != nil {
 				fmt.Printf("could not open a browser: %v\nopen %s manually\n", err, base+"/dashboard")
 			}
 			pause(in)
-		case "2":
+		case "terminal":
 			runCLISetup(base, in)
-		case "3":
-			if !ownsServer {
-				continue
-			}
+		case "hide":
 			if runtime.GOOS == "darwin" {
 				// A detached child on macOS sits outside the login session and
 				// NSStatusItem silently fails there, so this process stays and
 				// only drops the terminal (9Router does the same).
-				if !startTray() {
+				if _, ok := startTray(); !ok {
 					pause(in)
 					continue
 				}
+				enableAutostart()
 				ignoreHangup()
 				fmt.Printf("\nKineRouter is running in the tray (PID %d)\n  Server: %s\nClose this terminal anytime; quit from the tray icon.\n", os.Getpid(), base)
 				return
@@ -100,18 +112,29 @@ func runLauncher(port int, ownsServer bool) {
 				pause(in)
 				continue
 			}
+			enableAutostart()
 			fmt.Printf("KineRouter is now running in the background\n  Server: %s\nClose this terminal anytime; quit from the tray icon.\n", base)
 			stopSelf()
 			return
-		case "5":
-			if !hasUpdate {
-				continue
-			}
-			showUpdate(latest, ownsServer, in)
 		default:
+			// Exit stops the gateway this process owns, like 9Router's cleanup():
+			// leaving it running would hide a server the user just closed.
+			if ownsServer {
+				stopSelf()
+			}
 			return
 		}
 	}
+}
+
+// enableAutostart installs the OS login entry now that the user asked for the
+// background mode; 9Router enables autostart at that same moment.
+func enableAutostart() {
+	self, err := os.Executable()
+	if err != nil {
+		return
+	}
+	autostart.Enable(self)
 }
 
 // showUpdate prints the one update command that matches how this binary was
@@ -237,12 +260,11 @@ func waitPortFree(port int, timeout time.Duration) bool {
 	}
 }
 
-// startTray launches the companion tray binary that sits next to this one.
-func startTray() bool {
+// trayBinary resolves the companion tray binary that sits next to this one.
+func trayBinary() (string, error) {
 	self, err := os.Executable()
 	if err != nil {
-		fmt.Printf("tray: %v\n", err)
-		return false
+		return "", err
 	}
 	name := "kinerouter-tray"
 	if runtime.GOOS == "windows" {
@@ -250,22 +272,37 @@ func startTray() bool {
 	}
 	bin := filepath.Join(filepath.Dir(self), name)
 	if _, err := os.Stat(bin); err != nil {
-		fmt.Printf("tray: %s not found.\n", bin)
+		return "", err
+	}
+	return bin, nil
+}
+
+// startTray launches the companion tray binary and returns its PID, so the
+// instance record can stop it later (9Router's cleanup kills the tray too).
+func startTray() (int, bool) {
+	bin, err := trayBinary()
+	if err != nil {
+		fmt.Printf("tray: %v\n", err)
 		fmt.Println("npm and release installs include it; from source, build it beside this binary:")
 		fmt.Println("  go build -tags tray -o kinerouter-tray ./cmd/kinerouter-tray")
-		return false
+		return 0, false
 	}
 	cmd := exec.Command(bin)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	// The tray quits the gateway it belongs to, like 9Router's tray Quit. Only
+	// the process that started it may be stopped, so the PID travels explicitly
+	// rather than trusting PPID (which changes if the gateway detaches again).
+	cmd.Env = append(os.Environ(), "KINEROUTER_OWNER_PID="+strconv.Itoa(os.Getpid()))
 	if err := cmd.Start(); err != nil {
 		fmt.Printf("tray: %v\n", err)
-		return false
+		return 0, false
 	}
+	pid := cmd.Process.Pid
 	if err := cmd.Process.Release(); err != nil {
 		fmt.Printf("tray: %v\n", err)
-		return false
+		return 0, false
 	}
-	return true
+	return pid, true
 }
 
 func openBrowser(target string) error {

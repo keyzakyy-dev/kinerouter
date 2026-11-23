@@ -5,6 +5,24 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+## [0.1.7] — 2026-11-23
+
+### Changed
+
+- **Launcher and tray follow 9Router exactly.** Menu order is Update (when
+  available), Web UI, Terminal UI, Hide to Tray, Exit; Exit stops the gateway
+  this process owns. The tray menu is status, Open Dashboard, Enable/✓
+  Auto-start, Quit, and Quit stops the gateway it belongs to.
+- **OS login entry (autostart).** Hide to Tray writes the per-user entry
+  (`~/.config/autostart/kinerouter.desktop`, `com.kinerouter.autostart.plist`,
+  or a Windows Startup `.vbs`) that runs `kinerouter --tray`. The tray toggles
+  it from its menu.
+- **One instance per machine.** `<data dir>/launcher.pid` records the gateway
+  and tray PIDs; the next launch stops exactly those processes (exe-guarded
+  against PID reuse) before taking over the port, instead of attaching to a
+  server that updates on a different schedule. A tray whose gateway died exits
+  on its own.
+
 ## [0.1.6] — 2026-11-23
 
 ### Fixed
