@@ -758,3 +758,26 @@ textarea {
 }
 .react-flow-controls-custom button:last-child { border-bottom: 0; }
 .react-flow-controls-custom button:hover { background: var(--color-bg-alt); }
+
+/* ============================================================
+   Sidebar motion, after Animate UI's sidebar primitive.
+   ============================================================ */
+
+/* A folded submenu staggers its rows in: 8px from the right, out of a 4px blur. */
+@keyframes sidebar-sub-in {
+  from { opacity: 0; transform: translateX(8px); filter: blur(4px); }
+  to { opacity: 1; transform: translateX(0); filter: blur(0); }
+}
+.sidebar-sub-in > * {
+  animation: sidebar-sub-in 0.3s cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+.sidebar-sub-in > * { animation-delay: inherit; }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-sub-in > * { animation: none; }
+}
+
+/* The collapsed rail's tooltip grows from the row, from 0.7. */
+@keyframes rail-tip-in {
+  from { opacity: 0; transform: translateY(-50%) scale(0.7); }
+  to { opacity: 1; transform: translateY(-50%) scale(1); }
+}

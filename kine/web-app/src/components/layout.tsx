@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -14,11 +14,16 @@ const SHUTDOWN_COUNTDOWN_SEC = 3
 /** Collapsed/expanded state survives reloads; local only, nothing is sent to the gateway. */
 const COLLAPSE_KEY = 'kinerouter.sidebar'
 
-/** Label + trailing chrome in a row: they fold away when the rail is collapsed. */
-const HIDES = 'group-data-[collapsed=true]/sidebar:hidden'
+/** Sidebar motion, on Animate UI's curve: the collapse and everything inside it. */
+const SIDEBAR_EASE = 'ease-[cubic-bezier(0.77,0,0.175,1)]'
+const SIDEBAR_MS = 'duration-[280ms]'
+
+/** Label + trailing chrome: they fold their width and fade into a light blur. */
+const HIDES = `shrink-0 overflow-hidden whitespace-nowrap transition-[opacity,filter,width] duration-150 ease-out group-data-[collapsed=true]/sidebar:w-0 group-data-[collapsed=true]/sidebar:opacity-0 group-data-[collapsed=true]/sidebar:blur-[2px] motion-reduce:transition-none`
 /** The row becomes a 36×34 icon tile in the slim rail. */
-const ROW_COLLAPSED =
-  'group-data-[collapsed=true]/sidebar:mx-auto group-data-[collapsed=true]/sidebar:size-9 group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:rounded-[10px] group-data-[collapsed=true]/sidebar:px-0'
+const ROW_COLLAPSED = `group-data-[collapsed=true]/sidebar:mx-auto group-data-[collapsed=true]/sidebar:size-9 group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:gap-0 group-data-[collapsed=true]/sidebar:rounded-[10px] group-data-[collapsed=true]/sidebar:px-0`
+/** Row motion shared by every nav row, so buttons resize on the sidebar's timing. */
+const ROW_BASE = `relative z-[1] flex shrink-0 items-center gap-3 overflow-hidden rounded-lg px-3 py-1 min-h-8 text-[13px] font-medium transition-[color,background-color,width,height,padding,border-radius] ${SIDEBAR_MS} ${SIDEBAR_EASE} motion-reduce:transition-none`
 
 /** Sidebar structure mirrors KineRouter's src/shared/components/Sidebar.js. */
 type NavItem = { href: string; label: string; icon: string }
@@ -93,7 +98,7 @@ function RailTip({ label, children }: { label?: string; children: React.ReactNod
           <div
             role="tooltip"
             style={{ top, left: TIP_LEFT }}
-            className="pointer-events-none fixed z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-surface-3 px-2.5 py-1 text-xs font-medium text-text-main shadow-lg ring-1 ring-border before:absolute before:top-1/2 before:-left-1 before:h-2 before:w-2 before:-translate-y-1/2 before:rotate-45 before:rounded-sm before:bg-surface-3"
+            className="pointer-events-none fixed z-50 -translate-y-1/2 origin-left animate-[rail-tip-in_140ms_cubic-bezier(0.34,1.56,0.64,1)] whitespace-nowrap rounded-md bg-surface-3 px-2.5 py-1 text-xs font-medium text-text-main shadow-lg ring-1 ring-border before:absolute before:top-1/2 before:-left-1 before:h-2 before:w-2 before:-translate-y-1/2 before:rotate-45 before:rounded-sm before:bg-surface-3"
           >
             {label}
           </div>,
@@ -118,13 +123,15 @@ function NavRow({
       to={item.href}
       end={item.href === '/dashboard/endpoint'}
       onClick={onNavigate}
+      data-sidebar="menu-button"
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-3 rounded-lg px-3 py-1 transition-all group',
+          ROW_BASE,
+          'group',
           ROW_COLLAPSED,
           isActive
             ? 'bg-primary/10 text-primary group-data-[collapsed=true]/sidebar:bg-primary group-data-[collapsed=true]/sidebar:text-white group-data-[collapsed=true]/sidebar:shadow-[0_4px_14px_-4px_rgba(229,106,74,0.7)]'
-            : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
+            : 'text-text-muted hover:text-text-main',
         )
       }
     >
@@ -149,6 +156,7 @@ function NavRow({
 export function AppShell() {
   const { logout } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [version, setVersion] = useState('')
   const [mediaOpen, setMediaOpen] = useState(false)
   const [enableTranslator, setEnableTranslator] = useState(false)
@@ -160,6 +168,46 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) !== 'open')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { copied, copy } = useCopyToClipboard()
+
+  /* One highlight surface hands itself from row to row, as Animate UI's does. */
+  const navRef = useRef<HTMLElement | null>(null)
+  const [hl, setHl] = useState({ top: 0, left: 0, width: 0, height: 0, on: false })
+
+  const measure = useCallback((el: HTMLElement | null) => {
+    const box = navRef.current
+    if (!el || !box) return
+    const b = box.getBoundingClientRect()
+    const r = el.getBoundingClientRect()
+    setHl({
+      top: r.top - b.top + box.scrollTop,
+      left: r.left - b.left,
+      width: r.width,
+      height: r.height,
+      on: true,
+    })
+  }, [])
+
+  const activeRow = useCallback(
+    () => navRef.current?.querySelector<HTMLElement>('[aria-current="page"]') ?? null,
+    [],
+  )
+
+  // Follow the active row: after navigation, while the rail resizes, and when a
+  // submenu folds (its rows move everything below them).
+  useEffect(() => {
+    const box = navRef.current
+    if (!box) return
+    const follow = () => measure(activeRow())
+    follow()
+    // The rail's CSS transition ends after this; ResizeObserver covers the frames.
+    const settle = window.setTimeout(follow, 300)
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(follow)
+    ro?.observe(box)
+    return () => {
+      window.clearTimeout(settle)
+      ro?.disconnect()
+    }
+  }, [pathname, collapsed, mediaOpen, measure, activeRow])
 
   useEffect(() => {
     api
@@ -248,9 +296,22 @@ export function AppShell() {
               aria-expanded={!collapsed}
               className="ml-auto inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main group-data-[collapsed=true]/sidebar:mx-auto"
             >
-              <span className="material-symbols-outlined block text-[17px] leading-none">
-                {collapsed ? 'left_panel_open' : 'left_panel_close'}
-              </span>
+              {/* Animated panel-left: the divider narrows as the rail closes. */}
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden
+                className="size-[17px]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+              >
+                <rect x="3" y="4" width="18" height="16" rx="2.5" />
+                <path
+                  d="M9.5 4.5v15"
+                  className={`transition-transform duration-[350ms] ease-[cubic-bezier(0.215,0.61,0.355,1)] motion-reduce:transition-none ${collapsed ? '-translate-x-[1.5px]' : ''}`}
+                />
+              </svg>
             </button>
           </div>
           {latestVersion && (
@@ -266,7 +327,7 @@ export function AppShell() {
               </div>
               <div className="-m-1 flex flex-col gap-1.5 rounded p-1 group-data-[collapsed=true]/sidebar:hidden">
                 <span className="text-xs font-semibold text-success">↑ New version available: v{latestVersion}</span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => setShowUpdate(true)}
                     className="cursor-pointer rounded bg-success px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:opacity-90"
@@ -276,11 +337,12 @@ export function AppShell() {
                   <button
                     onClick={() => copy(installCmd)}
                     title="Copy install command"
-                    className="min-w-0 flex-1 cursor-pointer text-left transition-opacity hover:opacity-80"
+                    aria-label="Copy install command"
+                    className="grid size-6 cursor-pointer place-items-center rounded border border-success/30 text-success/80 transition-colors hover:bg-success/10 hover:text-success"
                   >
-                    <code className="block truncate font-mono text-[10px] text-success/80">
-                      {copied ? '✓ copied!' : installCmd}
-                    </code>
+                    <span className="material-symbols-outlined text-[13px]">
+                      {copied ? 'check' : 'content_copy'}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -291,7 +353,29 @@ export function AppShell() {
         {/* Navigation */}
         {/* RailTip wraps rows in display:contents, which `space-y-*` can't space,
             so the gaps come from flex `gap` on each list instead. */}
-        <nav className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-2 group-data-[collapsed=true]/sidebar:px-2">
+        <nav
+          ref={navRef}
+          onPointerOver={(e) => {
+            const row = (e.target as HTMLElement).closest<HTMLElement>('[data-sidebar="menu-button"]')
+            if (row) measure(row)
+          }}
+          onPointerLeave={() => measure(activeRow())}
+          className="custom-scrollbar relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-2 group-data-[collapsed=true]/sidebar:px-2 [&>*]:shrink-0"
+        >
+          {/* The shared surface: it glides to the row under the pointer, and back
+              to the active row when the pointer leaves. Rows paint their content
+              above it (z-1), so only one highlight is ever visible. */}
+          <div
+            aria-hidden
+            className={`pointer-events-none absolute left-0 rounded-lg bg-surface-2 transition-[top,left,width,height,opacity] ${SIDEBAR_MS} ${SIDEBAR_EASE} motion-reduce:transition-none`}
+            style={{
+              top: hl.top,
+              left: hl.left,
+              width: hl.width,
+              height: hl.height,
+              opacity: hl.on ? 1 : 0,
+            }}
+          />
           <p className={cn('mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.09em] text-text-muted/60', HIDES)}>
             Gateway
           </p>
@@ -326,7 +410,8 @@ export function AppShell() {
             <button
               onClick={() => setMediaOpen((v) => !v)}
               aria-expanded={mediaOpen}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-1 transition-all group text-text-muted hover:bg-surface-2 hover:text-text-main group-data-[collapsed=true]/sidebar:hidden"
+              data-sidebar="menu-button"
+              className={`group relative z-[1] flex w-full shrink-0 items-center gap-3 overflow-hidden rounded-lg px-3 py-1 min-h-8 text-[13px] font-medium text-text-muted transition-[color,background-color] duration-200 hover:text-text-main group-data-[collapsed=true]/sidebar:hidden`}
             >
               <span className="material-symbols-outlined text-[18px] shrink-0">perm_media</span>
               <span className="flex-1 text-left text-[13px] font-medium">Media Providers</span>
@@ -340,14 +425,16 @@ export function AppShell() {
             <RailTip label={collapsed ? 'Media Providers' : undefined}>
               <NavLink
                 to={MEDIA_ITEMS[0].href}
+                data-sidebar="menu-button"
                 className={({ isActive }) =>
                   cn(
-                    'hidden items-center gap-3 rounded-lg px-3 py-1 transition-all group',
+                    ROW_BASE,
+                    'group hidden',
                     ROW_COLLAPSED,
                     'group-data-[collapsed=true]/sidebar:flex',
                     isActive
                       ? 'bg-primary/10 text-primary group-data-[collapsed=true]/sidebar:bg-primary group-data-[collapsed=true]/sidebar:text-white group-data-[collapsed=true]/sidebar:shadow-[0_4px_14px_-4px_rgba(229,106,74,0.7)]'
-                      : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
+                      : 'text-text-muted hover:text-text-main',
                   )
                 }
               >
@@ -369,9 +456,15 @@ export function AppShell() {
               </NavLink>
             </RailTip>
             {mediaOpen && !collapsed && (
-              <div className="flex flex-col gap-1.5 pl-4">
-                {MEDIA_ITEMS.map((item) => (
-                  <NavRow key={item.href} item={item} collapsed={collapsed} />
+              <div className="flex shrink-0 flex-col gap-1.5 pl-4">
+                {MEDIA_ITEMS.map((item, i) => (
+                  <div
+                    key={item.href}
+                    className="sidebar-sub-in"
+                    style={{ animationDelay: `${Math.min(i, 9) * 33}ms` }}
+                  >
+                    <NavRow item={item} collapsed={collapsed} />
+                  </div>
                 ))}
               </div>
             )}
@@ -390,13 +483,15 @@ export function AppShell() {
             <RailTip label={collapsed ? 'Settings' : undefined}>
               <NavLink
                 to="/dashboard/settings"
+                data-sidebar="menu-button"
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-1 transition-all group',
+                    ROW_BASE,
+                    'group',
                     ROW_COLLAPSED,
                     isActive
                       ? 'bg-primary/10 text-primary group-data-[collapsed=true]/sidebar:bg-primary group-data-[collapsed=true]/sidebar:text-white group-data-[collapsed=true]/sidebar:shadow-[0_4px_14px_-4px_rgba(229,106,74,0.7)]'
-                      : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
+                      : 'text-text-muted hover:text-text-main',
                   )
                 }
               >
