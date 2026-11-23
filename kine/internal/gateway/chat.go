@@ -114,7 +114,24 @@ func (g *Gateway) handleRaw(w http.ResponseWriter, r *http.Request, raw map[stri
 			return
 		}
 	}
-	g.dispatch(w, r, targets, raw, apiKey, clientFormat, stream, resolveSessionID(r.Header, raw, ""))
+	g.dispatchDone(w, r, targets, raw, apiKey, clientFormat, stream, resolveSessionID(r.Header, raw, ""))
+}
+
+// dispatchDone runs the solo dispatch path and writes the failure it returns.
+// Attempts only write on success, so a non-ok result still has a clean writer.
+func (g *Gateway) dispatchDone(w http.ResponseWriter, r *http.Request, targets []target, raw map[string]any, apiKey, clientFormat string, stream bool, sessionID string) {
+	res := g.dispatch(w, r, targets, raw, apiKey, clientFormat, stream, sessionID)
+	if res.ok {
+		return
+	}
+	status := res.status
+	if status >= 200 && status < 300 {
+		status = http.StatusServiceUnavailable
+	}
+	if status == 0 {
+		status = http.StatusServiceUnavailable
+	}
+	writeErr(w, status, firstNonEmpty(upstreamMessage(res.body), "No available credentials for this model"))
 }
 
 // resolveTargets maps a requested model to ordered provider/model targets.
@@ -193,8 +210,7 @@ func (g *Gateway) handleComboStrategy(w http.ResponseWriter, r *http.Request, co
 		if err != nil {
 			continue
 		}
-		rr := &statusRecorder{ResponseWriter: w}
-		result := g.dispatch(rr, r, targets, raw, apiKey, clientFormat, stream, sessionID)
+		result := g.dispatch(w, r, targets, raw, apiKey, clientFormat, stream, sessionID)
 		if result.ok {
 			return
 		}
@@ -218,26 +234,9 @@ type dispatchResult struct {
 	body   []byte
 }
 
-// statusRecorder captures the first status written so a failed combo member
-// can be retried without leaking partial output to the client.
-type statusRecorder struct {
-	http.ResponseWriter
-	wrote bool
-}
-
-func (s *statusRecorder) WriteHeader(code int) {
-	if !s.wrote {
-		s.wrote = true
-	}
-}
-func (s *statusRecorder) Write(b []byte) (int, error) {
-	s.wrote = true
-	return len(b), nil
-}
-func (s *statusRecorder) Flush() {}
-
 // dispatch runs one target through the account-fallback loop.
 func (g *Gateway) dispatch(w http.ResponseWriter, r *http.Request, targets []target, raw map[string]any, apiKey, clientFormat string, stream bool, sessionID string) dispatchResult {
+	var last dispatchResult
 	for _, t := range targets {
 		conns, err := g.store.ListConnections(t.Provider, true)
 		if err != nil || len(conns) == 0 {
@@ -275,10 +274,14 @@ func (g *Gateway) dispatch(w http.ResponseWriter, r *http.Request, targets []tar
 			if upErr.status == http.StatusUnauthorized || upErr.status == http.StatusForbidden ||
 				upErr.status == http.StatusTooManyRequests || upErr.status == http.StatusPaymentRequired {
 				g.markUnavailable(conn, upErr.status, upErr.message, t.Model)
+				last = dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
 				continue
 			}
 			return dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
 		}
+	}
+	if last.status != 0 {
+		return last
 	}
 	return dispatchResult{status: http.StatusServiceUnavailable,
 		body: []byte(`{"error":{"message":"No available credentials for this model","type":"service_unavailable"}}`)}
