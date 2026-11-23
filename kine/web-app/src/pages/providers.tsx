@@ -468,7 +468,7 @@ export function ProvidersPage() {
     <>
       <PageHeader
         title="Providers"
-        description={`${providers.length} providers in the registry · ${providers.filter((p) => p.connections > 0).length} connected`}
+        description={`${providers.length} providers in the registry · ${new Set(conns.map((c) => c.provider)).size} connected`}
         actions={
           <div className="flex items-center gap-2">
             <div className="relative">
