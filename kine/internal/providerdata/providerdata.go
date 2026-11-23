@@ -419,8 +419,18 @@ func (r *Registry) UpstreamModelID(provider, model string) string {
 	}
 	for _, m := range e.Models {
 		if m.ID == model && m.UpstreamModelID != "" {
-			return m.UpstreamModelID
+			return stripEffortSuffix(m.UpstreamModelID)
 		}
+	}
+	return model
+}
+
+// stripEffortSuffix removes the "(high)" / "(medium)" / "(low)" effort marker
+// a registry row carries. The tier is request metadata, not part of the wire
+// model id; Google answers a suffixed id with 404.
+func stripEffortSuffix(model string) string {
+	if i := strings.IndexByte(model, '('); i > 0 && strings.HasSuffix(model, ")") {
+		return strings.TrimSpace(model[:i])
 	}
 	return model
 }
