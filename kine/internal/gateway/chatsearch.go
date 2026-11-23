@@ -247,7 +247,7 @@ func (g *Gateway) searchViaChat(r *http.Request, provider string, p searchParams
 	if model == "" {
 		return http.StatusBadRequest, nil, fmt.Errorf("Provider %s has no default search model", provider)
 	}
-	conns, _ := g.store.ListConnections(provider, true)
+	conns := g.searchConnections(provider)
 	conn := g.pickConnection(conns, provider, map[string]bool{})
 	if conn == nil {
 		return http.StatusUnauthorized, nil, fmt.Errorf("No credentials for provider: %s", provider)

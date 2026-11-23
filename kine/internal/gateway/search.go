@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/keyzakyy-dev/kinerouter/internal/store"
 )
 
 type searchParams struct {
@@ -111,8 +113,27 @@ func (g *Gateway) handleSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 // searchOnce runs one dedicated search and normalizes its results.
-func (g *Gateway) searchOnce(r *http.Request, provider string, cfg map[string]any, p searchParams) (int, []byte, error) {
+// searchCredentialFallbacks lets a search provider reuse the key of the chat
+// provider it belongs to when no connection of its own exists.
+var searchCredentialFallbacks = map[string]string{
+	"ollama-search": "ollama",
+	"zai-search":    "glm",
+	"cline":         "clinepass",
+	"clinepass":     "cline",
+}
+
+func (g *Gateway) searchConnections(provider string) []*store.Connection {
 	conns, _ := g.store.ListConnections(provider, true)
+	if len(conns) == 0 {
+		if fallback := searchCredentialFallbacks[provider]; fallback != "" {
+			conns, _ = g.store.ListConnections(fallback, true)
+		}
+	}
+	return conns
+}
+
+func (g *Gateway) searchOnce(r *http.Request, provider string, cfg map[string]any, p searchParams) (int, []byte, error) {
+	conns := g.searchConnections(provider)
 	conn := g.pickConnection(conns, provider, map[string]bool{})
 	if conn != nil {
 		p.token = conn.Str("apiKey")
