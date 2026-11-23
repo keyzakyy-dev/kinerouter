@@ -715,9 +715,15 @@ export const api = {
     request<RequestDetailsPage>(`/api/usage/request-details?${new URLSearchParams(params)}`),
 
   version: () =>
-    request<{ version: string; latest: string; latestVersion: string; updateAvailable: boolean; hasUpdate: boolean }>(
-      '/api/version',
-    ),
+    request<{
+      version: string
+      latest: string
+      latestVersion: string
+      updateAvailable: boolean
+      hasUpdate: boolean
+      installMethod?: string
+      installCommand?: string
+    }>('/api/version'),
 
   // CLI tools: one settings endpoint per tool (see internal/gateway/clitools.go).
   // The body shape differs per tool; pages own it.

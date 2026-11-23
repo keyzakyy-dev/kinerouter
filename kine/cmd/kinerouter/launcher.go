@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -15,13 +17,20 @@ import (
 	"time"
 
 	"golang.org/x/term"
+
+	"github.com/keyzakyy-dev/kinerouter/internal/gateway"
 )
 
 // runLauncher is the interactive menu shown when `kinerouter` is started with
 // no arguments from a terminal: serve the gateway, then let the user pick the
-// web dashboard, the CLI setup, or the tray. A non-TTY start (Docker, systemd,
-// piped output) returns immediately and behaves exactly as before.
-func runLauncher(port int) {
+// web dashboard, the CLI setup, the tray, or an update. A non-TTY start
+// (Docker, systemd, piped output) returns immediately and behaves exactly as
+// before.
+//
+// ownsServer is false when another instance already holds the port; the menu
+// still works against it, but offers no tray/continue options that would
+// pretend this process owns the gateway.
+func runLauncher(port int, ownsServer bool) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		return
 	}
@@ -29,15 +38,30 @@ func runLauncher(port int) {
 		return
 	}
 
+	// Update check runs once, in parallel with the menu being read. Its 4s
+	// timeout is the only network wait here; an offline host just gets no item.
+	latest, hasUpdate := gateway.UpdateInfo()
+
 	base := "http://127.0.0.1:" + strconv.Itoa(port)
 	in := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Printf("\nKineRouter is running at %s\n", base)
+		if ownsServer {
+			fmt.Printf("\nKineRouter %s is running at %s\n", gateway.Version, base)
+		} else {
+			fmt.Printf("\nKineRouter is already running at %s\n", base)
+		}
 		fmt.Println("  1) Web UI  — open the dashboard in a browser")
 		fmt.Println("  2) CLI    — configure local coding tools")
-		fmt.Println("  3) Hide to tray — keep serving in the background")
-		fmt.Println("  4) Continue without the menu")
-		fmt.Print("\nChoose [1-4]: ")
+		if ownsServer {
+			fmt.Println("  3) Hide to tray — keep serving in the background")
+			fmt.Println("  4) Continue without the menu")
+		} else {
+			fmt.Println("  4) Exit")
+		}
+		if hasUpdate {
+			fmt.Printf("  5) Update to v%s (current v%s)\n", latest, gateway.Version)
+		}
+		fmt.Print("\nChoose [1-5]: ")
 
 		line, err := in.ReadString('\n')
 		if err != nil {
@@ -53,16 +77,68 @@ func runLauncher(port int) {
 		case "2":
 			runCLISetup(base, in)
 		case "3":
+			if !ownsServer {
+				continue
+			}
 			if startTray() {
 				ignoreHangup()
 				fmt.Printf("\nTray started. Gateway: %s\nClose this terminal anytime; Ctrl+C stops the gateway.\n", base)
 				return
 			}
 			pause(in)
+		case "5":
+			if !hasUpdate {
+				continue
+			}
+			showUpdate(latest, ownsServer, in)
 		default:
 			return
 		}
 	}
+}
+
+// showUpdate prints the one update command that matches how this binary was
+// installed, then exits so the installer can replace the running file. This is
+// 9Router's flow: never update underneath a live process.
+func showUpdate(latest string, ownsServer bool, in *bufio.Reader) {
+	fmt.Printf("\nUpdate v%s → v%s\n\nRun after this exits:\n\n  %s\n\n", gateway.Version, latest, gateway.InstallCommand())
+	if !ownsServer {
+		fmt.Println("Another KineRouter owns the port; stop it first (pkill -x kinerouter).")
+		pause(in)
+		return
+	}
+	stopSelf()
+}
+
+// stopSelf asks the main goroutine to shut the server down cleanly. On Windows
+// signal delivery to the own process fails, so fall back to an immediate exit.
+func stopSelf() {
+	if p, err := os.FindProcess(os.Getpid()); err == nil {
+		if err := p.Signal(syscall.SIGTERM); err == nil {
+			time.Sleep(time.Second)
+			return
+		}
+	}
+	os.Exit(0)
+}
+
+// runningVersion answers which KineRouter is on port, or "" when the port is
+// free or held by something else. Used to attach to an existing instance
+// instead of dying with "bind: address already in use".
+func runningVersion(port int) string {
+	client := &http.Client{Timeout: 600 * time.Millisecond}
+	resp, err := client.Get("http://127.0.0.1:" + strconv.Itoa(port) + "/api/version")
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Version string `json:"version"`
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&out) != nil {
+		return ""
+	}
+	return out.Version
 }
 
 // waitPort polls until the gateway accepts connections so the menu never opens
@@ -118,7 +194,7 @@ func startTray() bool {
 	bin := filepath.Join(filepath.Dir(self), name)
 	if _, err := os.Stat(bin); err != nil {
 		fmt.Printf("tray: %s not found.\n", bin)
-		fmt.Println("The tray ships with Windows releases only; elsewhere build it beside this binary:")
+		fmt.Println("npm and release installs include it; from source, build it beside this binary:")
 		fmt.Println("  go build -tags tray -o kinerouter-tray ./cmd/kinerouter-tray")
 		return false
 	}

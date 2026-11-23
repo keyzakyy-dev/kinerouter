@@ -36,6 +36,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	// A second `kinerouter` must not die with "bind: address already in use".
+	// If the port is already serving KineRouter, attach the launcher to it;
+	// anything else is a genuine conflict for ListenAndServe to report.
+	if v := runningVersion(cfg.Port); v != "" {
+		log.Printf("KineRouter %s is already running on port %d", v, cfg.Port)
+		runLauncher(cfg.Port, false)
+		return
+	}
 	st, err := store.Open(cfg.DBPath())
 	if err != nil {
 		log.Fatalf("database: %v", err)
@@ -77,7 +85,7 @@ func main() {
 
 	// Interactive launcher: Web UI / CLI / tray. Skipped when stdin is not a
 	// terminal, so Docker and systemd keep the old behaviour.
-	go runLauncher(cfg.Port)
+	go runLauncher(cfg.Port, true)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)

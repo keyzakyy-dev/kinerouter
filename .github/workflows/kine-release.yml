@@ -125,6 +125,69 @@ jobs:
             kine/dist/LICENSE
             kine/dist/NOTICE
 
+  tray:
+    name: Tray ${{ matrix.os }}/${{ matrix.arch }}
+    needs: binaries
+    # cgo + GTK cannot be cross-compiled from one runner, so each platform
+    # links natively. Serialised because every job rewrites the release's
+    # checksums.txt; parallel writers would drop each other's entries.
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - { os: ubuntu-latest, goos: linux, arch: amd64 }
+          - { os: ubuntu-24.04-arm, goos: linux, arch: arm64 }
+          - { os: macos-15-intel, goos: darwin, arch: amd64 }
+          - { os: macos-15, goos: darwin, arch: arm64 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: kine/go.sum
+
+      - name: Linux GUI deps
+        if: matrix.goos == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev
+
+      - name: Build
+        working-directory: kine
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          version="${TAG#kine-v}"
+          asset="kinerouter-tray_${version}_${GOOS}_${GOARCH}"
+          mkdir -p dist
+          CGO_ENABLED=1 go build -tags tray -trimpath -ldflags "-s -w" \
+            -o "dist/$asset" ./cmd/kinerouter-tray
+          echo "asset=$asset" >> "$GITHUB_ENV"
+          echo "version=$version" >> "$GITHUB_ENV"
+          echo "tag=$TAG" >> "$GITHUB_ENV"
+
+      # The release and its checksums.txt are created by the binaries job.
+      # Append this artifact's hash rather than uploading a fresh file.
+      - name: Publish tray and merge checksums
+        working-directory: kine
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "$tag" --pattern checksums.txt --dir dist --clobber
+          sum=$(sha256sum "dist/$asset" | cut -d' ' -f1)
+          grep -v "[[:space:]]$asset\$" dist/checksums.txt > dist/checksums.new || true
+          echo "$sum  $asset" >> dist/checksums.new
+          mv dist/checksums.new dist/checksums.txt
+          gh release upload "$tag" "dist/$asset" dist/checksums.txt --clobber
+
   image:
     name: Image
     needs: test

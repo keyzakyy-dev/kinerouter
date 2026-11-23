@@ -110,6 +110,33 @@ func atoiSafe(s string) int {
 	return n
 }
 
+// UpdateInfo returns the newest release and whether it is newer than this
+// build. One call, one network attempt, shared by the launcher and the API.
+func UpdateInfo() (string, bool) {
+	latest := latestVersionCached()
+	return latest, latest != "" && compareSemver(latest, Version) > 0
+}
+
+// InstallMethod names the way this binary was delivered. The npm shim exports
+// KINEROUTER_INSTALL=npm; every other delivery (release binary, install.sh,
+// Docker) is "script". Update advice must match it: telling an npm user to run
+// the install script leaves two binaries on PATH, which is exactly the drift
+// the single-owner rule avoids.
+func InstallMethod() string {
+	if os.Getenv("KINEROUTER_INSTALL") == "npm" {
+		return "npm"
+	}
+	return "script"
+}
+
+// InstallCommand is the one-liner that updates an existing install.
+func InstallCommand() string {
+	if InstallMethod() == "npm" {
+		return "npm i -g kinerouter@latest --prefer-online"
+	}
+	return "curl -fsSL https://raw.githubusercontent.com/keyzakyy-dev/kinerouter/main/kine/install.sh | sh"
+}
+
 func (g *Gateway) handleVersion(w http.ResponseWriter, r *http.Request) {
 	latest := latestVersionCached()
 	hasUpdate := latest != "" && compareSemver(latest, Version) > 0
@@ -122,5 +149,7 @@ func (g *Gateway) handleVersion(w http.ResponseWriter, r *http.Request) {
 		"currentVersion":  Version,
 		"latestVersion":   latest,
 		"hasUpdate":       hasUpdate,
+		"installMethod":   InstallMethod(),
+		"installCommand":  InstallCommand(),
 	})
 }

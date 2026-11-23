@@ -301,16 +301,24 @@ tools               registry extractor, benchmark client
 ## Releases and updates
 
 KineRouter versions are tagged `kine-vX.Y.Z` (the `kine-` prefix keeps them
-distinct from the `vX.Y.Z` tags this repository already carries). A tag builds cross-compiled binaries for linux/darwin/
-windows on amd64+arm64, publishes them with a `checksums.txt`, and pushes a
-multi-arch image to `ghcr.io/<owner>/kinerouter`. `/api/version` reads the
-`kine-*` GitHub release, which is what the dashboard's "Update now" button
-offers; the version is stamped into the binary at link time.
+distinct from the `vX.Y.Z` tags this repository already carries). A tag builds
+cross-compiled gateway binaries for linux/darwin/windows on amd64+arm64, builds
+the tray companion natively on each platform (cgo + GTK on Linux), publishes
+everything with one `checksums.txt`, and pushes a multi-arch image to
+`ghcr.io/<owner>/kinerouter`. `/api/version` reads the `kine-*` GitHub release.
+
+Install and update follow one rule: **one install path per machine**.
+
+- `npm i -g kinerouter` is the canonical desktop path. The binaries live in
+  `~/.kinerouter/runtime`, so updating the npm package never replaces a running
+  file in place, and a skipped postinstall self-heals on first run.
+- `install.sh` / `install.ps1` are for machines without Node.js.
+- The launcher's "Update" entry prints the command matching how this copy was
+  installed, then stops the server before the file is replaced.
 
 `go install` is not a supported install path: release tags are `kine-vX.Y.Z`,
 which Go does not accept as module versions, and `web/dist` holds only a
-placeholder in git, so a module build would serve no dashboard. Use a release
-binary, `install.sh`, npm or Docker.
+placeholder in git, so a module build would serve no dashboard.
 
 ## License
 

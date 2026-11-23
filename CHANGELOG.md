@@ -5,6 +5,36 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+## [0.1.4] — 2026-11-23
+
+### Changed
+
+- **Install and update follow the 9Router layout.** The npm shim downloads the
+  gateway and tray into `~/.kinerouter/runtime`
+  (`%LOCALAPPDATA%\kinerouter\runtime` on Windows) instead of the package
+  directory, so a global update can replace files while the gateway runs and no
+  second PATH entry can shadow the binary. A skipped postinstall now self-heals
+  on first run instead of asking for a reinstall.
+- **Tray is released for every desktop platform.** CI builds it natively on
+  linux/amd64, linux/arm64, darwin/amd64 and darwin/arm64 (cgo + GTK on Linux)
+  and appends their hashes to the release's `checksums.txt`. npm, `install.sh`
+  and `install.ps1` install it beside the gateway, so "Hide to tray" works after
+  a normal install instead of requiring a local `go build -tags tray`.
+
+### Added
+
+- **Launcher update entry.** When a newer release exists, the menu offers
+  `Update to vX.Y.Z`, prints the command for the install path this copy came
+  from (`npm i -g kinerouter@latest --prefer-online` vs the install script), and
+  stops the server before the file is replaced.
+- **Second launch attaches instead of failing.** If the port already serves
+  KineRouter, `kinerouter` opens the menu against the running instance and
+  exits; only a non-KineRouter port conflict still reports a bind error.
+- **Install paths warn about duplicates.** `install.sh` and `install.ps1` detect
+  another `kinerouter` on `PATH` and tell the user to remove it, keeping one
+  owner per command name. The dashboard's update command now comes from
+  `/api/version` (`installMethod` / `installCommand`) for the same reason.
+
 ## [0.1.3] — 2026-11-23
 
 ### Added

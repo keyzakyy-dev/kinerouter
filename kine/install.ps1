@@ -99,6 +99,15 @@ try {
 
     $dir = if ($env:KINEROUTER_INSTALL_DIR) { $env:KINEROUTER_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'KineRouter\bin' }
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
+
+    # One owner per command name: an npm-installed kinerouter earlier on PATH
+    # would shadow this one and update on its own schedule.
+    $existing = Get-Command kinerouter -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($existing -and $existing.Source -ne (Join-Path $dir 'kinerouter.exe')) {
+        Write-Say "warning: $($existing.Source) also provides kinerouter and may win by PATH order"
+        Write-Say "         uninstall it (npm rm -g kinerouter) so updates cannot drift apart"
+    }
+
     $dest = Join-Path $dir 'kinerouter.exe'
     Move-Item -Path $assetPath -Destination $dest -Force
 

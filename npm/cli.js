@@ -1,45 +1,40 @@
 #!/usr/bin/env node
 // Thin shim: `kinerouter` anywhere on PATH runs the downloaded Go binary with
 // the same argv, stdio and exit code. Nothing else lives here — flags, help and
-// subcommands (connect/show/mitm-server) belong to the binary.
+// subcommands (connect/show/tray) belong to the binary.
+//
+// Like 9Router, the shim self-heals: if npm 11 skipped the postinstall script
+// and the binary is missing, it runs the download once instead of asking the
+// user to reinstall.
 "use strict";
 
-const fs = require("fs");
-const path = require("path");
 const { spawnSync } = require("child_process");
+const { ensureGateway } = require("./runtime");
 
-// Must match install.js exactly, including the KINEROUTER_VERSION override:
-// otherwise a pinned install lands one filename and this looks for another.
-const VERSION = (process.env.KINEROUTER_VERSION || require("./package.json").version).replace(/^v/, "");
-const ext = process.platform === "win32" ? ".exe" : "";
-const BIN = path.join(
-  __dirname,
-  "bin",
-  `kinerouter_${VERSION}_${platformName()}_${archName()}${ext}`,
-);
-
-function platformName() {
-  return { darwin: "darwin", linux: "linux", win32: "windows" }[process.platform] || process.platform;
+let target;
+try {
+  target = ensureGateway();
+} catch (err) {
+  console.error(`[kinerouter] ${err.message}`);
+  console.error("[kinerouter] see https://github.com/keyzakyy-dev/kinerouter/releases");
+  process.exit(1);
 }
 
-function archName() {
-  return { x64: "amd64", arm64: "arm64" }[process.arch] || process.arch;
-}
-
-const target = process.env.KINEROUTER_BIN || BIN;
-
-if (!fs.existsSync(target)) {
+if (!require("fs").existsSync(target)) {
   console.error(
     `[kinerouter] binary not found at ${target}\n` +
-      `[kinerouter] the postinstall download was skipped or failed. Either reinstall:\n` +
-      `  npm i -g kinerouter\n` +
-      `or fetch a release bundle from https://github.com/keyzakyy-dev/kinerouter/releases\n` +
-      `and set KINEROUTER_BIN=/path/to/kinerouter`,
+      `[kinerouter] reinstall with: npm i -g kinerouter\n` +
+      `or set KINEROUTER_BIN=/path/to/kinerouter`,
   );
   process.exit(1);
 }
 
-const res = spawnSync(target, process.argv.slice(2), { stdio: "inherit" });
+// Tells the gateway it was installed through npm, so its own update advice uses
+// `npm i -g` instead of the install script. Otherwise both suggestions would be
+// followed by some users and the machine ends up with two install paths.
+const env = { ...process.env, KINEROUTER_INSTALL: "npm" };
+
+const res = spawnSync(target, process.argv.slice(2), { stdio: "inherit", env });
 if (res.error) {
   console.error(`[kinerouter] failed to start ${target}: ${res.error.message}`);
   process.exit(1);

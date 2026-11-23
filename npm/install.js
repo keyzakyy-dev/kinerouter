@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Downloads the matching release binary into ./bin so `npm i -g kinerouter`
-// yields a working `kinerouter` command. The Go binary is the real program:
-// this package is only a delivery shim, and `cli.js` just execs it.
+// Downloads the release binaries into the user data dir so `npm i -g
+// kinerouter` yields a working `kinerouter` command. The Go binary is the real
+// program: this package is only a delivery shim, and `cli.js` just execs it.
 //
-// Verification: the release publishes checksums.txt next to the binaries; the
+// Verification: the release publishes checksums.txt next to the binaries; each
 // downloaded file must match the sha256 for its own name. A missing or
-// mismatched entry aborts the install rather than running unverified bytes.
+// mismatched gateway entry aborts the install rather than running unverified
+// bytes; a missing tray is a warning only, because older releases predate it.
 //
 // Env:
 //   KINEROUTER_VERSION      pin a tag (default: the package's own version)
@@ -16,17 +17,17 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const https = require("https");
+const { VERSION, PLATFORM, ARCH, EXT, runtimeDir, gatewayPath, trayPath } = require("./runtime");
 
-const VERSION = (process.env.KINEROUTER_VERSION || require("./package.json").version).replace(/^v/, "");
 const REPO = "keyzakyy-dev/kinerouter";
-const BIN_DIR = path.join(__dirname, "bin");
-
-const PLATFORM = { darwin: "darwin", linux: "linux", win32: "windows" }[process.platform];
-const ARCH = { x64: "amd64", arm64: "arm64" }[process.arch];
 
 function assetName() {
-  const ext = process.platform === "win32" ? ".exe" : "";
-  return `kinerouter_${VERSION}_${PLATFORM}_${ARCH}${ext}`;
+  return `kinerouter_${VERSION}_${PLATFORM}_${ARCH}${EXT}`;
+}
+
+function trayAssetName() {
+  // Windows is the only platform that appends .exe to the asset name.
+  return `kinerouter-tray_${VERSION}_${PLATFORM}_${ARCH}${EXT}`;
 }
 
 function skip(reason) {
@@ -70,6 +71,15 @@ function expectedSha(checksums, name) {
   return "";
 }
 
+async function download(base, name, want, dest) {
+  const buf = await get(`${base}/${name}`);
+  const got = crypto.createHash("sha256").update(buf).digest("hex");
+  if (got !== want) throw new Error(`sha256 mismatch for ${name}: got ${got}, want ${want}`);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, buf, { mode: 0o755 });
+  console.log(`[kinerouter] installed ${name} -> ${dest}`);
+}
+
 async function main() {
   if (process.env.KINEROUTER_SKIP_DOWNLOAD === "1") return skip("KINEROUTER_SKIP_DOWNLOAD=1");
   if (!PLATFORM || !ARCH) return skip(`unsupported platform ${process.platform}/${process.arch}`);
@@ -87,35 +97,21 @@ async function main() {
   const want = expectedSha(checksums, name);
   if (!want) throw new Error(`checksums.txt has no entry for ${name}`);
 
-  const buf = await get(`${base}/${name}`);
-  const got = crypto.createHash("sha256").update(buf).digest("hex");
-  if (got !== want) throw new Error(`sha256 mismatch for ${name}: got ${got}, want ${want}`);
+  await download(base, name, want, gatewayPath());
 
-  fs.mkdirSync(BIN_DIR, { recursive: true });
-  const dest = path.join(BIN_DIR, name);
-  fs.writeFileSync(dest, buf, { mode: 0o755 });
-  console.log(`[kinerouter] installed ${name} (sha256 verified)`);
-
-  // `kinerouter tray` execs a sibling tray binary. Only the Windows one is
-  // published (systray is pure Go there); elsewhere the user builds it with
-  // `-tags tray`. A missing asset is not an install failure — older releases
-  // predate the tray.
-  if (process.platform === "win32") {
-    const trayName = `kinerouter-tray_${VERSION}_windows_${ARCH}.exe`;
-    const traySha = expectedSha(checksums, trayName);
-    if (!traySha) {
-      console.warn(`[kinerouter] no ${trayName} in checksums.txt; the tray is unavailable`);
-      return;
-    }
-    try {
-      const trayBuf = await get(`${base}/${trayName}`);
-      const trayGot = crypto.createHash("sha256").update(trayBuf).digest("hex");
-      if (trayGot !== traySha) throw new Error(`sha256 mismatch for ${trayName}`);
-      fs.writeFileSync(path.join(BIN_DIR, "kinerouter-tray.exe"), trayBuf, { mode: 0o755 });
-      console.log(`[kinerouter] installed ${trayName} (sha256 verified)`);
-    } catch (err) {
-      console.warn(`[kinerouter] tray not installed: ${err.message}`);
-    }
+  // Same runtime dir as the gateway, so `kinerouter tray` finds it as a
+  // sibling. Linux/macOS trays are built with cgo in CI; a release that has no
+  // asset for this platform still installs, just without the tray.
+  const trayName = trayAssetName();
+  const traySha = expectedSha(checksums, trayName);
+  if (!traySha) {
+    console.warn(`[kinerouter] release has no ${trayName}; tray unavailable`);
+    return;
+  }
+  try {
+    await download(base, trayName, traySha, trayPath());
+  } catch (err) {
+    console.warn(`[kinerouter] tray not installed: ${err.message}`);
   }
 }
 

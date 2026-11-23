@@ -121,22 +121,22 @@ kill $pid
 
 ## ⚡ Quick Start
 
-### Prebuilt binary
+### npm (recommended)
 
 ```bash
-VERSION=0.1.1   # newest kine-vX.Y.Z from the releases page
-base=https://github.com/keyzakyy-dev/kinerouter/releases/download/kine-v$VERSION
-curl -fLO "$base/kinerouter_${VERSION}_linux_amd64"
-curl -fLO "$base/checksums.txt"
-sha256sum -c --ignore-missing checksums.txt
-chmod +x "kinerouter_${VERSION}_linux_amd64"
-sudo mv "kinerouter_${VERSION}_linux_amd64" /usr/local/bin/kinerouter
+npm i -g kinerouter
 INITIAL_PASSWORD='choose-something' kinerouter
 ```
 
-Swap `linux_amd64` for `linux_arm64`, `darwin_amd64` or `darwin_arm64`.
+The postinstall step downloads the gateway **and the tray companion** into
+`~/.kinerouter/runtime` (`%LOCALAPPDATA%\kinerouter\runtime` on Windows) and
+verifies both against the release's `checksums.txt`. npm 11+ blocks postinstall
+scripts by default; if the download was skipped, the `kinerouter` shim fetches
+it once on first run instead of failing.
 
 ### Install script
+
+Machines without Node.js:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/keyzakyy-dev/kinerouter/main/kine/install.sh | sh
@@ -148,27 +148,23 @@ Windows:
 irm https://raw.githubusercontent.com/keyzakyy-dev/kinerouter/main/kine/install.ps1 | iex
 ```
 
-The Windows installer, npm shim and `.exe` archive also place
-`kinerouter-tray.exe` beside the gateway. Linux/macOS releases do not ship the
-tray (it needs cgo + GTK); build it locally:
+### Prebuilt binary
 
 ```bash
-cd kine && go build -tags tray -o kinerouter-tray ./cmd/kinerouter-tray
-```
-
-### npm
-
-```bash
-npm i -g kinerouter
+VERSION=0.1.4   # newest kine-vX.Y.Z from the releases page
+base=https://github.com/keyzakyy-dev/kinerouter/releases/download/kine-v$VERSION
+curl -fLO "$base/kinerouter_${VERSION}_linux_amd64"
+curl -fLO "$base/kinerouter-tray_${VERSION}_linux_amd64"
+curl -fLO "$base/checksums.txt"
+sha256sum -c --ignore-missing checksums.txt
+chmod +x kinerouter_${VERSION}_linux_amd64 kinerouter-tray_${VERSION}_linux_amd64
+sudo install -m755 kinerouter_${VERSION}_linux_amd64 /usr/local/bin/kinerouter
+sudo install -m755 kinerouter-tray_${VERSION}_linux_amd64 /usr/local/bin/kinerouter-tray
 INITIAL_PASSWORD='choose-something' kinerouter
 ```
 
-npm 11+ blocks postinstall scripts by default; if the binary download is
-skipped, allow it once:
-
-```bash
-npm i -g --allow-scripts=kinerouter kinerouter
-```
+Swap `linux_amd64` for `linux_arm64`, `darwin_amd64` or `darwin_arm64`.
+The tray needs GTK3 + AppIndicator on Linux and nothing extra on macOS/Windows.
 
 ### Docker
 
@@ -176,11 +172,11 @@ npm i -g --allow-scripts=kinerouter kinerouter
 docker run -d --name kinerouter -p 20128:20128 \
   -e INITIAL_PASSWORD='choose-something' \
   -v kinerouter-data:/data \
-  ghcr.io/keyzakyy-dev/kinerouter:0.1.1
+  ghcr.io/keyzakyy-dev/kinerouter:0.1.4
 ```
 
 The release workflow publishes `X.Y.Z` and `X.Y` tags; pull the version you
-want explicitly.
+want explicitly. Docker has no tray and no launcher menu.
 
 ### From source
 
@@ -188,8 +184,11 @@ want explicitly.
 git clone https://github.com/keyzakyy-dev/kinerouter.git
 cd kinerouter/kine/web-app && npm ci && npm run build && cd ..
 go build -o kinerouter ./cmd/kinerouter
+go build -tags tray -o kinerouter-tray ./cmd/kinerouter-tray
 ./kinerouter
 ```
+
+### Run
 
 Starting `kinerouter` with no arguments from a terminal opens a launcher menu:
 
@@ -198,9 +197,23 @@ Starting `kinerouter` with no arguments from a terminal opens a launcher menu:
   2) CLI    — configure local coding tools
   3) Hide to tray — keep serving in the background
   4) Continue without the menu
+  5) Update to vX.Y.Z (current vA.B.C)   # only when a newer release exists
 ```
 
-Non-interactive starts (Docker, systemd, piped output) skip the menu.
+Option 5 prints the update command for **the way this copy was installed**
+(`npm i -g kinerouter@latest --prefer-online` or the install script) and stops
+the server first, because Windows locks a running `.exe` and every platform
+would otherwise keep serving the old binary.
+
+A second `kinerouter` on a busy port attaches to the running instance instead of
+failing with `bind: address already in use`. Non-interactive starts (Docker,
+systemd, piped output) skip the menu.
+
+**One install path per machine.** The npm shim, the install scripts and a manual
+release copy all provide the same command name. Whichever comes first on
+`PATH` wins, and the others update on their own schedule. The installers warn
+when they see a second copy; remove it (`npm rm -g kinerouter`, or delete the
+stray binary) before updating.
 
 Dashboard: `http://localhost:20128/dashboard` · API: `http://localhost:20128/v1`
 

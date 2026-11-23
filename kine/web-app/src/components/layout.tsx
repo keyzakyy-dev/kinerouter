@@ -7,9 +7,8 @@ import { useAuth } from '@/lib/auth'
 import { Modal } from '@/components/modal'
 import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 
-/** KineRouter is not on npm; the update command installs the Go binary. */
-const INSTALL_CMD =
-  'curl -fsSL https://raw.githubusercontent.com/keyzakyy-dev/kinerouter/main/kine/install.sh | sh'
+/** Fallback until /api/version reports how this binary was installed. */
+const INSTALL_CMD = 'npm i -g kinerouter@latest --prefer-online'
 const SHUTDOWN_COUNTDOWN_SEC = 3
 
 /** Collapsed/expanded state survives reloads; local only, nothing is sent to the gateway. */
@@ -154,6 +153,7 @@ export function AppShell() {
   const [mediaOpen, setMediaOpen] = useState(false)
   const [enableTranslator, setEnableTranslator] = useState(false)
   const [latestVersion, setLatestVersion] = useState('')
+  const [installCmd, setInstallCmd] = useState(INSTALL_CMD)
   const [showUpdate, setShowUpdate] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const [disconnected, setDisconnected] = useState(false)
@@ -166,6 +166,7 @@ export function AppShell() {
       .version()
       .then((v) => {
         setVersion(v.version)
+        if (v.installCommand) setInstallCmd(v.installCommand)
         if (v.hasUpdate) setLatestVersion(v.latestVersion || v.latest)
       })
       .catch(() => {})
@@ -198,8 +199,8 @@ export function AppShell() {
   // Copy the install command, count down, then stop the server so the user can
   // upgrade the binary. Same one-way flow as the reference sidebar.
   const copyAndShutdown = () => {
-    copy(INSTALL_CMD)
-    navigator.clipboard?.writeText(INSTALL_CMD).catch(() => {})
+    copy(installCmd)
+    navigator.clipboard?.writeText(installCmd).catch(() => {})
     let remaining = SHUTDOWN_COUNTDOWN_SEC
     setCountdown(remaining)
     setDisconnected(true)
@@ -275,12 +276,12 @@ export function AppShell() {
                   Update now
                 </button>
                 <button
-                  onClick={() => copy(INSTALL_CMD)}
+                  onClick={() => copy(installCmd)}
                   title="Copy install command"
                   className="min-w-0 flex-1 cursor-pointer text-left transition-opacity hover:opacity-80"
                 >
                   <code className="block truncate font-mono text-[10px] text-success/80">
-                    {copied ? '✓ copied!' : INSTALL_CMD}
+                    {copied ? '✓ copied!' : installCmd}
                   </code>
                 </button>
               </div>
@@ -398,7 +399,7 @@ export function AppShell() {
             Copy the install command, then run it in a terminal. The server stops so the binary can be replaced.
           </p>
           <code className="break-all rounded-lg border border-border bg-surface-2 p-3 font-mono text-xs text-text-main">
-            {INSTALL_CMD}
+            {installCmd}
           </code>
           <div className="flex items-center justify-end gap-2">
             <button

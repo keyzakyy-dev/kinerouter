@@ -117,14 +117,25 @@ fi
 mkdir -p "$dir" || die "cannot create $dir"
 [ -w "$dir" ] || die "$dir is not writable; set KINEROUTER_INSTALL_DIR or re-run with appropriate permissions"
 
+# One owner per command name. A second kinerouter earlier on PATH (usually the
+# npm shim) would shadow this install and update on its own schedule, which is
+# the version drift this warning exists to stop.
+existing=$(command -v kinerouter 2>/dev/null || true)
+case "$existing" in
+	"" | "$dir/kinerouter") ;;
+	*)
+		say "warning: $existing also provides kinerouter and may win by PATH order"
+		say "         remove it (npm rm -g kinerouter) so updates cannot drift apart"
+		;;
+esac
+
 mv "$tmp/$asset" "$dir/kinerouter"
 chmod 0755 "$dir/kinerouter"
 
 say "installed $dir/kinerouter ($tag, sha256 verified)"
 
-# Optional companion. Releases publish it for Windows only today; if a unix
-# tray asset ever appears, install it beside the gateway so `kinerouter tray`
-# finds it. Missing asset is not an install failure.
+# Companion binary, delivered beside the gateway so `kinerouter tray` finds it
+# as a sibling. Missing asset is not an install failure.
 tray="kinerouter-tray_${version}_${os}_${arch}"
 traywant=$(grep "[[:space:]]\(\./\)\{0,1\}${tray}\$" "$tmp/checksums.txt" | head -n 1 | cut -d' ' -f1 || true)
 if [ -n "$traywant" ] && fetch "$base/$tray" "$tmp/$tray" 2>/dev/null; then
