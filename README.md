@@ -151,7 +151,7 @@ irm https://raw.githubusercontent.com/keyzakyy-dev/kinerouter/main/kine/install.
 ### Prebuilt binary
 
 ```bash
-VERSION=0.1.4   # newest kine-vX.Y.Z from the releases page
+VERSION=0.1.5   # newest kine-vX.Y.Z from the releases page
 base=https://github.com/keyzakyy-dev/kinerouter/releases/download/kine-v$VERSION
 curl -fLO "$base/kinerouter_${VERSION}_linux_amd64"
 curl -fLO "$base/kinerouter-tray_${VERSION}_linux_amd64"
@@ -172,11 +172,12 @@ The tray needs GTK3 + AppIndicator on Linux and nothing extra on macOS/Windows.
 docker run -d --name kinerouter -p 20128:20128 \
   -e INITIAL_PASSWORD='choose-something' \
   -v kinerouter-data:/data \
-  ghcr.io/keyzakyy-dev/kinerouter:0.1.4
+  ghcr.io/keyzakyy-dev/kinerouter:0.1.5
 ```
 
-The release workflow publishes `X.Y.Z` and `X.Y` tags; pull the version you
-want explicitly. Docker has no tray and no launcher menu.
+The release workflow publishes `X.Y.Z`, `X.Y` and `latest` tags. Docker has no
+tray and no launcher menu; its update command is
+`docker pull ghcr.io/keyzakyy-dev/kinerouter:latest && docker restart kinerouter`.
 
 ### From source
 

@@ -117,17 +117,27 @@ fi
 mkdir -p "$dir" || die "cannot create $dir"
 [ -w "$dir" ] || die "$dir is not writable; set KINEROUTER_INSTALL_DIR or re-run with appropriate permissions"
 
-# One owner per command name. A second kinerouter earlier on PATH (usually the
-# npm shim) would shadow this install and update on its own schedule, which is
-# the version drift this warning exists to stop.
+# One owner per command name. Warn only when the other copy would actually win
+# by PATH order — an older copy sitting later is ignored, and saying otherwise
+# sends curl users to uninstall npm for no reason.
 existing=$(command -v kinerouter 2>/dev/null || true)
-case "$existing" in
-	"" | "$dir/kinerouter") ;;
-	*)
-		say "warning: $existing also provides kinerouter and may win by PATH order"
-		say "         remove it (npm rm -g kinerouter) so updates cannot drift apart"
-		;;
-esac
+if [ -n "$existing" ] && [ "$existing" != "$dir/kinerouter" ]; then
+	other=$(dirname "$existing")
+	earlier=false
+	old_ifs=$IFS
+	IFS=:
+	for p in $PATH; do
+		[ "$p" = "$other" ] && { earlier=true; break; }
+		[ "$p" = "$dir" ] && break
+	done
+	IFS=$old_ifs
+	if [ "$earlier" = true ]; then
+		say "warning: $existing comes first on PATH and will shadow this install"
+		say "         remove it (npm rm -g kinerouter) or put $dir before $other"
+	else
+		say "note: another copy exists at $existing; it is later on PATH and ignored"
+	fi
+fi
 
 mv "$tmp/$asset" "$dir/kinerouter"
 chmod 0755 "$dir/kinerouter"

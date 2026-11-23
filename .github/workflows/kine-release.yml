@@ -214,6 +214,7 @@ jobs:
           tags: |
             type=match,pattern=kine-v(.*),group=1
             type=match,pattern=kine-v(\d+\.\d+),group=1
+            type=raw,value=latest
       - name: Version
         env:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}

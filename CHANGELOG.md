@@ -5,6 +5,23 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+## [0.1.5] — 2026-11-23
+
+### Fixed
+
+- **Update advice follows the real install path.** `/api/version` now decides
+  npm vs script vs Docker from the binary's own location
+  (`node_modules/kinerouter`, `.../kinerouter/runtime`, `/.dockerenv`) instead
+  of a runtime environment variable. A curl install no longer gets told to run
+  `npm i -g`, which was how a second copy appeared on PATH. The launcher and the
+  dashboard both read this value.
+- **Install-script warning only fires when it matters.** `install.sh` compares
+  PATH order before complaining: a stray copy that is later on PATH is reported
+  as ignored, not as a reason to uninstall something.
+- **Docker update path.** Images now also publish the `latest` tag, and a
+  container's update command is
+  `docker pull ghcr.io/keyzakyy-dev/kinerouter:latest && docker restart kinerouter`.
+
 ## [0.1.4] — 2026-11-23
 
 ### Changed

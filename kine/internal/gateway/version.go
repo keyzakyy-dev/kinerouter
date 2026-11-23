@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -117,22 +118,44 @@ func UpdateInfo() (string, bool) {
 	return latest, latest != "" && compareSemver(latest, Version) > 0
 }
 
-// InstallMethod names the way this binary was delivered. The npm shim exports
-// KINEROUTER_INSTALL=npm; every other delivery (release binary, install.sh,
-// Docker) is "script". Update advice must match it: telling an npm user to run
-// the install script leaves two binaries on PATH, which is exactly the drift
-// the single-owner rule avoids.
+// InstallMethod names the way this binary was delivered, decided from the
+// binary's own path so it survives a restart without the shim's environment:
+//
+//   - npm keeps the binary under node_modules/kinerouter or the runtime dir
+//     (~/.kinerouter/runtime, %LOCALAPPDATA%\kinerouter\runtime)
+//   - a script/manual install puts it in a bin directory
+//   - Docker mounts the binary at /kinerouter, next to /.dockerenv
+//
+// Update advice must match the real install path: telling a curl user to run
+// npm leaves two binaries on PATH, which is exactly the drift the single-owner
+// rule avoids. KINEROUTER_INSTALL remains an explicit override for layouts
+// this cannot classify.
 func InstallMethod() string {
-	if os.Getenv("KINEROUTER_INSTALL") == "npm" {
-		return "npm"
+	if v := os.Getenv("KINEROUTER_INSTALL"); v != "" {
+		return v
+	}
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return "docker"
+	}
+	if exe, err := os.Executable(); err == nil {
+		p := strings.ToLower(filepath.ToSlash(exe))
+		switch {
+		case strings.Contains(p, "/node_modules/kinerouter/"):
+			return "npm"
+		case strings.Contains(p, "/kinerouter/runtime/"), strings.Contains(p, "/.kinerouter/runtime/"):
+			return "npm"
+		}
 	}
 	return "script"
 }
 
 // InstallCommand is the one-liner that updates an existing install.
 func InstallCommand() string {
-	if InstallMethod() == "npm" {
+	switch InstallMethod() {
+	case "npm":
 		return "npm i -g kinerouter@latest --prefer-online"
+	case "docker":
+		return "docker pull ghcr.io/keyzakyy-dev/kinerouter:latest && docker restart kinerouter"
 	}
 	return "curl -fsSL https://raw.githubusercontent.com/keyzakyy-dev/kinerouter/main/kine/install.sh | sh"
 }
