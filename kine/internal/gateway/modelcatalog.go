@@ -35,7 +35,8 @@ func kindSetFilter(kinds []string) map[string]bool {
 }
 
 // buildModelsList lists every model the router can serve, optionally only the
-// given kinds. Only active connections contribute, matching buildModelsList.
+// given kinds. Active connections and no-auth providers contribute the registry
+// catalogue; custom model rows and node models are added on top.
 func (g *Gateway) buildModelsList(kinds []string) []map[string]any {
 	want := kindSetFilter(kinds)
 	conns, _ := g.store.ListConnections("", false)
@@ -45,9 +46,20 @@ func (g *Gateway) buildModelsList(kinds []string) []map[string]any {
 			have[c.Provider] = true
 		}
 	}
+	disabled, _ := g.store.DisabledModels()
+	disabledOf := func(alias, id string) bool {
+		for _, d := range disabled[alias] {
+			if d == id || d == "*" {
+				return true
+			}
+		}
+		return false
+	}
 	data := []map[string]any{}
 	for _, e := range g.reg.Entries {
-		if !have[e.ID] {
+		// A no-auth provider is listable without a stored connection, matching
+		// upstream's injected virtual account.
+		if !have[e.ID] && !(g.exec != nil && g.exec.IsNoAuth(e.ID)) {
 			continue
 		}
 		models := g.reg.Models[e.Alias]
@@ -58,6 +70,9 @@ func (g *Gateway) buildModelsList(kinds []string) []map[string]any {
 			m := &models[i]
 			kind := modelKind(m)
 			if want != nil && !want[kind] {
+				continue
+			}
+			if disabledOf(e.Alias, m.ID) || disabledOf(e.ID, m.ID) {
 				continue
 			}
 			entry := map[string]any{
@@ -74,6 +89,9 @@ func (g *Gateway) buildModelsList(kinds []string) []map[string]any {
 			}
 			data = append(data, entry)
 		}
+	}
+	if want == nil || want["llm"] {
+		data = g.appendCustomModels(data, have, disabledOf)
 	}
 	combos, _ := g.store.ListCombos()
 	for _, c := range combos {
@@ -95,6 +113,57 @@ func (g *Gateway) buildModelsList(kinds []string) []map[string]any {
 		for alias := range aliases {
 			data = append(data, map[string]any{"id": alias, "object": "model", "owned_by": "alias"})
 		}
+	}
+	return data
+}
+
+// appendCustomModels publishes kv customModels rows under the node prefix (or
+// the provider alias), skipping disabled rows and aliases with no live
+// connection. Mirrors appendLooseCustomModels.
+func (g *Gateway) appendCustomModels(data []map[string]any, have map[string]bool, disabledOf func(alias, id string) bool) []map[string]any {
+	models, err := g.store.ListCustomModels()
+	if err != nil {
+		return data
+	}
+	nodes, _ := g.store.ListProviderNodes()
+	prefixOf := map[string]string{}
+	for _, n := range nodes {
+		if p, _ := n.Data["prefix"].(string); p != "" {
+			prefixOf[n.ID] = p
+		}
+	}
+	seen := map[string]bool{}
+	for _, m := range data {
+		if id, ok := m["id"].(string); ok {
+			seen[id] = true
+		}
+	}
+	for _, cm := range models {
+		provider, _ := cm["providerAlias"].(string)
+		id, _ := cm["id"].(string)
+		if provider == "" || id == "" || !have[provider] {
+			continue
+		}
+		if typ, _ := cm["type"].(string); typ != "" && typ != "llm" {
+			continue
+		}
+		prefix := provider
+		if p := prefixOf[provider]; p != "" {
+			prefix = p
+		}
+		if disabledOf(provider, id) || disabledOf(prefix, id) {
+			continue
+		}
+		fullID := prefix + "/" + id
+		if seen[fullID] {
+			continue
+		}
+		seen[fullID] = true
+		entry := map[string]any{"id": fullID, "object": "model", "owned_by": prefix}
+		if caps, ok := cm["caps"].(map[string]any); ok && len(caps) > 0 {
+			entry["capabilities"] = caps
+		}
+		data = append(data, entry)
 	}
 	return data
 }
