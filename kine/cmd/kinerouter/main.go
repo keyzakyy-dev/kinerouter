@@ -75,6 +75,10 @@ func main() {
 		}
 	}()
 
+	// Interactive launcher: Web UI / CLI / tray. Skipped when stdin is not a
+	// terminal, so Docker and systemd keep the old behaviour.
+	go runLauncher(cfg.Port)
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop

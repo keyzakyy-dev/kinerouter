@@ -191,6 +191,17 @@ go build -o kinerouter ./cmd/kinerouter
 ./kinerouter
 ```
 
+Starting `kinerouter` with no arguments from a terminal opens a launcher menu:
+
+```
+  1) Web UI  — open the dashboard in a browser
+  2) CLI    — configure local coding tools
+  3) Hide to tray — keep serving in the background
+  4) Continue without the menu
+```
+
+Non-interactive starts (Docker, systemd, piped output) skip the menu.
+
 Dashboard: `http://localhost:20128/dashboard` · API: `http://localhost:20128/v1`
 
 **Next:** log in with `INITIAL_PASSWORD` (default `123456`), connect a provider,

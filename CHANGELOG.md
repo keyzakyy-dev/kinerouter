@@ -5,6 +5,17 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+## [0.1.3] — 2026-11-23
+
+### Added
+
+- **Interactive launcher.** `kinerouter` with no arguments in a terminal now
+  starts the gateway and shows a menu: open the web dashboard, configure local
+  coding tools through `kinerouter connect`, hide to tray, or continue without
+  the menu. Non-TTY starts (Docker, systemd, piped output) behave exactly as
+  before. Hiding to tray ignores SIGHUP so closing the terminal leaves the
+  gateway serving.
+
 ## [0.1.2] — 2026-11-23
 
 ### Fixed
