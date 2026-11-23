@@ -255,3 +255,45 @@ func TestResolveAliasChain(t *testing.T) {
 		}
 	}
 }
+
+// A 200 with no completion fails over to the next account instead of reaching
+// the client as an empty success.
+func TestChatFailsOverOnEmptyCompletion(t *testing.T) {
+	empty := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"x","object":"chat.completion","choices":[]}`))
+	}))
+	defer empty.Close()
+	good := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"y","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	defer good.Close()
+
+	g := New(&config.Config{DataDir: t.TempDir()}, testGateway(t).store, nil)
+	node := &store.ProviderNode{ID: "openai-compatible-chat-test", Type: "openai-compatible",
+		Data: map[string]any{"prefix": "tst", "baseUrl": empty.URL + "/v1"}}
+	if err := g.store.SaveProviderNode(node); err != nil {
+		t.Fatalf("node: %v", err)
+	}
+	// Priority decides order: the empty account is tried first.
+	for id, base := range map[string]string{"a-empty": empty.URL + "/v1", "b-good": good.URL + "/v1"} {
+		if err := g.store.UpsertConnection(&store.Connection{
+			ID: id, Provider: node.ID, AuthType: "apikey", IsActive: true,
+			Data: map[string]any{"apiKey": "k", "providerSpecificData": map[string]any{"baseUrl": base, "prefix": "tst"}},
+		}); err != nil {
+			t.Fatalf("conn: %v", err)
+		}
+	}
+	if _, err := g.store.CreateAPIKey("test", "m", "sk-test"); err != nil {
+		t.Fatalf("key: %v", err)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions",
+		strings.NewReader(`{"model":"tst/foo","messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Authorization", "Bearer sk-test")
+	g.handleChat(rec, req, "openai")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "hello") {
+		t.Fatalf("status %d body %q", rec.Code, rec.Body.String())
+	}
+}

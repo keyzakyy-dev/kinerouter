@@ -346,6 +346,12 @@ func (g *Gateway) dispatch(w http.ResponseWriter, r *http.Request, targets []tar
 				last = dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
 				continue
 			}
+			if upErr.status >= 500 {
+				// A 5xx (including an unusable 200 body) is retryable: another
+				// account or combo member may answer.
+				last = dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
+				continue
+			}
 			return dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
 		}
 	}
@@ -612,7 +618,11 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 			if err != nil {
 				return dispatchResult{}, err
 			}
-			outBody, u := translateNonStream(translate.FormatOpenAI, clientFormat, mustJSON(folded))
+			foldedBody := mustJSON(folded)
+			if e := emptyCompletionError(foldedBody); e != nil {
+				return dispatchResult{}, e
+			}
+			outBody, u := translateNonStream(translate.FormatOpenAI, clientFormat, foldedBody)
 			mergeUsage(&usage, u)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -626,7 +636,11 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 			respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
 			folded := translate.CollectKiroEvents(bytes.NewReader(respBody), t.Model, kiroRestore)
 			providerFormat = translate.FormatOpenAI
-			outBody, u := translateNonStream(providerFormat, clientFormat, mustJSON(folded))
+			foldedBody := mustJSON(folded)
+			if e := emptyCompletionError(foldedBody); e != nil {
+				return dispatchResult{}, e
+			}
+			outBody, u := translateNonStream(providerFormat, clientFormat, foldedBody)
 			mergeUsage(&usage, u)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -642,6 +656,9 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 		} else if isNDJSONStream(providerFormat) {
 			respBody = mustJSON(collectNDJSON(providerFormat, bytes.NewReader(respBody)))
 			providerFormat = translate.FormatOpenAI
+		}
+		if e := emptyCompletionError(respBody); e != nil {
+			return dispatchResult{}, e
 		}
 		outBody, u := translateNonStream(providerFormat, clientFormat, respBody)
 		mergeUsage(&usage, u)
