@@ -50,7 +50,7 @@ func runLauncher(port int, ownsServer bool) {
 	type item struct{ label, action string }
 	var opts []item
 	if hasUpdate {
-		opts = append(opts, item{fmt.Sprintf("Update to v%s (current v%s)", latest, gateway.Version), "update"})
+		opts = append(opts, item{fmt.Sprintf("Update to v%s (current: v%s)", latest, gateway.Version), "update"})
 	}
 	opts = append(opts, item{"Web UI (Open in Browser)", "web"})
 	opts = append(opts, item{"Terminal UI (Interactive CLI)", "terminal"})
@@ -63,7 +63,8 @@ func runLauncher(port int, ownsServer bool) {
 	for i, o := range opts {
 		labels[i] = o.label
 	}
-	subtitle := "Server: " + base
+	// 9Router paints only the URL green inside the dim subtitle.
+	subtitle := "🚀 Server: \x1b[32m" + base + "\x1b[0m"
 	if !ownsServer {
 		subtitle += " (started outside this terminal)"
 	}

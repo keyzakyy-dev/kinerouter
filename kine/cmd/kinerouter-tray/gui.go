@@ -39,7 +39,7 @@ func runGUI() error {
 
 func onReady() {
 	systray.SetIcon(trayIcon())
-	systray.SetTitle("KineRouter")
+	systray.SetTitle("")
 	systray.SetTooltip(fmt.Sprintf("KineRouter - Port %d", port))
 
 	// Same four entries as 9Router's buildMenuItems: status, dashboard,
