@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,7 +20,66 @@ import (
 
 	"github.com/keyzakyy-dev/kinerouter/internal/autostart"
 	"github.com/keyzakyy-dev/kinerouter/internal/gateway"
+	"github.com/keyzakyy-dev/kinerouter/internal/launcherpid"
 )
+
+// The tray outlives nothing: it belongs to the gateway that spawned it, so its
+// PID is kept here for reuse (9Router inits one icon at menu start instead of
+// creating a second one when the user hides to tray) and for cleanup on exit.
+var (
+	trayMu       sync.Mutex
+	trayPID      int
+	dataDirRef   string
+	instancePort int
+)
+
+// ensureTray shows the menu-time icon once and reuses it afterwards.
+func ensureTray() bool {
+	trayMu.Lock()
+	defer trayMu.Unlock()
+	if trayPID > 0 && processAlive(trayPID) {
+		return true
+	}
+	pid, ok := startTray()
+	if !ok {
+		return false
+	}
+	trayPID = pid
+	recordInstance(pid)
+	return true
+}
+
+// stopTray removes the icon before a handoff, so the detached copy never runs
+// two trays (9Router's cleanup does the same).
+func stopTray() {
+	trayMu.Lock()
+	pid := trayPID
+	trayPID = 0
+	trayMu.Unlock()
+	if pid <= 0 || !processAlive(pid) {
+		return
+	}
+	_ = signalTerm(pid)
+	for i := 0; i < 30 && processAlive(pid); i++ {
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// recordInstance rewrites <data dir>/launcher.pid with the tray this gateway
+// owns, so the next launch can stop both.
+func recordInstance(pid int) {
+	if dataDirRef == "" {
+		return
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return
+	}
+	trayExe, _ := trayBinary()
+	_ = launcherpid.Write(dataDirRef, launcherpid.Record{
+		PID: os.Getpid(), Port: instancePort, Exe: self, TrayPID: pid, TrayExe: trayExe,
+	})
+}
 
 // runLauncher is the interactive menu shown when `kinerouter` is started with
 // no arguments from a terminal: serve the gateway, then let the user pick the
@@ -36,6 +96,12 @@ func runLauncher(port int, ownsServer bool) {
 	}
 	if !waitPort(port, 3*time.Second) {
 		return
+	}
+
+	// 9Router inits the tray alongside the menu, so the icon is already there
+	// when the user picks Hide.
+	if ownsServer {
+		ensureTray()
 	}
 
 	// Update check runs once, in parallel with the menu being read. Its 4s
@@ -92,8 +158,9 @@ func runLauncher(port int, ownsServer bool) {
 			if runtime.GOOS == "darwin" {
 				// A detached child on macOS sits outside the login session and
 				// NSStatusItem silently fails there, so this process stays and
-				// only drops the terminal (9Router does the same).
-				if _, ok := startTray(); !ok {
+				// only drops the terminal (9Router does the same). The icon from
+				// menu time is the one that stays.
+				if !ensureTray() {
 					pause(in)
 					continue
 				}
@@ -105,6 +172,7 @@ func runLauncher(port int, ownsServer bool) {
 			// Linux/Windows: hand the gateway to a detached copy in a new
 			// session, then stop this one so the child can claim the port. The
 			// child starts its own tray, exactly like `9router --tray`.
+			stopTray()
 			fmt.Printf("\nStarting background process... (tray icon will appear shortly)\n")
 			if !hideToTray(port) {
 				pause(in)

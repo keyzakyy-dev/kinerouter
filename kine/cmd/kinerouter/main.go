@@ -76,9 +76,12 @@ func main() {
 	defer st.Close()
 
 	// Lets the next launch stop exactly this process (9Router's launcher.pid).
+	dataDirRef = cfg.DataDir
+	instancePort = cfg.Port
 	self, _ := os.Executable()
 	_ = launcherpid.Write(cfg.DataDir, launcherpid.Record{PID: os.Getpid(), Port: cfg.Port, Exe: self})
 	defer launcherpid.RemoveIfOwner(cfg.DataDir, os.Getpid())
+	defer stopTray()
 
 	static, err := web.Handler()
 	if err != nil {
@@ -121,19 +124,9 @@ func main() {
 				log.Printf("tray: gateway did not become ready")
 				return
 			}
-			pid, ok := startTray()
-			if !ok {
+			if !ensureTray() {
 				log.Printf("tray: companion binary not found next to %s", os.Args[0])
-				return
 			}
-			// Record the tray too: the next launch stops both, so no orphan icon
-			// survives the gateway it belongs to.
-			self, _ := os.Executable()
-			trayExe, _ := trayBinary()
-			_ = launcherpid.Write(cfg.DataDir, launcherpid.Record{
-				PID: os.Getpid(), Port: cfg.Port, Exe: self,
-				TrayPID: pid, TrayExe: trayExe,
-			})
 		}()
 		// No controlling terminal, but a stray HUP from a launcher wrapper must
 		// not stop the gateway either.

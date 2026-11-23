@@ -5,6 +5,16 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## Unreleased
 
+### Changed
+
+- **Tray icon lives for the whole launcher session**, as in 9Router: it is
+  created when the menu opens and reused by Hide to Tray instead of a second
+  icon being spawned, then handed to the detached process on Linux/Windows
+  (the old icon is removed first). Exit and gateway shutdown remove it.
+- **Menu rows match 9Router exactly**: labels use `(current: vY)`, the server
+  line is `🚀 Server: <green url>` under a dim wrapper, and the selected row is
+  `★` with reverse+bright (`>` on Windows).
+
 ## [0.1.8] — 2026-11-23
 
 ### Changed
