@@ -226,3 +226,32 @@ func TestFilterByStrictAssignment(t *testing.T) {
 		t.Fatalf("freebuff filter = %v", ids)
 	}
 }
+
+// An alias may chain to another alias or name a combo, matching upstream
+// resolveModel's alias-then-combo order.
+func TestResolveAliasChain(t *testing.T) {
+	g := testGateway(t)
+	for alias, target := range map[string]string{
+		"one":   "two",
+		"two":   "three",
+		"three": "prov/model",
+		"loop":  "loop",
+		"combo": "mycombo",
+	} {
+		if err := g.store.SetModelAlias(alias, target); err != nil {
+			t.Fatalf("alias %s: %v", alias, err)
+		}
+	}
+	for in, want := range map[string]string{
+		"one":   "prov/model",
+		"two":   "prov/model",
+		"three": "prov/model",
+		"loop":  "loop",
+		"nope":  "nope",
+		"combo": "mycombo",
+	} {
+		if got := g.resolveAliasChain(in); got != want {
+			t.Errorf("resolveAliasChain(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

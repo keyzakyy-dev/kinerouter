@@ -45,6 +45,26 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request, clientForma
 
 // handleRaw runs the chat pipeline on an already-decoded body. stream is passed
 // separately because Gemini-native clients signal it in the URL, not the body.
+// resolveAliasChain follows kv modelAliases until the value stops changing, so
+// an alias may point at another alias, a combo or a concrete provider/model.
+func (g *Gateway) resolveAliasChain(name string) string {
+	aliases, err := g.store.GetModelAliases()
+	if err != nil {
+		return name
+	}
+	seen := map[string]bool{name: true}
+	current := name
+	for i := 0; i < 8; i++ {
+		next, ok := aliases[current]
+		if !ok || next == "" || next == current || seen[next] {
+			break
+		}
+		seen[next] = true
+		current = next
+	}
+	return current
+}
+
 func (g *Gateway) handleRaw(w http.ResponseWriter, r *http.Request, raw map[string]any, clientFormat string, stream bool) {
 	modelStr, _ := raw["model"].(string)
 	if modelStr == "" {
@@ -92,7 +112,9 @@ func (g *Gateway) handleRaw(w http.ResponseWriter, r *http.Request, raw map[stri
 		return
 	}
 
-	// Combo expansion: try members in order.
+	// Combo expansion: try members in order. An alias may name a combo, so the
+	// requested id is resolved through the alias table first.
+	modelStr = g.resolveAliasChain(modelStr)
 	if combo, err := g.store.GetComboByName(modelStr); err == nil && combo != nil && len(combo.Models) > 0 {
 		g.handleCombo(w, r, combo, raw, apiKey, clientFormat, stream)
 		return
@@ -202,7 +224,7 @@ func (g *Gateway) flattenComboModels(name string, models []string) []string {
 	var walk func([]string, map[string]bool)
 	walk = func(list []string, seen map[string]bool) {
 		for _, member := range list {
-			if nested, err := g.store.GetComboByName(member); err == nil && nested != nil && len(nested.Models) > 0 && !seen[nested.Name] {
+			if nested, err := g.store.GetComboByName(g.resolveAliasChain(member)); err == nil && nested != nil && len(nested.Models) > 0 && !seen[nested.Name] {
 				seen[nested.Name] = true
 				walk(nested.Models, seen)
 				continue
