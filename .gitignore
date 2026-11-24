@@ -22,3 +22,6 @@
 
 # Local-only project workflow notes
 WORKFLOW.md
+
+# Graphify knowledge graph output (local, rebuild with `graphify extract . --code-only`)
+graphify-out/
