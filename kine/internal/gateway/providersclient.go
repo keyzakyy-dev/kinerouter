@@ -31,7 +31,7 @@ func (g *Gateway) registerProvidersClientRoutes(mux *http.ServeMux) {
 }
 
 func (g *Gateway) usageEligible(c *store.Connection) bool {
-	if _, ok := c.Specific()["demoUsage"]; ok {
+	if _, ok := c.Specific()["usageSnapshot"]; ok {
 		return true
 	}
 	e, ok := g.reg.ByID[c.Provider]

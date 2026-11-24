@@ -83,6 +83,40 @@ func usageConn(c *store.Connection, force bool) providerusage.Conn {
 	}
 }
 
+// storedUsage expands the usage snapshot a dev connection carries at
+// providerSpecificData.usageSnapshot, so the quota tracker has rows without
+// live provider calls. Reset times are stored as resetInMinutes and expanded
+// per request, so a seeded snapshot never goes stale.
+func storedUsage(c *store.Connection) map[string]any {
+	raw, _ := c.Specific()["usageSnapshot"].(map[string]any)
+	if raw == nil {
+		return nil
+	}
+	out := map[string]any{}
+	if plan, ok := raw["plan"]; ok {
+		out["plan"] = plan
+	}
+	quotas, _ := raw["quotas"].(map[string]any)
+	next := make(map[string]any, len(quotas))
+	for name, v := range quotas {
+		q, _ := v.(map[string]any)
+		if q == nil {
+			continue
+		}
+		cp := make(map[string]any, len(q)+1)
+		for k, val := range q {
+			cp[k] = val
+		}
+		if mins, ok := cp["resetInMinutes"].(float64); ok {
+			delete(cp, "resetInMinutes")
+			cp["resetAt"] = time.Now().Add(time.Duration(mins * float64(time.Minute))).UTC().Format(time.RFC3339)
+		}
+		next[name] = cp
+	}
+	out["quotas"] = next
+	return out
+}
+
 // refreshUsageConnection refreshes an OAuth connection when its token is near
 // expiry and returns the re-read row.
 func (g *Gateway) refreshUsageConnection(r *http.Request, c *store.Connection) *store.Connection {
@@ -120,7 +154,7 @@ func (g *Gateway) handleConnectionUsage(w http.ResponseWriter, r *http.Request) 
 		writeErr(w, http.StatusNotFound, "Connection not found")
 		return
 	}
-	if demo := demoUsage(c); demo != nil {
+	if demo := storedUsage(c); demo != nil {
 		writeJSON(w, http.StatusOK, demo)
 		return
 	}
