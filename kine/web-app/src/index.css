@@ -97,19 +97,22 @@
 }
 
 .dark {
-  --color-brand-50: #fdf1ed;
-  --color-brand-100: #fadccf;
-  --color-brand-200: #f4b59c;
-  --color-brand-300: #ee8d6a;
-  --color-brand-400: #ea7855;
-  --color-brand-500: #e56a4a;
-  --color-brand-600: #cc5236;
-  --color-brand-700: #a64027;
-  --color-brand-800: #7a2f1d;
-  --color-brand-900: #4d1e12;
+  /* Monochrome accent: dark mode uses a light neutral for primary actions.
+     Status hues below stay colourful on purpose. */
+  --color-brand-50: #fafafa;
+  --color-brand-100: #f0f0f0;
+  --color-brand-200: #e5e5e5;
+  --color-brand-300: #d4d4d4;
+  --color-brand-400: #b9b9b9;
+  --color-brand-500: #ededed;
+  --color-brand-600: #d4d4d4;
+  --color-brand-700: #a3a3a3;
+  --color-brand-800: #737373;
+  --color-brand-900: #404040;
 
-  --color-primary: #e56a4a;
-  --color-primary-hover: #cc5236;
+  --color-primary: #ededed;
+  --color-primary-hover: #d4d4d4;
+  --primary-foreground: #0a0a0a;
 
   /* Surfaces (dark - neutral warm) */
   --color-bg: #1a1a1a;
@@ -133,16 +136,15 @@
   --color-info: #60a5fa;
 
   --shadow-soft: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --shadow-warm: 0 2px 12px -2px rgba(229, 106, 74, 0.25);
+  --shadow-warm: 0 2px 12px -2px rgba(0, 0, 0, 0.35);
   --shadow-elevated: 0 12px 28px -4px rgba(0, 0, 0, 0.45);
   --shadow-elev:
     inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.4),
     0 16px 48px -8px rgba(0, 0, 0, 0.55);
-  --shadow-focus: 0 0 0 3px rgba(229, 106, 74, 0.18);
+  --shadow-focus: 0 0 0 3px rgba(255, 255, 255, 0.16);
 
   /* Charts keep the accent palette in dark; light mode is monochrome.
-     Six distinct hues, ordered brand-first so the main series stays the
-     accent orange and the rest read as separate categories on #262626. */
+     Six distinct hues so series read as separate categories on #262626. */
   --chart-1: #e56a4a;
   --chart-2: #38bdf8;
   --chart-3: #34d399;
@@ -230,7 +232,7 @@ select {
   --color-input: var(--color-border);
   --color-ring: var(--color-primary);
   --color-destructive: var(--color-danger);
-  --color-primary-foreground: #ffffff;
+  --color-primary-foreground: var(--primary-foreground);
 
   --font-sans: "Google Sans", "Google Sans Text", system-ui, sans-serif;
   --font-display: "Google Sans", "Google Sans Text", system-ui, sans-serif;

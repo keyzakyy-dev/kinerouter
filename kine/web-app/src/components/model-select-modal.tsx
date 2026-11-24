@@ -284,7 +284,7 @@ export function ModelSelectModal({
           m.isPlaceholder
             ? 'border-dashed border-border bg-surface italic text-text-muted hover:text-primary'
             : isAdded || selectedModel === m.value
-              ? 'border-primary bg-primary text-white'
+              ? 'border-primary bg-primary text-primary-foreground'
               : 'border-border bg-surface text-text-main hover:border-primary/50 hover:bg-primary/5',
         )}
       >
@@ -384,7 +384,7 @@ export function ModelSelectModal({
                     className={cn(
                       'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium',
                       wildcardAdded
-                        ? 'border-primary bg-primary text-white'
+                        ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-transparent text-primary hover:border-primary/20 hover:bg-primary/10',
                     )}
                   >

@@ -113,8 +113,10 @@ export function ConfirmModal({
           onClick={() => onConfirm?.()}
           disabled={loading}
           className={cn(
-            'inline-flex h-9 cursor-pointer items-center justify-center rounded-md px-4 text-sm font-medium text-white transition-colors disabled:opacity-50',
-            variant === 'danger' ? 'bg-danger hover:bg-danger/90' : 'bg-primary hover:bg-primary/90',
+            'inline-flex h-9 cursor-pointer items-center justify-center rounded-md px-4 text-sm font-medium transition-colors disabled:opacity-50',
+            variant === 'danger'
+              ? 'bg-danger text-white hover:bg-danger/90'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90',
           )}
         >
           {loading ? 'Working…' : confirmLabel}

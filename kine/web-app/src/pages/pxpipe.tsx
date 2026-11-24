@@ -213,7 +213,7 @@ export default function PxpipePage() {
                 className={cn(
                   'rounded-md px-3 py-1 text-xs font-medium transition-colors',
                   windowId === tab.id
-                    ? 'bg-primary text-white shadow-sm'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-text-muted hover:bg-surface-3 hover:text-text-main',
                 )}
               >

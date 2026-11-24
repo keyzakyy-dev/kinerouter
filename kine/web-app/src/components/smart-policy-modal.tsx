@@ -94,7 +94,7 @@ export function SmartPolicyModal({
                     <span
                       className={cn(
                         'flex size-4 shrink-0 items-center justify-center rounded-full border',
-                        selected ? 'border-primary bg-primary text-white' : 'border-border bg-surface',
+                        selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-surface',
                       )}
                     >
                       {selected && <span className="size-1.5 rounded-full bg-white" />}
@@ -135,7 +135,7 @@ export function SmartPolicyModal({
                           onClick={() => setThreshold(pct)}
                           className={cn(
                             'rounded px-2 py-0.5 font-mono text-[11px]',
-                            threshold === pct ? 'bg-primary font-semibold text-white' : 'bg-surface-2 text-text-muted hover:text-text-main',
+                            threshold === pct ? 'bg-primary font-semibold text-primary-foreground' : 'bg-surface-2 text-text-muted hover:text-text-main',
                           )}
                         >
                           {pct}%
