@@ -67,6 +67,8 @@ function UsageStats({ period }: { period: string }) {
   const [tableView, setTableView] = useState<TableView>('model')
   const [viewMode, setViewMode] = useState<ViewMode>('costs')
   const [providers, setProviders] = useState<TopoProvider[]>([])
+  /** Every custom node id → its name, so request rows can label any provider. */
+  const [nodeNames, setNodeNames] = useState<Record<string, string>>({})
   const isInitialLoad = useRef(true)
 
   // Connected LLM providers, one node per provider type.
@@ -75,6 +77,7 @@ function UsageStats({ period }: { period: string }) {
       .then(([p, n]) => {
         const nodeName: Record<string, string> = {}
         for (const node of n.nodes || []) if (node.name) nodeName[node.id] = node.name
+        setNodeNames(nodeName)
         const seen = new Set<string>()
         const unique = ((p.connections || []) as Connection[])
           .filter((c) => {
@@ -259,9 +262,10 @@ function UsageStats({ period }: { period: string }) {
           />
           <RecentRequests
             requests={stats.recentRequests || []}
-            providerNames={Object.fromEntries(
-              providers.map((p) => [p.provider, p.nodeName || p.name || p.provider]),
-            )}
+            providerNames={{
+              ...Object.fromEntries(providers.map((p) => [p.provider, p.nodeName || p.name || p.provider])),
+              ...nodeNames,
+            }}
           />
         </div>
       )}

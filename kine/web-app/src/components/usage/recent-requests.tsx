@@ -55,8 +55,9 @@ export function RecentRequests({
                     </span>
                   )}
                 </div>
-                <span className="shrink-0 pt-0.5 font-mono text-[10px] text-text-muted">
-                  {fmt(r.promptTokens)}↑ {fmt(r.completionTokens)}↓
+                <span className="shrink-0 pt-0.5 pl-2 text-right font-mono text-[10px]">
+                  <span className="text-text-main">{fmt(r.promptTokens)}↑</span>{' '}
+                  <span className="text-text-muted">{fmt(r.completionTokens)}↓</span>
                 </span>
                 <span className="w-14 shrink-0 pt-0.5 text-right font-mono text-[10px] text-text-muted">
                   <TimeAgo timestamp={r.timestamp} />
