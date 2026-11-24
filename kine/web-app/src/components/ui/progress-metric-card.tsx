@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { MetricChart, formatCompact, type MetricAccent, type SeriesPoint } from './metric-chart'
+import { useEffect, useState, type ReactNode, type CSSProperties } from 'react'
+import { ACCENTS, MetricChart, formatCompact, type MetricAccent, type SeriesPoint } from './metric-chart'
 
 export interface ProgressMetricCardProps {
   title: string
@@ -37,13 +37,6 @@ function useCountUp(target: number, duration = 1300, delay = 0) {
 }
 
 /** Light mode draws every sparkline in one neutral grey; dark keeps the accent. */
-const ACCENT_CLASS: Record<MetricAccent, string> = {
-  emerald: '[--metric-accent:var(--chart-2)] dark:[--metric-accent:var(--chart-1)]',
-  rose: '[--metric-accent:var(--chart-2)] dark:[--metric-accent:var(--chart-2)]',
-  amber: '[--metric-accent:var(--chart-2)] dark:[--metric-accent:var(--chart-3)]',
-  sky: '[--metric-accent:var(--chart-2)] dark:[--metric-accent:var(--chart-4)]',
-  violet: '[--metric-accent:var(--chart-2)] dark:[--metric-accent:var(--chart-5)]',
-}
 
 /** Count + sparkline only: no controls, no footer. */
 export default function ProgressMetricCard({
@@ -68,7 +61,10 @@ export default function ProgressMetricCard({
         </span>
       </div>
 
-      <div className={`mt-auto h-16 w-full ${ACCENT_CLASS[accent]}`}>
+      <div
+        className="mt-auto h-16 w-full"
+        style={{ '--metric-accent': ACCENTS[accent] } as CSSProperties}
+      >
         {(data?.length ?? 0) >= 2 && (
           <MetricChart data={data} color="var(--metric-accent)" valueFormatter={valueFormatter} />
         )}

@@ -4,11 +4,11 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'rec
 export type SeriesPoint = { date: string; value: number }
 
 export const ACCENTS = {
-  emerald: 'var(--chart-1)',
-  rose: 'var(--chart-2)',
-  amber: 'var(--chart-3)',
-  sky: 'var(--chart-4)',
-  violet: 'var(--chart-5)',
+  emerald: 'var(--metric-emerald)',
+  rose: 'var(--metric-rose)',
+  amber: 'var(--metric-amber)',
+  sky: 'var(--metric-sky)',
+  violet: 'var(--metric-violet)',
 } as const
 
 export type MetricAccent = keyof typeof ACCENTS

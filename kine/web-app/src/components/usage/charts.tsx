@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
@@ -11,10 +11,25 @@ const fmtCost4 = (n: number | null | undefined) => `$${(n || 0).toFixed(4)}`
 const CHART_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)', 'var(--color-text-muted)', 'var(--color-text-subtle)']
 
 const TOOLTIP_STYLE = {
-  backgroundColor: 'var(--color-bg)',
-  border: '1px solid var(--color-border)',
+  backgroundColor: 'var(--card)',
+  border: '1px solid var(--border)',
   borderRadius: 8,
   fontSize: 12,
+  color: 'var(--foreground)',
+}
+
+const AXIS_TICK = { fontSize: 10, fill: 'var(--color-text-subtle)' }
+
+/** Empty panel: inset ring + dimmed surface so it reads as a slot, not a card. */
+function ChartEmpty({ icon, children }: { icon: string; children: ReactNode }) {
+  return (
+    <div className="flex h-56 flex-col items-center justify-center gap-3 rounded-xl bg-surface-2/60 ring-1 ring-inset ring-border-subtle">
+      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500/10 text-brand-500">
+        <Icon name={icon} className="text-[20px]" />
+      </span>
+      <span className="max-w-[240px] text-center text-xs leading-relaxed text-text-muted">{children}</span>
+    </div>
+  )
 }
 
 type ChartMode = 'tokens' | 'requests' | 'cost'
@@ -66,10 +81,7 @@ export function UsageChart({ period }: { period: string }) {
       {loading ? (
         <div className="flex h-56 items-center justify-center text-xs text-text-muted">Loading…</div>
       ) : !hasData ? (
-        <div className="flex h-56 flex-col items-center justify-center gap-2 rounded-xl bg-surface-2 text-center text-xs text-text-muted">
-          <Icon name="monitoring" className="text-[24px] text-text-muted/60" />
-          <span>No {cfg.label.toLowerCase()} recorded for this period.</span>
-        </div>
+        <ChartEmpty icon="monitoring">No {cfg.label.toLowerCase()} recorded for this period.</ChartEmpty>
       ) : (
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -81,16 +93,16 @@ export function UsageChart({ period }: { period: string }) {
                 </linearGradient>
               ))}
             </defs>
-            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.1} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.8} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 10, fill: 'currentColor', fillOpacity: 0.5 }}
+              tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
               interval="preserveStartEnd"
             />
             <YAxis
-              tick={{ fontSize: 10, fill: 'currentColor', fillOpacity: 0.5 }}
+              tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
               tickFormatter={cfg.formatter}
@@ -152,24 +164,21 @@ export function ProviderBarChart({ byProvider }: { byProvider: Record<string, Us
       </div>
       <div className="min-w-0 px-2 pb-2">
       {chartData.length === 0 ? (
-        <div className="flex h-56 flex-col items-center justify-center gap-2 rounded-xl bg-surface-2 text-center text-xs text-text-muted">
-          <Icon name="bar_chart" className="text-[24px] text-text-muted/60" />
-          <span>No provider usage for this period.</span>
-        </div>
+        <ChartEmpty icon="bar_chart">No provider usage for this period.</ChartEmpty>
       ) : (
         <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.1} vertical={false} />
+          <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 16 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.8} vertical={false} />
             <XAxis
               dataKey="name"
-              tick={{ fontSize: 10, fill: 'currentColor', fillOpacity: 0.6 }}
+              tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
               interval={0}
               tickFormatter={(v: string) => (v.length > 10 ? `${v.slice(0, 10)}…` : v)}
             />
             <YAxis
-              tick={{ fontSize: 10, fill: 'currentColor', fillOpacity: 0.5 }}
+              tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
               tickFormatter={f}
@@ -230,17 +239,14 @@ export function TopModelsChart({ byModel }: { byModel: Record<string, UsageStat>
       </div>
       <div className="min-w-0 px-2 pb-2">
       {chartData.length === 0 ? (
-        <div className="flex h-56 flex-col items-center justify-center gap-2 rounded-xl bg-surface-2 text-center text-xs text-text-muted">
-          <Icon name="smart_toy" className="text-[24px] text-text-muted/60" />
-          <span>No model usage for this period.</span>
-        </div>
+        <ChartEmpty icon="smart_toy">No model usage for this period.</ChartEmpty>
       ) : (
         <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 40, left: 4, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.1} horizontal={false} />
+          <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 40, left: 4, bottom: 16 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.8} horizontal={false} />
             <XAxis
               type="number"
-              tick={{ fontSize: 10, fill: 'currentColor', fillOpacity: 0.5 }}
+              tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
               tickFormatter={f}
@@ -248,7 +254,7 @@ export function TopModelsChart({ byModel }: { byModel: Record<string, UsageStat>
             <YAxis
               type="category"
               dataKey="name"
-              tick={{ fontSize: 10, fill: 'currentColor', fillOpacity: 0.7 }}
+              tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
               width={90}
