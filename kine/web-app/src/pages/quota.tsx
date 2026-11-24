@@ -150,9 +150,12 @@ function formatTimeRemaining(value: string | null | undefined): string {
 }
 
 const selectClass =
-  'h-8 cursor-pointer rounded-lg border border-black/10 bg-black/[0.02] px-2 text-xs text-text-main outline-none transition-colors hover:bg-black/5'
+  'h-8 cursor-pointer rounded-lg bg-black/[0.03] px-2 text-xs text-text-main outline-none transition-colors hover:bg-black/[0.06]'
 const iconButtonClass =
-  'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-black/10 text-text-main transition-colors hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50'
+  'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-black/[0.06] hover:text-text-main disabled:cursor-not-allowed disabled:opacity-40'
+const chipClass =
+  'flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs text-text-muted transition-colors hover:bg-black/[0.06] hover:text-text-main disabled:cursor-not-allowed disabled:opacity-40'
+const chipActiveClass = 'bg-black/[0.06] text-text-main'
 
 export default function QuotaPage() {
   const { copied, copy } = useCopyToClipboard()
@@ -652,13 +655,13 @@ export default function QuotaPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
-        <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-1">
           <div className="relative">
             <button
               type="button"
               onClick={() => setProviderMenuOpen((p) => !p)}
-              className="flex h-8 cursor-pointer items-center justify-between gap-1 rounded-lg border border-black/10 bg-black/[0.02] px-2 text-xs text-text-main transition-colors hover:bg-black/5"
+              className={cn(chipClass, 'gap-1.5 pl-2', providerFilter !== 'all' && chipActiveClass)}
               aria-haspopup="menu"
               aria-expanded={providerMenuOpen}
               title="Filter quota providers"
@@ -765,16 +768,14 @@ export default function QuotaPage() {
             </select>
           )}
 
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
             onClick={() => setExpiringFirst((p) => !p)}
             aria-pressed={expiringFirst}
-            className={cn(
-              'flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-2 text-xs transition-colors',
-              expiringFirst
-                ? 'border-border bg-foreground/5 text-muted-foreground'
-                : 'border-black/10 text-text-main hover:bg-black/5',
-            )}
+            className={cn(chipClass, expiringFirst && chipActiveClass)}
             title="Sort accounts by earliest quota reset time"
           >
             <Icon name="hourglass_top" className="text-[14px]" />
@@ -790,7 +791,7 @@ export default function QuotaPage() {
               )
             }
             disabled={bulkToggling}
-            className="flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-red-500/30 px-2 text-xs text-red-500 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+            className={cn(chipClass, 'hover:bg-red-500/10 hover:text-red-500')}
             title="Disable connections with depleted quota on the current page"
           >
             <Icon name="block" className="text-[14px]" />
@@ -806,23 +807,25 @@ export default function QuotaPage() {
               )
             }
             disabled={bulkToggling}
-            className="flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-foreground/5 disabled:opacity-50"
+            className={chipClass}
             title="Enable connections that still have quota on the current page"
           >
             <Icon name="check_circle" className="text-[14px]" />
             <span className="hidden sm:inline">Turn on Available</span>
           </button>
 
+          <div className="mx-1 hidden h-4 w-px bg-black/10 lg:block" />
+
           <button
             onClick={() => setAutoRefresh((p) => !p)}
-            className="flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-black/10 px-2 text-xs transition-colors hover:bg-black/5"
+            className={cn(chipClass, autoRefresh && 'text-text-main')}
             title={autoRefresh ? 'Disable auto-refresh' : 'Enable auto-refresh'}
           >
             <Icon
               name={autoRefresh ? 'toggle_on' : 'toggle_off'}
-              className={cn('text-[14px]', autoRefresh ? 'text-primary' : 'text-text-muted')}
+              className={cn('text-[16px]', autoRefresh ? 'text-primary' : 'text-text-muted')}
             />
-            <span className="hidden text-text-main sm:inline">Auto-refresh</span>
+            <span className="hidden sm:inline">Auto-refresh</span>
             {autoRefresh && <span className="text-[10px] tabular-nums text-text-muted">({countdown}s)</span>}
           </button>
 
@@ -833,7 +836,7 @@ export default function QuotaPage() {
             className={iconButtonClass}
             title="Refresh all"
           >
-            <Icon name="refresh" className={cn('text-[14px]', refreshingAll && 'animate-spin')} />
+            <Icon name="refresh" className={cn('text-[15px]', refreshingAll && 'animate-spin')} />
           </button>
         </div>
       </div>
