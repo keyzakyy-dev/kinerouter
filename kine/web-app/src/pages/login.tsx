@@ -46,13 +46,14 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.02fr_1fr]">
-      <aside className="relative hidden overflow-hidden border-r border-border bg-surface p-10 lg:flex lg:flex-col lg:justify-between">
+      <aside className="relative hidden overflow-hidden p-10 lg:flex lg:flex-col">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage:
               'radial-gradient(115% 85% at 0% 0%, color-mix(in oklab, var(--color-brand-500) 22%, transparent), transparent 62%), radial-gradient(90% 70% at 100% 100%, color-mix(in oklab, var(--color-brand-500) 8%, transparent), transparent 70%)',
+            maskImage: 'linear-gradient(to right, #000 50%, transparent 100%)',
           }}
         />
         <div className="relative flex items-center gap-2.5">
@@ -60,11 +61,8 @@ export default function LoginPage() {
           <span className="text-[15px] font-semibold tracking-tight">KineRouter</span>
         </div>
 
-        <div className="relative max-w-md">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-brand-500">
-            Local AI gateway
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold leading-[1.15] tracking-tight text-balance">
+        <div className="relative my-auto max-w-md">
+          <h2 className="text-3xl font-semibold leading-[1.15] tracking-tight text-balance">
             One endpoint for every provider you already pay for.
           </h2>
           <ul className="mt-8 space-y-4">
@@ -81,10 +79,6 @@ export default function LoginPage() {
             ))}
           </ul>
         </div>
-
-        <p className="relative text-[11px] text-text-subtle">
-          Runs entirely on this machine — no prompt leaves your network.
-        </p>
       </aside>
 
       <main className="flex flex-col justify-center px-5 py-10 sm:px-10">
@@ -94,13 +88,9 @@ export default function LoginPage() {
             <span className="text-[15px] font-semibold tracking-tight">KineRouter</span>
           </div>
 
-          <h1 className="text-xl font-semibold tracking-tight">
-            {needsSetup ? 'Set the dashboard password' : 'Sign in to the dashboard'}
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
           <p className="mt-1.5 text-xs leading-relaxed text-text-muted">
-            {needsSetup
-              ? 'Choose the password this instance will ask for from now on.'
-              : 'Enter the dashboard password for this instance to continue.'}
+            Enter the dashboard password for this instance.
           </p>
 
           <form onSubmit={submit} className="mt-6">
@@ -141,23 +131,13 @@ export default function LoginPage() {
           </form>
 
           {needsSetup ? (
-            <div className="mt-6 rounded-lg border border-border-subtle bg-surface-2/50 p-3.5">
-              <div className="flex items-center gap-1.5 text-[11px] font-medium text-text-muted">
-                <Icon name="info" className="text-[13px]" />
-                Fresh install
-              </div>
-              <p className="mt-1.5 text-[11px] leading-relaxed text-text-muted">
-                Sign in locally with <code className="rounded bg-surface-3/70 px-1 py-0.5 font-mono text-text-main">123456</code>{' '}
-                (or your <code className="rounded bg-surface-3/70 px-1 py-0.5 font-mono text-text-main">INITIAL_PASSWORD</code>),
-                then change it in Settings. Remote access stays locked until the password is set.
-              </p>
-            </div>
-          ) : (
-            <p className="mt-6 text-[11px] leading-relaxed text-text-subtle">
-              The password is stored on this machine only. Reset it with{' '}
-              <code className="font-mono">INITIAL_PASSWORD</code> if you lose it.
+            <p className="mt-6 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] leading-relaxed text-text-muted">
+              <Icon name="info" className="text-[13px]" />
+              Fresh install: the password is
+              <code className="rounded bg-surface-3/70 px-1 py-0.5 font-mono text-text-main">123456</code>
+              until you change it in Settings.
             </p>
-          )}
+          ) : null}
         </div>
       </main>
     </div>
