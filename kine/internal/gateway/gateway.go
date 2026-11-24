@@ -396,10 +396,8 @@ func (w *statusWriter) Flush() {
 	}
 }
 
-// quietPath reports routine dashboard polling and UI assets. At info they
-// would bury the requests an operator opens the console for, so they log at
-// debug instead — the same list 9router-go uses, plus this dashboard's own
-// pollers.
+// quietPath reports routine UI assets and dashboard pollers, which the
+// reference logs at debug instead of info. The list is 9router-go's, verbatim.
 func quietPath(path string) bool {
 	if strings.HasPrefix(path, "/providers/") || strings.HasPrefix(path, "/assets/") {
 		return true
@@ -407,9 +405,7 @@ func quietPath(path string) bool {
 	switch path {
 	case "/favicon.ico", "/favicon.svg", "/icons.svg",
 		"/api/connections", "/api/provider-nodes", "/api/usage/stats",
-		"/api/usage/stream", "/api/usage/chart", "/usage/stream", "/health",
-		"/api/tunnel/status", "/api/auth/status", "/api/version", "/api/settings",
-		"/api/keys", "/api/models", "/api/providers":
+		"/api/usage/stream", "/usage/stream", "/health", "/api/tunnel/status":
 		return true
 	}
 	return false

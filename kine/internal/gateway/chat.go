@@ -451,9 +451,21 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 	}
 	// Token savers run on the translated body (RTK compress → caveman →
 	// ponytail → custom prompt), as chatCore.js does.
+	var savedTokens int64
 	if settings, err := g.store.GetSettings(); err == nil {
 		cfg := saverCfgFrom(g, settings, hdr, t.Model, providerFormat)
-		cfg.apply(reqBody, providerFormat)
+		if cfg.active() {
+			// The console reports what the savers bought: bytes removed from the
+			// outbound body, in the same 4-bytes-per-token unit the rest of the
+			// dashboard uses.
+			before := len(mustJSON(reqBody))
+			cfg.apply(reqBody, providerFormat)
+			if after := len(mustJSON(reqBody)); after < before {
+				savedTokens = int64(before-after) / 4
+			}
+		} else {
+			cfg.apply(reqBody, providerFormat)
+		}
 	}
 	// Per-provider body quirks (kimchi artifact stripping, codebuddy neutral
 	// system prompt, azure/iflow/etc. transport handled after build).
@@ -660,7 +672,7 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			w.Write(outBody)
-			g.recordUsage(conn, t, apiKey, clientFormat, u, start)
+			g.recordUsage(conn, t, apiKey, clientFormat, u, start, nil, savedTokens)
 			return dispatchResult{ok: true, status: http.StatusOK}, nil
 		}
 		// Kiro answers in AWS EventStream, never SSE: fold frames into one
@@ -678,7 +690,7 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			w.Write(outBody)
-			g.recordUsage(conn, t, apiKey, clientFormat, u, start)
+			g.recordUsage(conn, t, apiKey, clientFormat, u, start, nil, savedTokens)
 			return dispatchResult{ok: true, status: http.StatusOK}, nil
 		}
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
@@ -698,7 +710,7 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(outBody)
-		g.recordUsage(conn, t, apiKey, clientFormat, u, start)
+		g.recordUsage(conn, t, apiKey, clientFormat, u, start, nil, savedTokens)
 		return dispatchResult{ok: true, status: http.StatusOK}, nil
 	}
 
@@ -711,6 +723,9 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 	peek.Header().Set("X-Accel-Buffering", "no")
 	peek.WriteHeader(http.StatusOK)
 
+	stats := &streamStats{}
+	out := statsWriter{w: peek, s: stats}
+
 	var u translate.Usage
 	if wire == "cursor" {
 		// ponytail: no empty-turn tail-only retry (JS CURSOR_EMPTY_TURN_MAX_RETRIES)
@@ -719,17 +734,17 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 		// Auto must report the concrete upstream model.
 		u, err = streamCursor(resp.Body, agentSession, clientFormat, t.Model, peek, peek)
 	} else if wire == "kiro" {
-		u = streamKiro(resp.Body, clientFormat, t.Model, kiroRestore, peek, peek)
+		u = streamKiro(resp.Body, clientFormat, t.Model, kiroRestore, out, peek)
 		err = nil
 	} else {
-		u, err = streamTranslate(resp.Body, providerFormat, clientFormat, peek, peek)
+		u, err = streamTranslate(resp.Body, providerFormat, clientFormat, out, peek)
 	}
 	if err != nil {
 		if !peek.committed {
 			return dispatchResult{}, err
 		}
 		// Headers already sent; report what we have.
-		g.recordUsage(conn, t, apiKey, clientFormat, u, start)
+		g.recordUsage(conn, t, apiKey, clientFormat, u, start, stats, savedTokens)
 		return dispatchResult{ok: true, status: http.StatusOK}, nil
 	}
 	if ferr := peek.Finish(); ferr != nil {
@@ -737,10 +752,10 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 			return dispatchResult{}, ferr
 		}
 		// In-band provider error was already committed for the client.
-		g.recordUsage(conn, t, apiKey, clientFormat, u, start)
+		g.recordUsage(conn, t, apiKey, clientFormat, u, start, stats, savedTokens)
 		return dispatchResult{ok: true, status: http.StatusOK}, nil
 	}
-	g.recordUsage(conn, t, apiKey, clientFormat, u, start)
+	g.recordUsage(conn, t, apiKey, clientFormat, u, start, stats, savedTokens)
 	return dispatchResult{ok: true, status: http.StatusOK}, nil
 }
 
@@ -1052,13 +1067,20 @@ func (g *Gateway) markUnavailable(c *store.Connection, status int, message, mode
 	})
 }
 
-// usageLogLine renders the reference's one-line usage record: provider, model,
-// token split, latency, cost, and the account that paid for the turn. token
-// counts are cache-inclusive, matching the stored usage row.
-func usageLogLine(conn *store.Connection, t target, u translate.Usage, cost float64, start time.Time) string {
-	line := fmt.Sprintf("logged provider=%s model=%s prompt=%d completion=%d cached=%d cache_creation=%d latency_ms=%d cost=%.6f",
-		t.Provider, t.Model, u.PromptTokens+u.CacheRead+u.CacheCreation, u.CompletionTokens,
-		u.CacheRead, u.CacheCreation, time.Since(start).Milliseconds(), cost)
+// usageLogLine renders the same one-line usage record 9router-go emits:
+// provider, model, token split, stream timing, cost, what the savers bought,
+// and the account that paid for the turn. Token counts are cache-inclusive,
+// matching the stored usage row.
+func usageLogLine(conn *store.Connection, t target, u translate.Usage, cost float64, start time.Time, stats *streamStats, savedTokens int64) string {
+	prompt := u.PromptTokens + u.CacheRead + u.CacheCreation
+	line := fmt.Sprintf("logged provider=%s model=%s prompt=%d completion=%d cached=%d cache_creation=%d cache_creation_5m=0 cache_creation_1h=0 ttft_ms=%d latency_ms=%d cost=%v tok_per_sec=%v max_gap_ms=%d",
+		t.Provider, t.Model, prompt, u.CompletionTokens, u.CacheRead, u.CacheCreation,
+		stats.ttftMs(start), time.Since(start).Milliseconds(), cost,
+		stats.tokPerSec(u.CompletionTokens), stats.maxGapMs())
+	if savedTokens > 0 {
+		original := prompt + savedTokens
+		line += fmt.Sprintf(" compressed=%d->%d (%d%% saved)", original, prompt, savedTokens*100/original)
+	}
 	if conn.ID == "" || conn.ID == "noauth" {
 		return line + " account=Public / Direct"
 	}
@@ -1069,10 +1091,13 @@ func usageLogLine(conn *store.Connection, t target, u translate.Usage, cost floa
 	if conn.Email != "" {
 		line += " email=" + conn.Email
 	}
+	if egress := conn.Str("egress"); egress != "" {
+		line += " egress=" + egress
+	}
 	return line
 }
 
-func (g *Gateway) recordUsage(conn *store.Connection, t target, apiKey, endpoint string, u translate.Usage, start time.Time) {
+func (g *Gateway) recordUsage(conn *store.Connection, t target, apiKey, endpoint string, u translate.Usage, start time.Time, stats *streamStats, savedTokens int64) {
 	// A successful call proves the connection works; drop any stale
 	// "unavailable" marker left by an earlier failure.
 	if conn.Str("testStatus") != "active" || conn.Str("lastError") != "" {
@@ -1094,7 +1119,7 @@ func (g *Gateway) recordUsage(conn *store.Connection, t target, apiKey, endpoint
 		"cached_tokens":     u.CacheRead,
 	}
 	g.saveDetail(conn, t, u, start, "success", "")
-	logInfo("usage", "%s", usageLogLine(conn, t, u, cost, start))
+	logInfo("usage", "%s", usageLogLine(conn, t, u, cost, start, stats, savedTokens))
 	g.store.SaveUsage(store.UsageRecord{
 		Timestamp:        time.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00"),
 		Provider:         t.Provider,

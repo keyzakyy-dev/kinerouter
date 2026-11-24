@@ -73,7 +73,7 @@ func (g *Gateway) handleSystemone(w http.ResponseWriter, r *http.Request) {
 		status, out, usage, err := g.systemoneOnce(r, conn, t, cfg, body)
 		if status == http.StatusOK && err == nil {
 			if usage.PromptTokens > 0 || usage.CompletionTokens > 0 {
-				g.recordUsage(conn, t, "", "/v1/systemone", usage, start)
+				g.recordUsage(conn, t, "", "/v1/systemone", usage, start, nil, 0)
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(out)
