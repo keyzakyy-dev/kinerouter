@@ -293,9 +293,15 @@ export default function ConsoleLogPage() {
               {visible.map((entry) => {
                 const meta = LEVEL_META[entry.level]
                 return (
-                  <div key={`${entry.time}-${entry.line}`} className="flex items-baseline gap-3 px-3 py-1 hover:bg-surface-3/40">
+                  <div key={`${entry.time}-${entry.line}`} className="flex items-start gap-3 px-3 py-1 hover:bg-surface-3/40">
                     <span className="shrink-0 select-none tabular-nums text-[11px] text-text-muted">{entry.time}</span>
-                    <span className={cn('w-7 shrink-0 select-none text-[11px] font-bold', meta.text)}>{meta.label}</span>
+                    <span
+                      className={cn('mt-0.5 flex w-7 shrink-0 select-none justify-center', meta.text)}
+                      title={meta.label}
+                      aria-label={meta.label}
+                    >
+                      <Icon name={meta.icon} className="text-[13px]" />
+                    </span>
                     <span
                       className={cn(
                         'min-w-0 flex-1',
