@@ -46,11 +46,12 @@
   --color-text-muted: #737373;
   --color-text-subtle: #a3a3a3;
 
-  /* Status - only destructive keeps a hue (errors must read as errors) */
+  /* Status hues: badges and status text read as their meaning, not grey.
+     All four pass 4.5:1 on white so they work as text, not just as fills. */
   --color-danger: #cf222e;
-  --color-success: #171717;
-  --color-warning: #525252;
-  --color-info: #404040;
+  --color-success: #1a7f37;
+  --color-warning: #9a6700;
+  --color-info: #0969da;
 
   /* Radius */
   --radius-brand: 10px;
