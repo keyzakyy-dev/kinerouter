@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="kine/web-app/public/favicon.svg" alt="KineRouter" width="72"/>
+  <img src="kine/web-app/public/favicon.svg" alt="KineRouter" width="128"/>
 
   # KineRouter — One Binary AI Gateway
 
