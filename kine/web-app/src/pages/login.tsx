@@ -45,7 +45,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-[1.02fr_1fr]">
+    <div className="grid min-h-screen lg:mx-auto lg:w-full lg:max-w-5xl lg:grid-cols-[1.02fr_1fr]">
       <aside className="relative hidden overflow-hidden p-10 lg:flex lg:flex-col">
         <div
           aria-hidden
@@ -81,8 +81,8 @@ export default function LoginPage() {
         </div>
       </aside>
 
-      <main className="flex flex-col justify-center px-5 py-10 sm:px-10">
-        <div className="mx-auto w-full max-w-sm">
+      <main className="flex flex-col justify-center px-5 py-10 sm:px-10 lg:pl-6">
+        <div className="mx-auto w-full max-w-sm lg:mx-0">
           <div className="mb-7 flex items-center gap-2.5 lg:hidden">
             <span aria-hidden className={MARK} />
             <span className="text-[15px] font-semibold tracking-tight">KineRouter</span>
