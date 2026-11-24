@@ -120,8 +120,8 @@ func (g *Gateway) handleConnectionUsage(w http.ResponseWriter, r *http.Request) 
 		writeErr(w, http.StatusNotFound, "Connection not found")
 		return
 	}
-	if demoQuota() {
-		writeJSON(w, http.StatusOK, demoUsage(c))
+	if demo := demoUsage(c); demo != nil {
+		writeJSON(w, http.StatusOK, demo)
 		return
 	}
 	if !g.usageAllowed(c) {
