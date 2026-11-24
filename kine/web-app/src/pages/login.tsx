@@ -82,7 +82,8 @@ export default function LoginPage() {
       </aside>
 
       <main className="flex flex-col justify-center px-5 py-10 sm:px-10 lg:pl-6">
-        <div className="mx-auto w-full max-w-sm lg:mx-0">
+        {/* nudge: brand block is ~15px taller, centre both on the same top edge */}
+        <div className="mx-auto w-full max-w-sm lg:mx-0 lg:translate-y-[9px]">
           <div className="mb-7 flex items-center gap-2.5 lg:hidden">
             <span aria-hidden className={MARK} />
             <span className="text-[15px] font-semibold tracking-tight">KineRouter</span>
