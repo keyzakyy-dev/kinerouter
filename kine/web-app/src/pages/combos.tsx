@@ -261,7 +261,7 @@ export default function CombosPage() {
         </Card>
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-surface-2/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-surface-2/40 px-3 py-2 sm:min-h-[50px] sm:flex-row sm:items-center sm:justify-between">
             <label className="flex cursor-pointer select-none items-center gap-2 text-xs text-text-muted hover:text-primary">
               <input
                 type="checkbox"
