@@ -91,3 +91,20 @@ func TestPartialLineHeld(t *testing.T) {
 		t.Fatalf("entries: %#v", got)
 	}
 }
+
+// Terminal colour escapes must not reach the browser, whichever path captured
+// the line.
+func TestStripANSI(t *testing.T) {
+	b := Default()
+	b.Clear()
+	b.SetLevel(Debug)
+	defer b.SetLevel(Info)
+
+	b.Emit(Info, "tag", "\x1b[32mgreen\x1b[0m")
+	io.WriteString(b, "\x1b[31mraw red\x1b[0m\n")
+
+	got := b.Entries()
+	if len(got) != 2 || got[0].Line != "green" || got[1].Line != "raw red" {
+		t.Fatalf("entries: %#v", got)
+	}
+}

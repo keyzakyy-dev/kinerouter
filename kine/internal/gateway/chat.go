@@ -1052,6 +1052,26 @@ func (g *Gateway) markUnavailable(c *store.Connection, status int, message, mode
 	})
 }
 
+// usageLogLine renders the reference's one-line usage record: provider, model,
+// token split, latency, cost, and the account that paid for the turn. token
+// counts are cache-inclusive, matching the stored usage row.
+func usageLogLine(conn *store.Connection, t target, u translate.Usage, cost float64, start time.Time) string {
+	line := fmt.Sprintf("logged provider=%s model=%s prompt=%d completion=%d cached=%d cache_creation=%d latency_ms=%d cost=%.6f",
+		t.Provider, t.Model, u.PromptTokens+u.CacheRead+u.CacheCreation, u.CompletionTokens,
+		u.CacheRead, u.CacheCreation, time.Since(start).Milliseconds(), cost)
+	if conn.ID == "" || conn.ID == "noauth" {
+		return line + " account=Public / Direct"
+	}
+	line += " conn=" + conn.ID
+	if conn.Name != "" {
+		line += " connName=" + conn.Name
+	}
+	if conn.Email != "" {
+		line += " email=" + conn.Email
+	}
+	return line
+}
+
 func (g *Gateway) recordUsage(conn *store.Connection, t target, apiKey, endpoint string, u translate.Usage, start time.Time) {
 	// A successful call proves the connection works; drop any stale
 	// "unavailable" marker left by an earlier failure.
@@ -1074,8 +1094,7 @@ func (g *Gateway) recordUsage(conn *store.Connection, t target, apiKey, endpoint
 		"cached_tokens":     u.CacheRead,
 	}
 	g.saveDetail(conn, t, u, start, "success", "")
-	logInfo("usage", "logged provider=%s model=%s prompt=%d completion=%d cached=%d cost=%.6f conn=%s",
-		t.Provider, t.Model, u.PromptTokens+u.CacheRead+u.CacheCreation, u.CompletionTokens, u.CacheRead, cost, conn.ID)
+	logInfo("usage", "%s", usageLogLine(conn, t, u, cost, start))
 	g.store.SaveUsage(store.UsageRecord{
 		Timestamp:        time.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00"),
 		Provider:         t.Provider,

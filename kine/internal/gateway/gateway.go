@@ -4,6 +4,8 @@
 package gateway
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -394,20 +396,51 @@ func (w *statusWriter) Flush() {
 	}
 }
 
-// withRequestLog prints one row per finished request, the reference's
-// "request POST /chat/completions status=200 duration=…" line. Streams are
-// skipped: their duration is the whole turn and the line would arrive late.
+// quietPath reports routine dashboard polling and UI assets. At info they
+// would bury the requests an operator opens the console for, so they log at
+// debug instead — the same list 9router-go uses, plus this dashboard's own
+// pollers.
+func quietPath(path string) bool {
+	if strings.HasPrefix(path, "/providers/") || strings.HasPrefix(path, "/assets/") {
+		return true
+	}
+	switch path {
+	case "/favicon.ico", "/favicon.svg", "/icons.svg",
+		"/api/connections", "/api/provider-nodes", "/api/usage/stats",
+		"/api/usage/stream", "/api/usage/chart", "/usage/stream", "/health",
+		"/api/tunnel/status", "/api/auth/status", "/api/version", "/api/settings",
+		"/api/keys", "/api/models", "/api/providers":
+		return true
+	}
+	return false
+}
+
+// requestID honours an inbound X-Request-ID and otherwise mints a short one,
+// so two rows for the same turn can be tied together.
+func requestID(r *http.Request) string {
+	if id := r.Header.Get("X-Request-ID"); id != "" {
+		return id
+	}
+	var b [4]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// withRequestLog prints one row per finished request: method, path, status,
+// duration and request id, at the severity the reference uses (5xx error,
+// quiet debug, 4xx warn). Streams are skipped: their duration is the whole
+// turn and the line would arrive late.
 func (g *Gateway) withRequestLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/console-logs/stream") {
 			next.ServeHTTP(w, r)
 			return
 		}
-		// Static assets and the favicon would bury the request rows an
-		// operator actually reads.
-		if strings.HasPrefix(r.URL.Path, "/assets/") || r.URL.Path == "/favicon.ico" || r.URL.Path == "/favicon.svg" {
-			next.ServeHTTP(w, r)
-			return
+		id := requestID(r)
+		if id != "" && w.Header().Get("X-Request-ID") == "" {
+			w.Header().Set("X-Request-ID", id)
 		}
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w}
@@ -416,12 +449,22 @@ func (g *Gateway) withRequestLog(next http.Handler) http.Handler {
 		if status == 0 {
 			status = http.StatusOK
 		}
-		elapsed := time.Since(start)
-		line := fmt.Sprintf("%s %s status=%d duration=%s", r.Method, r.URL.Path, status, elapsed)
-		if status >= 400 {
-			logWarn("request", "%s", line)
-		} else {
-			logInfo("request", "%s", line)
+		// The compatibility prefix repeats on every call; log the route the
+		// client meant, not the alias it hit.
+		path := r.URL.Path
+		for len(path) > 4 && path[:4] == "/v1/" {
+			path = path[3:]
+		}
+		msg := fmt.Sprintf("%s %s status=%d duration=%s id=%s", r.Method, path, status, time.Since(start), id)
+		switch {
+		case status >= 500:
+			logError("request", "%s", msg)
+		case quietPath(path):
+			logDebug("request", "%s", msg)
+		case status >= 400:
+			logWarn("request", "%s", msg)
+		default:
+			logInfo("request", "%s", msg)
 		}
 	})
 }

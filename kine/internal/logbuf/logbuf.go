@@ -10,6 +10,8 @@ package logbuf
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -81,6 +83,25 @@ type buffer struct {
 
 var global = &buffer{subs: map[int]chan Event{}, level: Info}
 
+// init honours LOG_LEVEL for the capture floor, the same variable 9router-go
+// reads, so a restart can start quieter without touching the dashboard.
+func init() {
+	if l, ok := ParseLevel(os.Getenv("LOG_LEVEL")); ok {
+		global.level = l
+	}
+}
+
+// ansiSGR matches terminal colour sequences, which would otherwise reach the
+// browser as garbage glyphs.
+var ansiSGR = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string {
+	if !strings.Contains(s, "\x1b[") {
+		return s
+	}
+	return ansiSGR.ReplaceAllString(s, "")
+}
+
 // Default returns the process-wide buffer.
 func Default() *buffer { return global }
 
@@ -90,7 +111,7 @@ func (b *buffer) Emit(level Level, tag, format string, args ...any) {
 		Time:  time.Now().Format("15:04:05.000"),
 		Level: level.String(),
 		Tag:   tag,
-		Line:  fmt.Sprintf(format, args...),
+		Line:  stripANSI(fmt.Sprintf(format, args...)),
 	})
 }
 
@@ -117,7 +138,7 @@ func (b *buffer) Write(p []byte) (int, error) {
 		if len(line) > 9 && line[2] == ':' && line[5] == ':' && line[8] == ' ' {
 			line = line[9:]
 		}
-		b.push(Entry{Time: time.Now().Format("15:04:05.000"), Level: Info.String(), Line: line})
+		b.push(Entry{Time: time.Now().Format("15:04:05.000"), Level: Info.String(), Line: stripANSI(line)})
 	}
 	return len(p), nil
 }
