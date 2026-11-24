@@ -8,27 +8,31 @@ export interface ProgressMetricCardProps {
   accent?: MetricAccent
   valueFormatter?: (value: number) => string
   className?: string
+  /** Stagger so a row of cards counts up one after another. */
+  delay?: number
 }
 
-/** Counts up from zero with a decelerating tail; respects reduced motion. */
-function useCountUp(target: number, duration = 1600) {
+/** Counts up from zero, decelerating into the target; respects reduced motion. */
+function useCountUp(target: number, duration = 1300, delay = 0) {
   const [display, setDisplay] = useState(0)
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setDisplay(target)
       return
     }
-    const start = performance.now()
+    // Quadratic ease-out: gentle enough that small totals (a few dozen
+    // requests) still tick through most values instead of snapping.
     let raf = 0
-    const step = (now: number) => {
+    let start = 0
+    const tick = (now: number) => {
+      if (!start) start = now
       const p = Math.min(1, (now - start) / duration)
-      // Quintic ease-out: fast off the mark, long slow settle at the top.
-      setDisplay(target * (1 - (1 - p) ** 5))
-      if (p < 1) raf = requestAnimationFrame(step)
+      setDisplay(target * (1 - (1 - p) ** 2))
+      if (p < 1) raf = requestAnimationFrame(tick)
     }
-    raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
-  }, [target, duration])
+    const timer = setTimeout(() => { raf = requestAnimationFrame(tick) }, delay)
+    return () => { clearTimeout(timer); cancelAnimationFrame(raf) }
+  }, [target, duration, delay])
   return display
 }
 
@@ -49,8 +53,9 @@ export default function ProgressMetricCard({
   accent = 'emerald',
   valueFormatter,
   className = '',
+  delay = 0,
 }: ProgressMetricCardProps) {
-  const counted = useCountUp(value)
+  const counted = useCountUp(value, 1300, delay)
 
   return (
     <div

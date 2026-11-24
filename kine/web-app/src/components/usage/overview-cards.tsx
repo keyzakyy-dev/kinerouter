@@ -58,7 +58,7 @@ export function OverviewCards({ stats, period }: { stats: UsageStats; period: st
 
   return (
     <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
-      {cards.map((c) => (
+      {cards.map((c, i) => (
         <ProgressMetricCard
           key={c.title}
           title={c.title}
@@ -66,6 +66,7 @@ export function OverviewCards({ stats, period }: { stats: UsageStats; period: st
           valueFormatter={c.format}
           data={c.data}
           accent={c.accent}
+          delay={i * 120}
         />
       ))}
     </div>

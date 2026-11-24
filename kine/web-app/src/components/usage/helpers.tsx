@@ -9,14 +9,14 @@ export const PERIODS = [
   { value: 'all', label: 'All' },
 ] as const
 
-export const fmt = (n: number | null | undefined) => new Intl.NumberFormat().format(n || 0)
+export const fmt = (n: number | null | undefined) => new Intl.NumberFormat().format(Math.round(n || 0))
 export const fmtCost = (n: number | null | undefined) => `$${(n || 0).toFixed(2)}`
 
 export function fmtTokens(n: number | null | undefined) {
   const v = n || 0
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
   if (v >= 1000) return `${(v / 1000).toFixed(1)}K`
-  return String(v)
+  return String(Math.round(v))
 }
 
 /** UsageTable's relative formatter ("Just now", "5m ago", date). */
