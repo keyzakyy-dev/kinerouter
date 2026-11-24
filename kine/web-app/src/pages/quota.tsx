@@ -883,32 +883,40 @@ export default function QuotaPage() {
         ))}
       </div>
 
-      <div className="rounded-xl border border-black/10 bg-black/[0.02] px-3 py-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs text-text-muted">{pageSummary}</span>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={isCustomPageSize ? 'custom' : String(pageSize)}
-              onChange={(e) => {
-                const v = e.target.value
-                if (v === 'custom') return
-                const n = Number.parseInt(v, 10)
-                if (Number.isFinite(n)) {
-                  setPage(1)
-                  setPageSize(n)
-                  setCustomPageSizeInput(String(n))
-                }
-              }}
-              className={selectClass}
-              aria-label="Accounts per page"
-            >
-              {ACCOUNT_PAGE_SIZE_OPTIONS.map((o) => (
-                <option key={o} value={String(o)}>
-                  {o} / page
-                </option>
-              ))}
-              <option value="custom">Custom</option>
-            </select>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1 py-1">
+        <p className="text-[11px] text-text-muted">
+          {pageSummary}
+          {lastUpdated && (
+            <>
+              <span className="mx-1.5 opacity-40">·</span>
+              <span className="opacity-80">Updated {lastUpdated.toLocaleTimeString()}</span>
+            </>
+          )}
+        </p>
+        <div className="flex items-center gap-1.5">
+          <select
+            value={isCustomPageSize ? 'custom' : String(pageSize)}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === 'custom') return
+              const n = Number.parseInt(v, 10)
+              if (Number.isFinite(n)) {
+                setPage(1)
+                setPageSize(n)
+                setCustomPageSizeInput(String(n))
+              }
+            }}
+            className={selectClass}
+            aria-label="Accounts per page"
+          >
+            {ACCOUNT_PAGE_SIZE_OPTIONS.map((o) => (
+              <option key={o} value={String(o)}>
+                {o} / page
+              </option>
+            ))}
+            <option value="custom">Custom</option>
+          </select>
+          {isCustomPageSize && (
             <Input
               type="number"
               min="1"
@@ -920,22 +928,23 @@ export default function QuotaPage() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') applyPageSize(customPageSizeInput)
               }}
-              className="h-8 w-20 text-xs"
+              className="h-8 w-16 text-xs"
               aria-label="Custom accounts per page"
               placeholder={getPageSizeLabel(pageSize, isCustomPageSize)}
             />
-            <span className="text-xs text-text-muted">
-              Page {pagination.page} / {pagination.totalPages}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
+          )}
+          <div className="flex items-center gap-0.5">
             <button
               type="button"
               onClick={() => setPage(1)}
               disabled={pagination.page <= 1 || connectionsLoading || refreshingAll}
-              className={cn(iconButtonClass, 'w-auto px-3 text-xs')}
+              className={cn(
+                iconButtonClass,
+                'w-auto px-2 text-[11px] text-text-muted hover:text-text-main',
+              )}
+              aria-label="First page"
             >
-              First Page
+              First
             </button>
             <button
               type="button"
@@ -946,6 +955,9 @@ export default function QuotaPage() {
             >
               <Icon name="chevron_left" className="text-[16px]" />
             </button>
+            <span className="min-w-[52px] text-center text-[11px] tabular-nums text-text-muted">
+              {pagination.page} / {pagination.totalPages}
+            </span>
             <button
               type="button"
               onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
@@ -959,17 +971,16 @@ export default function QuotaPage() {
               type="button"
               onClick={() => setPage(pagination.totalPages)}
               disabled={pagination.page >= pagination.totalPages || connectionsLoading || refreshingAll}
-              className={cn(iconButtonClass, 'w-auto px-3 text-xs')}
+              className={cn(
+                iconButtonClass,
+                'w-auto px-2 text-[11px] text-text-muted hover:text-text-main',
+              )}
+              aria-label="Last page"
             >
-              Last Page
+              Last
             </button>
           </div>
         </div>
-        {lastUpdated && (
-          <p className="mt-1 text-[10px] text-text-muted">
-            Updated {lastUpdated.toLocaleTimeString()}
-          </p>
-        )}
       </div>
 
       <ConfirmModal
