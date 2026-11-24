@@ -108,4 +108,47 @@ func TestModelsAvailabilityCooldown(t *testing.T) {
 	}
 }
 
+// The synthetic "__all" row (connection unavailable, no model lock) reports
+// lastErrorAt and can be cleared, which re-marks the connection active.
+func TestModelsAvailabilityClearAll(t *testing.T) {
+	g := testGateway(t)
+	g.cliMachineID = "m1"
+	mux := http.NewServeMux()
+	g.registerModelsAdminRoutes(mux)
+	h := mux
+
+	c := &store.Connection{Provider: "acme", AuthType: "oauth", IsActive: true,
+		Data: map[string]any{"testStatus": "unavailable", "lastError": "402 no plan",
+			"lastErrorAt": "2026-11-23T17:04:31Z"}}
+	if err := g.store.UpsertConnection(c); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/api/models/availability", nil)
+	req.Header.Set("x-kine-cli-token", cliTok(g.cliMachineID))
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	var got struct {
+		Models []map[string]any `json:"models"`
+	}
+	json.Unmarshal(rr.Body.Bytes(), &got)
+	if len(got.Models) != 1 || got.Models[0]["model"] != "__all" ||
+		got.Models[0]["lastErrorAt"] != "2026-11-23T17:04:31Z" {
+		t.Fatalf("availability: %s", rr.Body.String())
+	}
+
+	req = httptest.NewRequest("POST", "/api/models/availability",
+		strings.NewReader(`{"action":"clearCooldown","provider":"acme","model":"__all"}`))
+	req.Header.Set("x-kine-cli-token", cliTok(g.cliMachineID))
+	rr = httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("clear: %d %s", rr.Code, rr.Body.String())
+	}
+	fresh, _ := g.store.GetConnection(c.ID)
+	if fresh.Str("testStatus") != "active" || fresh.Str("lastError") != "" {
+		t.Fatalf("still unavailable: %q %q", fresh.Str("testStatus"), fresh.Str("lastError"))
+	}
+}
+
 func cliTok(machineID string) string { return auth.CLIToken(machineID) }

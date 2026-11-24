@@ -127,6 +127,7 @@ export type ModelAvailabilityEntry = {
   connectionId: string
   connectionName: string
   lastError?: string | null
+  lastErrorAt?: string | null
 }
 
 export type ModelAvailability = { models: ModelAvailabilityEntry[]; unavailableCount: number }

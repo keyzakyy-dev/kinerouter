@@ -58,6 +58,7 @@ func (g *Gateway) handleModelsAvailability(w http.ResponseWriter, r *http.Reques
 				"connectionId":   c.ID,
 				"connectionName": connDisplayName(c),
 				"lastError":      nullableAny(c.Str("lastError")),
+				"lastErrorAt":    nullableAny(c.Str("lastErrorAt")),
 			})
 		}
 		if active == 0 && c.Str("testStatus") == "unavailable" {
@@ -68,6 +69,7 @@ func (g *Gateway) handleModelsAvailability(w http.ResponseWriter, r *http.Reques
 				"connectionId":   c.ID,
 				"connectionName": connDisplayName(c),
 				"lastError":      nullableAny(c.Str("lastError")),
+				"lastErrorAt":    nullableAny(c.Str("lastErrorAt")),
 			})
 		}
 	}
@@ -92,18 +94,21 @@ func (g *Gateway) handleClearCooldown(w http.ResponseWriter, r *http.Request) {
 	}
 	lockKey := modelLockPrefix + body.Model
 	for _, c := range conns {
-		if c.Str(lockKey) == "" && c.AuthType == "" {
-			continue
+		patch := map[string]any{}
+		if _, ok := c.Data[lockKey]; ok {
+			patch[lockKey] = nil
 		}
-		if _, ok := c.Data[lockKey]; !ok {
-			continue
-		}
-		patch := map[string]any{lockKey: nil}
-		if c.Str("testStatus") == "unavailable" {
+		// "__all" is the synthetic row for a connection marked unavailable with
+		// no active model lock; clearing it re-marks the whole connection.
+		if body.Model == "__all" || c.Str("testStatus") == "unavailable" {
 			patch["testStatus"] = "active"
 			patch["lastError"] = nil
 			patch["lastErrorAt"] = nil
+			patch["errorCode"] = nil
 			patch["backoffLevel"] = 0
+		}
+		if len(patch) == 0 {
+			continue
 		}
 		if _, err := g.store.PatchConnection(c.ID, patch); err != nil {
 			writeErr(w, http.StatusInternalServerError, "Failed to clear cooldown")

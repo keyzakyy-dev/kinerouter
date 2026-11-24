@@ -120,14 +120,22 @@ export function ModelAvailabilityBadge() {
                           <div
                             key={`${m.connectionId}-${m.model}`}
                             className="flex items-center justify-between rounded-lg bg-surface-2 px-2.5 py-1.5"
+                            title={m.lastError || undefined}
                           >
                             <div className="flex min-w-0 items-center gap-1.5">
                               <span aria-hidden className="shrink-0 text-[14px]" style={{ color: s.color }}>
                                 <Icon name={s.icon} />
                               </span>
-                              <span className="truncate font-mono text-xs text-text-main">{m.model}</span>
+                              <div className="min-w-0">
+                                <div className="truncate font-mono text-xs text-text-main">{m.model}</div>
+                                {m.lastErrorAt && (
+                                  <div className="truncate text-[10px] text-text-subtle">
+                                    {new Date(m.lastErrorAt).toLocaleString()}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            {m.status === 'cooldown' && (
+                            {m.status !== 'available' && (
                               <Button
                                 size="sm"
                                 variant="ghost"

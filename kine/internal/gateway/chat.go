@@ -1048,6 +1048,17 @@ func (g *Gateway) markUnavailable(c *store.Connection, status int, message, mode
 }
 
 func (g *Gateway) recordUsage(conn *store.Connection, t target, apiKey, endpoint string, u translate.Usage, start time.Time) {
+	// A successful call proves the connection works; drop any stale
+	// "unavailable" marker left by an earlier failure.
+	if conn.Str("testStatus") != "active" || conn.Str("lastError") != "" {
+		g.store.PatchConnection(conn.ID, map[string]any{
+			"testStatus":   "active",
+			"lastError":    nil,
+			"lastErrorAt":  nil,
+			"errorCode":    nil,
+			"backoffLevel": 0,
+		})
+	}
 	var cost float64
 	if id := g.reg.ResolveAlias(t.Provider); id != "" {
 		cost = g.pricing.Cost(id, t.Model, u.PromptTokens+u.CacheRead+u.CacheCreation, u.CompletionTokens)
