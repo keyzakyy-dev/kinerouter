@@ -165,7 +165,7 @@ function StatusLine({ stats, noAuth }: { stats: Stats; noAuth?: boolean }) {
   }
   if (noAuth) {
     return (
-      <Badge variant="success" size="sm" dot>
+      <Badge variant="success" size="sm" dot className="bg-emerald-500/12 text-emerald-700 dark:text-emerald-400">
         Ready
       </Badge>
     )
@@ -174,7 +174,7 @@ function StatusLine({ stats, noAuth }: { stats: Stats; noAuth?: boolean }) {
   return (
     <>
       {connected > 0 && (
-        <Badge variant="success" size="sm" dot>
+        <Badge variant="success" size="sm" dot className="bg-emerald-500/12 text-emerald-700 dark:text-emerald-400">
           {connected} Connected
         </Badge>
       )}
