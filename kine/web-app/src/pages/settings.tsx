@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type Settings } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
-import { useTheme, type Theme } from '@/lib/use-theme'
 import { PageHeader } from '@/components/layout'
 import { Icon } from '@/components/icon'
 import { Modal, ConfirmModal } from '@/components/modal'
@@ -15,12 +14,6 @@ import { cn } from '@/lib/utils'
 
 type Status = { type: '' | 'success' | 'error'; message: string }
 const EMPTY: Status = { type: '', message: '' }
-
-const THEME_OPTIONS: { value: Theme; icon: string; label: string }[] = [
-  { value: 'light', icon: 'light_mode', label: 'Light' },
-  { value: 'dark', icon: 'dark_mode', label: 'Dark' },
-  { value: 'system', icon: 'contrast', label: 'System' },
-]
 
 const LOCALES: { id: string; name: string; flag: string }[] = [
   { id: 'en', name: 'English', flag: '🇺🇸' },
@@ -164,7 +157,6 @@ const AuthModeCard = {
 export default function SettingsPage() {
   const navigate = useNavigate()
   const { logout } = useAuth()
-  const { theme, setTheme } = useTheme()
 
   const [settings, setSettings] = useState<Settings | null>(null)
   const [version, setVersion] = useState('')
@@ -597,36 +589,11 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Theme, security, SSO, routing defaults, and network." />
+      <PageHeader title="Settings" description="Security, SSO, routing defaults, and network." />
 
       <div className="space-y-4">
         <Section icon="computer" title="Local Mode" subtitle="Running on your machine">
-          <Row
-            title="Appearance"
-            desc="Theme applied to the dashboard and topology views."
-            right={
-              <div className="inline-flex shrink-0 items-center gap-0.5 rounded-lg bg-surface-2 p-1">
-                {THEME_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setTheme(option.value)}
-                    className={cn(
-                      'flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                      theme === option.value
-                        ? 'bg-card text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.08)]'
-                        : 'text-text-muted hover:text-text-main',
-                    )}
-                  >
-                    <Icon name={option.icon} className="text-[15px]" />
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            }
-          />
-
-          <div className="border-t border-border px-5 py-4">
+          <div className="px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2.5">
               <div className="min-w-0">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-text-muted">

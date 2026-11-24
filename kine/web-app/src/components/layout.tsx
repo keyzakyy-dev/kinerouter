@@ -12,9 +12,16 @@ import {
 } from '@/components/ui/sidebar'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { useTheme, type Theme } from '@/lib/use-theme'
 import { Modal } from '@/components/modal'
 import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
 import { Icon } from '@/components/icon'
+
+const THEME_OPTIONS: { value: Theme; icon: string; label: string }[] = [
+  { value: 'light', icon: 'light_mode', label: 'Light' },
+  { value: 'dark', icon: 'dark_mode', label: 'Dark' },
+  { value: 'system', icon: 'contrast', label: 'System' },
+]
 
 /** Fallback until /api/version reports how this binary was installed. */
 const INSTALL_CMD = 'npm i -g kinerouter@latest --prefer-online'
@@ -210,6 +217,7 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) !== 'open')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { copied, copy } = useCopyToClipboard()
+  const { theme, setTheme } = useTheme()
   const currentLabel = ALL_NAV_ITEMS.find((item) => isActive(pathname, item.href))?.label
 
   useEffect(() => {
@@ -413,6 +421,29 @@ export function AppShell() {
             </span>
             <span className="truncate font-medium text-text-main">{currentLabel ?? 'Overview'}</span>
           </nav>
+          <div
+            className="ml-auto inline-flex shrink-0 items-center gap-0.5 rounded-lg bg-surface-2 p-0.5"
+            role="group"
+            aria-label="Theme"
+          >
+            {THEME_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setTheme(option.value)}
+                title={option.label}
+                aria-label={option.label}
+                aria-pressed={theme === option.value}
+                className={`grid size-7 cursor-pointer place-items-center rounded-md transition-colors ${
+                  theme === option.value
+                    ? 'bg-card text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.08)]'
+                    : 'text-text-muted hover:text-text-main'
+                }`}
+              >
+                <Icon name={option.icon} className="text-[16px]" />
+              </button>
+            ))}
+          </div>
         </header>
         <div className="mx-auto w-full max-w-7xl px-8 py-8">
           <Outlet />
