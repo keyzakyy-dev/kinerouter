@@ -37,7 +37,12 @@ func modelKeyOf(model, provider string) string {
 func (s *Store) TrackPending(model, provider, connID string, started, failed bool) {
 	p := &s.pending
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	defer func() {
+		p.mu.Unlock()
+		// Push the in-flight change now so the topology lights up while a
+		// (streaming) request is still running, and clears as soon as it ends.
+		s.NotifyUsage()
+	}()
 	if p.byModel == nil {
 		p.byModel = map[string]int{}
 		p.byAcc = map[string]map[string]int{}
