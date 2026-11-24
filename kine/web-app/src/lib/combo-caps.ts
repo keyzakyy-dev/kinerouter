@@ -51,7 +51,7 @@ export function aggregateComboCapabilities(
 
 /** `fmtK` from the reference page: 200000 → "200K", 1e6 → "1M". */
 export function fmtK(n: number | undefined): string {
-  if (!n || !Number.isFinite(n)) return '—'
+  if (!n || !Number.isFinite(n)) return '-'
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`
   return `${Math.round(n / 1000)}K`
 }

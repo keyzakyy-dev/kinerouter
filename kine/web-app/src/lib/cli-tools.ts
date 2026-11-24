@@ -121,11 +121,11 @@ amp --model "{{model}}"
     },
   },
   {
-    id: 'qwen', name: 'Qwen Code', description: 'Alibaba Qwen Code CLI — supports OpenAI, Anthropic & Gemini providers via KineRouter', image: 'qwen', color: '#10B981', form: 'guide',
+    id: 'qwen', name: 'Qwen Code', description: 'Alibaba Qwen Code CLI. Supports OpenAI, Anthropic & Gemini providers via KineRouter', image: 'qwen', color: '#10B981', form: 'guide',
     docsUrl: 'https://qwenlm.github.io/qwen-code-docs/en/users/configuration/model-providers/',
     notes: [
       { type: 'info', text: 'Qwen Code supports multiple provider types (openai, anthropic, gemini) via modelProviders in settings.json. KineRouter works as an OpenAI-compatible endpoint.' },
-      { type: 'info', text: 'Any model available in KineRouter can be used — not just Qwen models. Select from Qwen, Claude, Gemini, GPT, and more.' },
+      { type: 'info', text: 'Any model available in KineRouter can be used, not just Qwen models. Select from Qwen, Claude, Gemini, GPT, and more.' },
       { type: 'warning', text: 'Config path: Linux/macOS ~/.qwen/settings.json • Windows %USERPROFILE%\\.qwen\\settings.json' },
       { type: 'error', text: 'Qwen OAuth free tier was discontinued on 2026-04-15. Use KineRouter with alicode/openrouter/anthropic/gemini providers instead.' },
     ],
@@ -183,12 +183,12 @@ amp --model "{{model}}"
     installUrl: 'https://cli.devin.ai',
     notes: [
       { type: 'info', text: 'This is a local dependency, not a routed CLI. The Devin CLI provider spawns `devin acp --agent-type summarizer` and relays its output.' },
-      { type: 'warning', text: 'Install the Devin CLI and run `devin auth login` — without it, the provider returns a spawn error on first request.' },
+      { type: 'warning', text: 'Install the Devin CLI and run `devin auth login`; without it, the provider returns a spawn error on first request.' },
     ],
     guideSteps: [
       { step: 1, title: 'Install Devin CLI', desc: 'Install via the official installer at cli.devin.ai.', docsUrl: 'https://cli.devin.ai' },
       { step: 2, title: 'Authenticate', desc: 'Log in once so the binary stores its own credentials.' },
-      { step: 3, title: 'Use the provider', desc: 'Pick any Devin CLI model under the Providers tab — no API key field needed.' },
+      { step: 3, title: 'Use the provider', desc: 'Pick any Devin CLI model under the Providers tab. No API key field needed.' },
     ],
     codeBlock: {
       language: 'bash',
@@ -203,7 +203,7 @@ devin --version`,
     id: 'opendesign', name: 'OpenDesign', description: 'Agent-native design skills pack', image: 'opendesign', color: '#EC4899', form: 'guide',
     docsUrl: 'https://github.com/manalkaff/opendesign',
     notes: [
-      { type: 'info', text: "OpenDesign ships as a plugin/skills pack installed into Claude Code, Cursor, OpenAI Codex, Gemini CLI, or OpenCode. It inherits the host agent's model config, so once your host points at KineRouter, /opendesign design sessions route through KineRouter automatically — no extra env vars needed." },
+      { type: 'info', text: "OpenDesign ships as a plugin/skills pack installed into Claude Code, Cursor, OpenAI Codex, Gemini CLI, or OpenCode. It inherits the host agent's model config, so once your host points at KineRouter, /opendesign design sessions route through KineRouter automatically, no extra env vars needed." },
       { type: 'info', text: 'Invoke with /opendesign <brief>. Covers decks, wireframes, interactive prototypes, design-system extraction, and brand systems, with a verifier subagent that checks output against the brief.' },
     ],
     guideSteps: [
@@ -290,7 +290,7 @@ export type MitmTool = {
 /**
  * MITM tools, mirrored from MITM_TOOLS + TOOL_HOSTS in the reference
  * (src/shared/constants/cliTools.js, mitmToolHosts.js). Hosts must match
- * internal/mitm/toolhosts.go — the alias PUT is rejected while DNS is off.
+ * internal/mitm/toolhosts.go; the alias PUT is rejected while DNS is off.
  */
 export const MITM_TOOLS: MitmTool[] = [
   {

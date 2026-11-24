@@ -433,7 +433,7 @@ export default function JailbreakPage() {
 
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label>Keyword rules — arm this preset when a model id matches</Label>
+                  <Label>Keyword rules: arm this preset when a model id matches</Label>
                   <RuleEditor
                     rules={draft.keywords ?? []}
                     onChange={(keywords) => setDraft({ ...draft, keywords })}
@@ -441,7 +441,7 @@ export default function JailbreakPage() {
                   />
                 </div>
                 <div>
-                  <Label>Preset excludes — never inject on these ids</Label>
+                  <Label>Preset excludes: never inject on these ids</Label>
                   <RuleEditor
                     rules={draft.excludes ?? []}
                     onChange={(next) => setDraft({ ...draft, excludes: next })}
@@ -499,7 +499,7 @@ export default function JailbreakPage() {
                     />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs text-text-main">{id}</p>
-                      <p className="text-[11px] text-text-muted">preset: {cfg.presetId || '—'}</p>
+                      <p className="text-[11px] text-text-muted">preset: {cfg.presetId || '-'}</p>
                     </div>
                     <Button size="icon" variant="ghost" onClick={() => deleteBinding(id)} title="Remove binding">
                       <Trash2 className="size-3.5" />
@@ -574,7 +574,7 @@ export default function JailbreakPage() {
                     />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs text-text-main">{id}</p>
-                      <p className="text-[11px] text-text-muted">preset: {cfg.presetId || '—'}</p>
+                      <p className="text-[11px] text-text-muted">preset: {cfg.presetId || '-'}</p>
                     </div>
                   </div>
                 ))}

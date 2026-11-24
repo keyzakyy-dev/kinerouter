@@ -222,7 +222,7 @@ export default function TerminalPage() {
       </Card>
 
       <p className="mt-3 text-[11px] text-text-muted">
-        Non-interactive commands only — full-screen programs (vim, top) need a PTY and are not supported.
+        Non-interactive commands only. Full-screen programs (vim, top) need a PTY and are not supported.
       </p>
     </div>
   )

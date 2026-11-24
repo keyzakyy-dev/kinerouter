@@ -19,7 +19,7 @@ export function CopyButton({
     try {
       await navigator.clipboard.writeText(value)
     } catch {
-      // clipboard API blocked (insecure origin / permissions) — fall back to select+execCommand
+      // clipboard API blocked (insecure origin / permissions), fall back to select+execCommand
       const el = document.createElement('textarea')
       el.value = value
       document.body.appendChild(el)

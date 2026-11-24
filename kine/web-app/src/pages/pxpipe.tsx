@@ -21,7 +21,7 @@ const fmtTokens = (n: number) => {
 }
 
 const fmtUptime = (ms: number) => {
-  if (!ms || ms <= 0) return '—'
+  if (!ms || ms <= 0) return '-'
   const m = Math.floor(ms / 60000)
   const h = Math.floor(m / 60)
   return h > 0 ? `${h}h${String(m % 60).padStart(2, '0')}m` : `${m}m`
@@ -145,7 +145,7 @@ export default function PxpipePage() {
 
   const w = stats?.windows?.[windowId]
   const statusLabel = !status
-    ? '—'
+    ? '-'
     : !status.installed
       ? 'Not installed'
       : health?.healthy
@@ -189,17 +189,17 @@ export default function PxpipePage() {
         />
         <SummaryCard
           label="Version"
-          value={status?.version ? `v${status.version}` : '—'}
+          value={status?.version ? `v${status.version}` : '-'}
           sub="pxpipe-proxy"
         />
         <SummaryCard label="Uptime" value={fmtUptime(status?.uptimeMs ?? 0)} sub="module loaded" />
-        <SummaryCard label="Requests" value={w ? w.requests.toLocaleString() : '—'} />
+        <SummaryCard label="Requests" value={w ? w.requests.toLocaleString() : '-'} />
         <SummaryCard
           label="Compressed"
-          value={w ? w.compressed.toLocaleString() : '—'}
+          value={w ? w.compressed.toLocaleString() : '-'}
           tone="text-success"
         />
-        <SummaryCard label="Bypassed" value={w ? w.bypassed.toLocaleString() : '—'} />
+        <SummaryCard label="Bypassed" value={w ? w.bypassed.toLocaleString() : '-'} />
       </div>
 
       <Card className="p-4">
@@ -226,36 +226,36 @@ export default function PxpipePage() {
           <div>
             <p className="text-xs text-text-muted">Original tokens</p>
             <p className="text-lg font-semibold text-text-main">
-              {w ? fmtTokens(w.tokensBeforeEst) : '—'}
+              {w ? fmtTokens(w.tokensBeforeEst) : '-'}
             </p>
           </div>
           <div>
             <p className="text-xs text-text-muted">After PXPIPE</p>
             <p className="text-lg font-semibold text-text-main">
-              {w ? fmtTokens(w.tokensAfterEst) : '—'}
+              {w ? fmtTokens(w.tokensAfterEst) : '-'}
             </p>
           </div>
           <div>
             <p className="text-xs text-text-muted">Saved</p>
             <p className="text-lg font-semibold text-success">
-              {w ? fmtTokens(w.tokensSavedEst) : '—'}
+              {w ? fmtTokens(w.tokensSavedEst) : '-'}
             </p>
           </div>
           <div>
             <p className="text-xs text-text-muted">Reduction</p>
-            <p className="text-lg font-semibold text-success">{w ? `${w.savedPct}%` : '—'}</p>
+            <p className="text-lg font-semibold text-success">{w ? `${w.savedPct}%` : '-'}</p>
           </div>
         </div>
         <p className="mt-3 text-xs text-text-muted">
           Estimates from body size before/after imaging; billed usage per request (recorded on the
           Usage page) remains the ground truth. Images generated:{' '}
-          {w ? w.imagesGenerated.toLocaleString() : '—'} · avg compression time:{' '}
-          {w ? `${w.avgCompressionMs}ms` : '—'} · errors: {w ? w.errors : '—'}
+          {w ? w.imagesGenerated.toLocaleString() : '-'} · avg compression time:{' '}
+          {w ? `${w.avgCompressionMs}ms` : '-'} · errors: {w ? w.errors : '-'}
         </p>
       </Card>
 
       <Card className="p-4">
-        <h3 className="mb-3 font-medium text-text-main">Tokens saved — last 30 days</h3>
+        <h3 className="mb-3 font-medium text-text-main">Tokens saved, last 30 days</h3>
         {stats?.timeline?.some((d) => d.tokensSavedEst > 0) ? (
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={stats.timeline} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -287,7 +287,7 @@ export default function PxpipePage() {
           </ResponsiveContainer>
         ) : (
           <div className="flex h-32 items-center justify-center text-sm text-text-muted">
-            No savings recorded yet — enable PXPIPE in the Token Saver and route a large
+            No savings recorded yet. Enable PXPIPE in the Token Saver and route a large
             Claude-format request.
           </div>
         )}
@@ -316,22 +316,22 @@ export default function PxpipePage() {
                     {new Date(ev.ts).toLocaleString()}
                   </td>
                   <td className="py-1.5 pr-3 font-mono text-xs">
-                    {ev.provider ? `${ev.provider}/${ev.model}` : ev.model || '—'}
+                    {ev.provider ? `${ev.provider}/${ev.model}` : ev.model || '-'}
                   </td>
                   <td className="py-1.5 pr-3 text-right font-mono text-xs">
-                    {ev.applied ? fmtTokens(ev.tokensBeforeEst) : '—'}
+                    {ev.applied ? fmtTokens(ev.tokensBeforeEst) : '-'}
                   </td>
                   <td className="py-1.5 pr-3 text-right font-mono text-xs">
-                    {ev.applied ? fmtTokens(ev.tokensAfterEst) : '—'}
+                    {ev.applied ? fmtTokens(ev.tokensAfterEst) : '-'}
                   </td>
                   <td className="py-1.5 pr-3 text-right font-mono text-xs text-success">
-                    {ev.applied ? fmtTokens(ev.tokensSavedEst) : '—'}
+                    {ev.applied ? fmtTokens(ev.tokensSavedEst) : '-'}
                   </td>
                   <td className="py-1.5 pr-3 text-right font-mono text-xs">
-                    {ev.applied ? `${ev.savedPct}%` : '—'}
+                    {ev.applied ? `${ev.savedPct}%` : '-'}
                   </td>
                   <td className="py-1.5 pr-3 text-right font-mono text-xs">
-                    {ev.durationMs != null ? `${ev.durationMs}ms` : '—'}
+                    {ev.durationMs != null ? `${ev.durationMs}ms` : '-'}
                   </td>
                   <td className="py-1.5">
                     <span

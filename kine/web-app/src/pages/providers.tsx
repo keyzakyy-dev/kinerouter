@@ -534,7 +534,7 @@ export function ProvidersPage() {
                   <div className="flex flex-col gap-1">
                     <p className="text-sm font-medium">Add your first custom provider</p>
                     <p className="max-w-md text-xs leading-relaxed text-text-muted">
-                      Point KineRouter at any OpenAI- or Anthropic-compatible endpoint — a local model server, gateway, or hosted proxy.
+                      Point KineRouter at any OpenAI- or Anthropic-compatible endpoint: a local model server, gateway, or hosted proxy.
                     </p>
                   </div>
                   <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">

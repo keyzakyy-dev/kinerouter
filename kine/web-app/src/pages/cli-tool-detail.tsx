@@ -589,7 +589,7 @@ function ToolDetail({ tool }: { tool: CliTool }) {
                 <Field label={`Models (${selected.length} selected)`}>
                   <div className="custom-scrollbar flex max-h-56 flex-col gap-0.5 overflow-y-auto rounded-lg bg-surface-2 p-1">
                     {models.length === 0 && (
-                      <p className="p-3 text-[11px] text-text-muted">No models — add a provider connection first.</p>
+                      <p className="p-3 text-[11px] text-text-muted">No models yet. Add a provider connection first.</p>
                     )}
                     {models.map((m) => (
                       <label
@@ -733,7 +733,7 @@ function ToolDetail({ tool }: { tool: CliTool }) {
       <ManualConfigModal
         isOpen={manualOpen}
         onClose={() => setManualOpen(false)}
-        title={`${tool.name} — Manual Configuration`}
+        title={`${tool.name}: Manual Configuration`}
         configs={manualConfigs(tool, withV1(baseUrl), apiKey, selected, claudeModels, autoCompact, subagentModel)}
       />
 
@@ -1303,7 +1303,7 @@ function GuideCard({
       .replace(/\{\{model\}\}/g, model || 'provider/model-id')
 
   // requiresExternalUrl tools (Cursor) write into their own cloud, so a
-  // localhost endpoint cannot work — the steps stay hidden until a tunnel or
+  // localhost endpoint cannot work; the steps stay hidden until a tunnel or
   // cloud endpoint exists in the endpoint list.
   const canShowGuide = !tool.requiresExternalUrl || hasExternalUrl
 

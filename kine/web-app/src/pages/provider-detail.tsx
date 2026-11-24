@@ -138,7 +138,7 @@ export function ProviderDetailPage() {
   }, [load])
 
   // MiniMax desktop lease: the server borrows the running desktop app's token
-  // over its local pipe, so there is nothing to type here — just the attempt.
+  // over its local pipe, so there is nothing to type here, just the attempt.
   const runLeaseConnect = () => {
     setLeaseBusy(true)
     setLeaseError('')
@@ -174,7 +174,7 @@ export function ProviderDetailPage() {
   }, [detail])
 
   // Live model catalog (cursor / zed / claude / commandcode) through the first
-  // active connection — the reference surfaces zed failures only.
+  // active connection; the reference surfaces zed failures only.
   useEffect(() => {
     if (!detail || !LIVE_MODEL_CATALOG_PROVIDERS.has(detail.id)) return
     const conn = detail.connections.find((c) => c.isActive)
@@ -819,7 +819,7 @@ export function ProviderDetailPage() {
                           variant="secondary"
                           disabled={leaseBusy}
                           onClick={runLeaseConnect}
-                          title="Borrow the signed-in MiniMax Code desktop app's login — no second sign-in, refresh stays with the desktop app"
+                          title="Borrow the signed-in MiniMax Code desktop app's login, no second sign-in, refresh stays with the desktop app"
                         >
                           <Icon name="desktop_windows" /> {leaseBusy ? 'Connecting…' : 'Use Desktop App'}
                         </Button>
@@ -912,7 +912,7 @@ export function ProviderDetailPage() {
                       variant="ghost"
                       disabled={leaseBusy}
                       onClick={runLeaseConnect}
-                      title="Borrow the signed-in MiniMax Code desktop app's login — no second sign-in, refresh stays with the desktop app"
+                      title="Borrow the signed-in MiniMax Code desktop app's login, no second sign-in, refresh stays with the desktop app"
                     >
                       <Icon name="desktop_windows" /> {leaseBusy ? 'Connecting…' : 'Use Desktop App'}
                     </Button>
@@ -1550,7 +1550,7 @@ export function NoAuthProxyCard({
               </SelectContent>
             </Select>
             {rotating && (
-              <p className="text-[11px] text-text-muted">Rotation active — all pools used.</p>
+              <p className="text-[11px] text-text-muted">Rotation active. All pools used.</p>
             )}
           </div>
 
@@ -2002,7 +2002,7 @@ export function AddApiKeyModal({
     <Modal
       isOpen
       onClose={onClose}
-      title={`Add ${label} — ${providerName}`}
+      title={`Add ${label}: ${providerName}`}
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
@@ -2450,7 +2450,7 @@ function OAuthModal({
         if (cancelled) return
         stateRef.current = start.state
         const popup = window.open(start.authorizeUrl, 'oauth_popup', 'width=600,height=700')
-        if (!popup) setError('Popup blocked — paste the callback URL below instead.')
+        if (!popup) setError('Popup blocked. Paste the callback URL below instead.')
 
         const handler = (e: MessageEvent) => {
           if (e.origin !== window.location.origin) return

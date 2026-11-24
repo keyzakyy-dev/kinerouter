@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
  * missing file falls back to the two-letter badge instead of a broken image.
  */
 
-/** Ported from src/shared/utils/providerIcon.js — brands sharing one mark. */
+/** Ported from src/shared/utils/providerIcon.js; brands sharing one mark. */
 const ICON_ALIASES: Record<string, string> = {
   'perplexity-agent': 'perplexity',
   'gitlab-duo': 'gitlab',

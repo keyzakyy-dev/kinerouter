@@ -6,7 +6,7 @@ import { Icon } from '@/components/icon'
  * Sponsored banner for the ad-funded providers (free-pi, freebuff).
  *
  * The creative comes from the gateway, which records what it served. The
- * impression is reported only after the banner is painted — never on a timer,
+ * impression is reported only after the banner is painted, never on a timer,
  * and never for an ad that was not displayed. A failed fetch or report is
  * silent: an ad is decoration, it must not make the page look broken.
  */

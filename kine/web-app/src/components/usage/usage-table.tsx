@@ -13,7 +13,7 @@ function ValueCells({ item, viewMode }: { item: Row | Group['summary']; viewMode
     return (
       <>
         <td className="px-3 py-2.5 text-right text-text-muted">{fmt(item.promptTokens)}</td>
-        <td className="px-3 py-2.5 text-right text-text-muted">{item.cachedTokens ? fmt(item.cachedTokens) : '—'}</td>
+        <td className="px-3 py-2.5 text-right text-text-muted">{item.cachedTokens ? fmt(item.cachedTokens) : '-'}</td>
         <td className="px-3 py-2.5 text-right text-text-muted">{fmt(item.completionTokens)}</td>
         <td className="px-3 py-2.5 text-right font-medium">{fmt(item.totalTokens)}</td>
       </>
@@ -22,7 +22,7 @@ function ValueCells({ item, viewMode }: { item: Row | Group['summary']; viewMode
   return (
     <>
       <td className="px-3 py-2.5 text-right text-text-muted">{fmtCost(item.inputCost)}</td>
-      <td className="px-3 py-2.5 text-right text-text-muted">{item.cachedCost ? fmtCost(item.cachedCost) : '—'}</td>
+      <td className="px-3 py-2.5 text-right text-text-muted">{item.cachedCost ? fmtCost(item.cachedCost) : '-'}</td>
       <td className="px-3 py-2.5 text-right text-text-muted">{fmtCost(item.outputCost)}</td>
       <td className="px-3 py-2.5 text-right font-medium text-warning">{fmtCost(item.totalCost || item.cost)}</td>
     </>
@@ -170,7 +170,7 @@ export function UsageTable({
 export function SummaryMetaCells({ cols, group }: { cols: number; group: Group }) {
   return (
     <>
-      <td className="px-3 py-2.5 text-text-muted">—</td>
+      <td className="px-3 py-2.5 text-text-muted">-</td>
       {cols > 1 && (
         <td className="px-3 py-2.5 text-right">{fmt(group.summary.requests)}</td>
       )}

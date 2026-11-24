@@ -15,7 +15,7 @@ export function fmtCost(n: number | null | undefined): string {
 }
 
 export function fmtTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
   return d.toLocaleString(undefined, {

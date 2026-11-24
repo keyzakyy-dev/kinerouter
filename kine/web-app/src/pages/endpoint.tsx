@@ -255,7 +255,7 @@ function TunnelSection() {
         }
         if (res.needsLogin && res.authUrl) {
           setTsAuthUrl(res.authUrl)
-          setTsProgress('Login required — finish login to continue')
+          setTsProgress('Login required. Finish login to continue')
           const loggedIn = await pollUntil(async () => (await api.tailscaleCheck()).loggedIn, () => alive.current)
           if (!loggedIn) { setTsError('Login timed out. Please try again.'); return }
           continue
@@ -419,15 +419,15 @@ function TunnelSection() {
         <div className="flex flex-col gap-2">
           {!requireApiKey && (
             <SecurityWarning
-              message="Require API key is disabled — your endpoint is publicly accessible without authentication."
+              message="Require API key is disabled. Your endpoint is publicly accessible without authentication."
               action={{ label: 'Enable', href: '#require-api-key' }}
             />
           )}
           {loginUnsafe && (
             <SecurityWarning
               message={!requireLogin
-                ? 'Require login is disabled — anyone can access your dashboard via tunnel.'
-                : 'Dashboard uses the default password — change it in Profile settings.'}
+                ? 'Require login is disabled. Anyone can access your dashboard via tunnel.'
+                : 'Dashboard uses the default password. Change it in Profile settings.'}
               action={{
                 label: !requireLogin ? 'Enable' : 'Change password',
                 href: '/dashboard/settings',
@@ -520,7 +520,7 @@ function KeyAccessControls({
       {restricted && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {allow.length === 0 && (
-            <span className="text-[11px] text-warning">No combos or models allowed — this key can call nothing.</span>
+            <span className="text-[11px] text-warning">No combos or models allowed. This key can call nothing.</span>
           )}
           {allow.map((entry) => (
             <span key={entry} className="flex items-center gap-1 rounded bg-card px-1.5 py-0.5 font-mono text-[10px] text-text-main">
@@ -797,7 +797,7 @@ export default function EndpointPage() {
       <Dialog open={!!created} onOpenChange={(o) => !o && setCreated(null)}>
         <DialogContent>
           <DialogTitle>Key created</DialogTitle>
-          <DialogDescription>Copy it now — this is the only time it is shown in full here.</DialogDescription>
+          <DialogDescription>Copy it now. This is the only time it is shown in full here.</DialogDescription>
           <div className="mt-4 flex items-center gap-2">
             <code className="min-w-0 flex-1 break-all rounded-lg bg-surface-2 px-3 py-2 font-mono text-xs">
               {created?.key}

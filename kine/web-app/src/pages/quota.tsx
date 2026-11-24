@@ -52,7 +52,7 @@ import { cn } from '@/lib/utils'
  * answers with the same provider-shaped payload KineRouter does, so the parsers in
  * lib/quota.ts stay identical.
  *
- * ponytail: the auto-ping scheduler itself (quotaAutoPing.js) is not ported —
+ * ponytail: the auto-ping scheduler itself (quotaAutoPing.js) is not ported;
  * this page only writes its settings. Pings happen when the matching server
  * loop lands. The edit modal also drops the Azure/Cloudflare/AWS blocks because
  * the Go update allowlist would discard those fields.

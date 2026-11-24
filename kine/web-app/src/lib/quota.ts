@@ -222,7 +222,7 @@ export function setQuotaCache(connectionId: string, entry: QuotaEntry) {
     cache[connectionId] = { ...entry, cachedAt: new Date().toISOString() }
     window.localStorage.setItem(QUOTA_CACHE_KEY, JSON.stringify(cache))
   } catch {
-    // storage full / disabled — the cache is only a nicety
+    // storage full / disabled; the cache is only a nicety
   }
 }
 
@@ -310,7 +310,7 @@ function num(v: unknown, fallback = 0): number {
 
 /** Row shape every provider branch builds.
  * `keepRemaining` is false where the API returns an absolute credit count in
- * `remaining` (Qoder, Grok Build) — the table reads it as a percentage. */
+ * `remaining` (Qoder, Grok Build); the table reads it as a percentage. */
 function row(
   name: string,
   quota: RawQuota,

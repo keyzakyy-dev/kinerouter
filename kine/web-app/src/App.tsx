@@ -71,7 +71,7 @@ export default function App() {
           <Route path="/dashboard/console-log" element={<ConsoleLogPage />} />
           <Route path="/dashboard/translator" element={<TranslatorPage />} />
           <Route path="/dashboard/media-providers/web" element={<WebProvidersPage />} />
-          {/* combo/:id must precede :kind/:providerId — `combo` would otherwise
+          {/* combo/:id must precede :kind/:providerId; `combo` would otherwise
               match the :kind segment and the pair would 404 as a provider. */}
           <Route path="/dashboard/media-providers/combo/:id" element={<MediaComboDetailPage />} />
           <Route path="/dashboard/media-providers/:kind" element={<MediaProvidersPage />} />

@@ -208,8 +208,8 @@ export function RequestDetailsTab() {
                         {nameById[d.provider] || d.provider}
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-text-main">{fmt(inputOf(t))}</td>
-                      <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-text-muted">{cachedOf(t) > 0 ? fmt(cachedOf(t)) : '—'}</td>
-                      <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-text-muted">{cacheCreateOf(t) > 0 ? fmt(cacheCreateOf(t)) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-text-muted">{cachedOf(t) > 0 ? fmt(cachedOf(t)) : '-'}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-text-muted">{cacheCreateOf(t) > 0 ? fmt(cacheCreateOf(t)) : '-'}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-text-main">{fmt(outputOf(t))}</td>
                       <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[10px] leading-tight text-text-muted">
                         <div>TTFT {d.latency?.ttft || 0}ms</div>
@@ -334,7 +334,7 @@ function DetailBody({ detail, nameById }: { detail: RequestDetail; nameById: Rec
           ) : (
             <p className="text-xs text-text-muted">
               Reason: <span className="font-mono text-[11px] text-text-main">{pxpipe.reason}</span>
-              {pxpipe.detail ? ` — ${pxpipe.detail}` : ''}
+              {pxpipe.detail ? `: ${pxpipe.detail}` : ''}
             </p>
           )}
         </div>

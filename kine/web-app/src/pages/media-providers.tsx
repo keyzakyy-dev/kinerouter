@@ -250,7 +250,7 @@ function customNodeProvider(n: ProviderNode): ProviderSummary {
 
 // ------------------------------------------------------------------ list
 
-/** `/dashboard/media-providers/:kind` — providers whose serviceKinds include it. */
+/** `/dashboard/media-providers/:kind`, for providers whose serviceKinds include it. */
 export function MediaProvidersPage() {
   const { kind = '' } = useParams()
   const notify = useNotify()
@@ -331,7 +331,7 @@ export function MediaProvidersPage() {
   )
 }
 
-/** `/dashboard/media-providers/web` — webSearch + webFetch side by side. */
+/** `/dashboard/media-providers/web`: webSearch + webFetch side by side. */
 export function WebProvidersPage() {
   const { providers, connections } = useMediaData()
   const [combos, setCombos] = useState<Combo[]>([])
@@ -839,7 +839,7 @@ function ProviderInfoCard({ title, config, website }: { title: string; config: M
   push('Free tier', config.freeTier)
   if (config.freeMonthlyQuota !== undefined) {
     const q = Number(config.freeMonthlyQuota)
-    rows.push(['Free quota', q === 0 ? '—' : q >= 999999 ? 'Unlimited' : `${q.toLocaleString()} / mo`])
+    rows.push(['Free quota', q === 0 ? '-' : q >= 999999 ? 'Unlimited' : `${q.toLocaleString()} / mo`])
   }
   if (Array.isArray(config.searchTypes)) push('Search types', config.searchTypes.join(', '))
   if (Array.isArray(config.formats)) push('Formats', config.formats.join(', '))
@@ -1010,7 +1010,7 @@ const isTunnelPublic = (url: string) => /^https?:\/\//.test(url) && !url.include
  * The reference ships per-kind cards (Embedding/Tts/Stt/Generic); the fields
  * and bodies they build are the same, so they collapse into this card.
  * ponytail: TTS voice/language pickers and the model-report SSE progress
- * stream are not ported — add when a TTS provider needs preset voices.
+ * stream are not ported; add when a TTS provider needs preset voices.
  */
 function ExampleCard({
   kind,
@@ -1419,7 +1419,7 @@ function parseModelEntry(entry: string): [string, string] {
   return idx < 0 ? [entry, ''] : [entry.slice(0, idx), entry.slice(idx + 1)]
 }
 
-/** `/dashboard/media-providers/combo/:id` — port of combo/[id]/page.js. */
+/** `/dashboard/media-providers/combo/:id`: port of combo/[id]/page.js. */
 export function MediaComboDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()

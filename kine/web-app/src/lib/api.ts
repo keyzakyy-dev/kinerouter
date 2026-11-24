@@ -755,7 +755,7 @@ export const api = {
   /** iflow: exchange a browser cookie for an API key and store a connection. */
   iflowCookie: (cookie: string) =>
     request<{ connection?: Connection; keys?: number }>('/api/oauth/iflow/cookie', json('POST', { cookie })),
-  /** Bulk account import (codex / grok-cli) — accepts account objects or JSON. */
+  /** Bulk account import (codex / grok-cli): accepts account objects or JSON. */
   bulkImport: (provider: 'codex' | 'grok-cli', body: Record<string, unknown>) =>
     request<{ success: number; failed: number; results: Array<Record<string, unknown>> }>(
       `/api/oauth/${provider}/bulk-import`,

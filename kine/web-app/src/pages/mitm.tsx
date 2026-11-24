@@ -232,12 +232,12 @@ export default function MitmPage() {
           {status?.isWin && !status.isAdmin && (
             <div className="flex items-center gap-2 rounded border border-danger/20 bg-danger/10 px-2 py-1.5 text-xs text-danger">
               <Icon name="shield_lock" className="shrink-0 text-[14px]" />
-              <span>Administrator required — restart KineRouter as Administrator to use MITM</span>
+              <span>Administrator required. Restart KineRouter as Administrator to use MITM</span>
             </div>
           )}
           {status && !status.isAdmin && status.needsSudoPassword && (
             <p className="text-xs text-text-muted">
-              Not running as root — the sudo password is required for every privileged action.
+              Not running as root: the sudo password is required for every privileged action.
             </p>
           )}
         </div>

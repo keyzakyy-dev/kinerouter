@@ -6,7 +6,7 @@
  * 19:30 local time; the overnight gap re-aligns the next day onto the anchor
  * because 24h is not a multiple of 5h.
  *
- * ponytail: only the pieces the settings modal renders are ported — the actual
+ * ponytail: only the pieces the settings modal renders are ported; the actual
  * ping scheduler lives in the server (quotaAutoPing.js equivalent is not
  * ported yet), so `getDuePingSlot` has no client caller.
  */

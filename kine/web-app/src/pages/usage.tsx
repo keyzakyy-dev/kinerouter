@@ -167,7 +167,7 @@ function UsageStats({ period }: { period: string }) {
 
     const summaryCells = (group: Group) => (
       <>
-        <td className="px-6 py-3 text-text-muted">—</td>
+        <td className="px-6 py-3 text-text-muted">-</td>
         <td className="px-6 py-3 text-right">{fmt(group.summary.requests)}</td>
         <td className="whitespace-nowrap px-6 py-3 text-right text-text-muted">{fmtTime(group.summary.lastUsed)}</td>
       </>

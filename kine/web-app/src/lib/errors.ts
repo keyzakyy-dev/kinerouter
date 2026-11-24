@@ -4,7 +4,7 @@
  * KineRouter's API answers `{"error":{"message":…,"type":…}}` (the
  * [OI]-compatible shape) while KineRouter's own routes answer `{"error":"…"}`.
  * Both are accepted so ported pages can call this instead of touching
- * `data.error` directly — passing the object to a toast crashes React.
+ * `data.error` directly; passing the object to a toast crashes React.
  */
 export function errorMessage(data: unknown, fallback: string): string {
   if (typeof data === 'string' && data) return data

@@ -36,10 +36,10 @@ const EMPTY_CAP_ENTRY = { enabled: true, roundRobin: false, models: [] as string
 const CAP_KEYS = ['vision', 'pdf', 'audioInput', 'videoInput'] as const
 
 const STRATEGY_OPTIONS = [
-  { value: 'fallback', label: 'Fallback — try in order' },
-  { value: 'round-robin', label: 'Round Robin — rotate' },
-  { value: 'smart', label: 'Smart Router — System One' },
-  { value: 'fusion', label: 'Fusion — panel + judge' },
+  { value: 'fallback', label: 'Fallback (try in order)' },
+  { value: 'round-robin', label: 'Round Robin (rotate)' },
+  { value: 'smart', label: 'Smart Router (System One)' },
+  { value: 'fusion', label: 'Fusion (panel + judge)' },
 ]
 
 type CapEntry = { enabled: boolean; roundRobin: boolean; models: string[] }
@@ -445,7 +445,7 @@ function ComboCard({
                   className="inline-flex max-w-full items-center gap-1 rounded border border-dashed border-primary/40 px-1.5 py-0.5 font-mono text-[11px] text-primary hover:border-primary hover:bg-primary/5"
                 >
                   <Icon name="gavel" className="text-[13px]" />
-                  <span className="truncate">{judge || `Auto — ${combo.models[0] || 'first model'}`}</span>
+                  <span className="truncate">{judge || `Auto: ${combo.models[0] || 'first model'}`}</span>
                 </button>
                 {judge && (
                   <button
@@ -468,7 +468,7 @@ function ComboCard({
                   className="inline-flex max-w-full items-center gap-1 rounded border border-dashed border-primary/40 px-1.5 py-0.5 font-mono text-[11px] text-primary hover:border-primary hover:bg-primary/5"
                 >
                   <Icon name="psychology" className="text-[13px]" />
-                  <span className="truncate">{routerModel || `Auto — ${DEFAULT_ROUTER_MODEL}`}</span>
+                  <span className="truncate">{routerModel || `Auto: ${DEFAULT_ROUTER_MODEL}`}</span>
                 </button>
                 {routerStatus.ready ? (
                   <Badge variant="success" size="sm" dot>{routerStatus.label}</Badge>
@@ -656,7 +656,7 @@ function CapacityAdapterCap({
         <div className="mx-4 mb-3 flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2 text-xs text-text-muted">
           <Icon name="info" className="shrink-0 text-[14px]" />
           <span className={cn('min-w-0 truncate', !enabled && 'opacity-50')}>
-            No models yet — requests fall back to <code className="font-mono text-text-main">{DEFAULT_FALLBACK_MODEL}</code>.
+            No models yet. Requests fall back to <code className="font-mono text-text-main">{DEFAULT_FALLBACK_MODEL}</code>.
           </span>
         </div>
       ) : (

@@ -269,7 +269,7 @@ export default function SettingsPage() {
 
   useEffect(() => { void load() }, [load])
 
-  // Patches merge into the current settings only — re-hydrating the forms here
+  // Patches merge into the current settings only; re-hydrating the forms here
   // would discard text the user is still typing (the reference does the same).
   const patch = async (p: Record<string, unknown>) => {
     const next = await api.patchSettings(p)
@@ -758,7 +758,7 @@ export default function SettingsPage() {
                 <h2 className="text-sm font-semibold text-text-main">Single Sign-On</h2>
                 <p className="mt-0.5 text-xs text-text-muted">
                   {ssoActive
-                    ? `${settings.ssoType === 'saml' ? 'SAML 2.0' : 'OIDC'} active — password login is off`
+                    ? `${settings.ssoType === 'saml' ? 'SAML 2.0' : 'OIDC'} active. Password login is off`
                     : settings.authMode === 'both'
                       ? `Password + ${settings.ssoType === 'saml' ? 'SAML 2.0' : 'OIDC'} active`
                       : 'Optional via Okta, Entra ID, Keycloak, or any OIDC provider'}

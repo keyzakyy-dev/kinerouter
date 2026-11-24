@@ -3,7 +3,7 @@
  * src/app/(dashboard)/dashboard/cli-tools/components/cliEndpointPresets.js.
  *
  * localStorage only: these are per-browser conveniences, never server state.
- * The keys keep the reference's `kinerouter.` prefix on purpose — a user moving
+ * The keys keep the reference's `kinerouter.` prefix on purpose; a user moving
  * between the two dashboards keeps the presets they saved.
  */
 

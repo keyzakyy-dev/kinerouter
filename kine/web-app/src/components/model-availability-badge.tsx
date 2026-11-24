@@ -30,7 +30,7 @@ export function ModelAvailabilityBadge() {
     try {
       setData(await api.modelsAvailability())
     } catch {
-      /* silent — retried on the next poll */
+      /* silent, retried on the next poll */
     } finally {
       setLoading(false)
     }

@@ -820,7 +820,7 @@ export default function TokenSaverPage() {
             )}
           </SaverRow>
 
-          {/* PXPIPE stays hidden from the UI — experimental, not exposed yet. */}
+          {/* PXPIPE stays hidden from the UI: experimental, not exposed yet. */}
           {false && (
             <SaverRow
               icon="image"

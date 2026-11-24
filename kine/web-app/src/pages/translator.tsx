@@ -99,7 +99,7 @@ export default function TranslatorPage() {
       const data = await res.json()
       if (data.success) setMeta(data.result)
     } catch {
-      // not valid JSON yet — nothing to detect
+      // not valid JSON yet, nothing to detect
     }
   }
 
@@ -266,7 +266,7 @@ export default function TranslatorPage() {
       <div className="mb-2 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text-main">Translator Debug</h1>
-          <p className="mt-1 text-sm text-text-muted">Replay request flow — matches log files</p>
+          <p className="mt-1 text-sm text-text-muted">Replay request flow, matching log files</p>
         </div>
         {meta && (
           <div className="flex flex-wrap items-center justify-end gap-2">

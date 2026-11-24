@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
  * the provider redirect; it hands the code back to the opener three ways
  * (postMessage, BroadcastChannel, localStorage) and then closes itself.
  *
- * Security: postMessage targets are a fixed allowlist — never "*" — so the code
+ * Security: postMessage targets are a fixed allowlist (never "*"), so the code
  * cannot reach a third-party frame that opened us.
  */
 const EXPECTED_ORIGINS = [window.location.origin, 'http://localhost:1455']

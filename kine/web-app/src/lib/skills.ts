@@ -1,5 +1,5 @@
 /**
- * Agent Skills metadata — single source of truth for /dashboard/skills.
+ * Agent Skills metadata: single source of truth for /dashboard/skills.
  * Each skill = 1 raw URL the user copies and pastes to any AI agent.
  * Ported from KineRouter's src/shared/constants/skills.js; the SKILL.md files live
  * in this repo under skills/ and are served by the KineRouter GitHub repo.
@@ -27,7 +27,7 @@ export const SKILLS: Skill[] = [
     id: 'kinerouter',
     name: 'KineRouter (Entry)',
     description:
-      'Setup + index of all capabilities. Start here — covers base URL, auth, model discovery, and links to every capability skill.',
+      'Setup + index of all capabilities. Start here: covers base URL, auth, model discovery, and links to every capability skill.',
     endpoint: null,
     icon: 'hub',
     isEntry: true,

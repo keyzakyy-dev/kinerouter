@@ -71,7 +71,7 @@ export function SmartPolicyModal({
     p.id === 'smart' ? 'Adaptive ≥80%' : p.id === 'strict' ? '1 Task = 1 Session' : p.id === 'per-turn' ? 'Dynamic' : `Adaptive ≥${threshold}%`
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Router Policy — ${comboName || 'Combo'}`} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Router Policy: ${comboName || 'Combo'}`} size="lg">
       <div className="flex flex-col gap-4">
         <p className="text-xs text-text-muted">
           Choose how the System One router manages model selection across conversation turns:

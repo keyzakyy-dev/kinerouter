@@ -343,7 +343,7 @@ export function AutoPingScheduleModal({
     >
       <div className="flex flex-col gap-4">
         <p className="text-sm text-text-muted">
-          Configure automated quota pings{connection?.name ? ` for ${connection.name}` : ''} — pick
+          Configure automated quota pings{connection?.name ? ` for ${connection.name}` : ''}. Pick
           one mode.
         </p>
 

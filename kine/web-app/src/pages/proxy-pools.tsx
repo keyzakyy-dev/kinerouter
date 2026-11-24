@@ -878,7 +878,7 @@ export default function ProxyPoolsPage() {
             </p>
             <ul className="list-disc space-y-0.5 pl-4 text-xs text-text-muted">
               <li>Your IP is replaced by Vercel&apos;s dynamic edge IPs (hundreds of IPs across 20+ global regions)</li>
-              <li>Vercel serves millions of apps — providers can&apos;t block Vercel IPs without affecting legitimate traffic</li>
+              <li>Vercel serves millions of apps; providers can&apos;t block Vercel IPs without affecting legitimate traffic</li>
               <li>Free tier: 100GB bandwidth/month, 500K edge invocations</li>
               <li>Deploy multiple relays on different accounts for more IP diversity</li>
             </ul>
@@ -1113,7 +1113,7 @@ export default function ProxyPoolsPage() {
               <ol className="list-decimal space-y-0.5 pl-4">
                 <li>Go to <b>User Settings</b> → <b>Applications</b> → <b>Personal access tokens</b></li>
                 <li>Select <b>New access token</b> and generate a token</li>
-                <li>Copy the token — you won&apos;t see it again after leaving the page</li>
+                <li>Copy the token. You won&apos;t see it again after leaving the page</li>
               </ol>
             </div>
           </div>
