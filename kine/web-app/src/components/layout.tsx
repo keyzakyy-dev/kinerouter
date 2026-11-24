@@ -155,29 +155,33 @@ function UpdateBanner({ latestVersion, onUpdate, onCopy, copied }: {
         onClick={onUpdate}
         title={`Update to v${latestVersion}`}
         aria-label={`Update to v${latestVersion}`}
-        className="mx-auto mb-1 grid size-7 cursor-pointer place-items-center rounded-md border border-success/40 text-[13px] font-semibold text-success transition-colors hover:bg-success/10"
+        className="mx-auto mb-1 grid size-7 cursor-pointer place-items-center rounded-md text-text-main transition-colors hover:bg-surface-3"
       >
-        ↑
+        <Icon name="download" className="text-[15px]" />
       </button>
     )
   }
   return (
-    <div className="mb-2 flex flex-col gap-1.5 px-[18px]">
-      <span className="text-xs font-semibold text-success">↑ New version available: v{latestVersion}</span>
-      <div className="flex items-center gap-1.5">
+    <div className="mx-3 mb-2 rounded-lg bg-surface-2 p-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[11px] font-semibold text-text-main">Update</span>
+        <span className="truncate font-mono text-[10px] text-text-muted">v{latestVersion}</span>
+      </div>
+      <div className="mt-2 flex items-center gap-1.5">
         <button
           onClick={onUpdate}
-          className="cursor-pointer rounded bg-success px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:opacity-90"
+          className="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-md bg-primary px-2 py-1.5 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
         >
-          Update now
+          <Icon name="download" className="text-[13px]" />
+          Install
         </button>
         <button
           onClick={onCopy}
           title="Copy install command"
           aria-label="Copy install command"
-          className="grid size-6 cursor-pointer place-items-center rounded border border-success/30 text-success/80 transition-colors hover:bg-success/10 hover:text-success"
+          className="grid size-7 cursor-pointer place-items-center rounded-md text-text-muted transition-colors hover:bg-surface-3 hover:text-text-main"
         >
-          <Icon name={copied ? 'check' : 'content_copy'} className="text-[13px]" />
+          <Icon name={copied ? 'check' : 'content_copy'} className="text-[14px]" />
         </button>
       </div>
     </div>
