@@ -45,7 +45,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-screen lg:mx-auto lg:w-full lg:max-w-5xl lg:grid-cols-[1.02fr_1fr]">
+    <div className="relative min-h-screen">
+      <div className="absolute left-6 top-6 hidden items-center gap-2.5 sm:left-10 sm:top-10 lg:flex">
+        <span aria-hidden className={MARK} />
+        <span className="text-[15px] font-semibold tracking-tight">KineRouter</span>
+      </div>
+
+      <div className="grid min-h-screen lg:mx-auto lg:w-full lg:max-w-5xl lg:grid-cols-[1.02fr_1fr]">
       <aside className="relative hidden overflow-hidden p-10 lg:flex lg:flex-col">
         <div
           aria-hidden
@@ -56,11 +62,6 @@ export default function LoginPage() {
             maskImage: 'linear-gradient(to right, #000 50%, transparent 100%)',
           }}
         />
-        <div className="relative flex items-center gap-2.5">
-          <span aria-hidden className={MARK} />
-          <span className="text-[15px] font-semibold tracking-tight">KineRouter</span>
-        </div>
-
         <div className="relative my-auto max-w-md">
           <h2 className="text-3xl font-semibold leading-[1.15] tracking-tight text-balance">
             One endpoint for every provider you already pay for.
@@ -83,7 +84,7 @@ export default function LoginPage() {
 
       <main className="flex flex-col justify-center px-5 py-10 sm:px-10 lg:pl-6">
         {/* nudge: brand block is ~15px taller, centre both on the same top edge */}
-        <div className="mx-auto w-full max-w-sm lg:mx-0 lg:translate-y-[9px]">
+        <div className="mx-auto w-full max-w-sm lg:mx-0 lg:-translate-y-[7px]">
           <div className="mb-7 flex items-center gap-2.5 lg:hidden">
             <span aria-hidden className={MARK} />
             <span className="text-[15px] font-semibold tracking-tight">KineRouter</span>
@@ -102,7 +103,7 @@ export default function LoginPage() {
                 type={reveal ? 'text' : 'password'}
                 autoFocus
                 autoComplete="current-password"
-                className="pr-11"
+                className="pr-11 focus-visible:ring-border"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -141,6 +142,7 @@ export default function LoginPage() {
           ) : null}
         </div>
       </main>
+      </div>
     </div>
   )
 }
