@@ -845,7 +845,7 @@ export default function QuotaPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
+      <div className="divide-y divide-black/[0.07] overflow-hidden rounded-2xl border border-black/10 bg-surface">
         {sortedConnections.map((conn) => (
           <QuotaCard
             key={conn.id}
@@ -1114,14 +1114,22 @@ function QuotaCard({
 
   const tooltip = (text: string) => ({ title: text })
 
+  const rowAction =
+    'flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-foreground/10 hover:text-text-main disabled:cursor-not-allowed disabled:opacity-40'
+
   return (
-    <Card className={cn('min-w-0', isInactive && 'opacity-60')}>
-      <div className="flex items-center justify-between gap-2 px-3.5 pb-2.5 pt-3">
-        <div className="flex min-w-0 items-center gap-2.5">
+    <div
+      className={cn(
+        'grid gap-x-6 gap-y-3 px-4 py-4 transition-colors hover:bg-foreground/[0.015] md:grid-cols-[210px_minmax(0,1fr)]',
+        isInactive && 'opacity-55',
+      )}
+    >
+      <div className="min-w-0">
+        <div className="flex items-start gap-2.5">
           <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-foreground/5">
             <ProviderIcon provider={conn.provider} size={30} className="object-contain" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <h3 className="truncate text-sm font-semibold text-text-main">{providerLabel}</h3>
               {!loading && visible.length > 0 && (
@@ -1136,170 +1144,170 @@ function QuotaCard({
             {secondaryLabel(conn) && (
               <p className="truncate text-[10px] leading-tight text-text-muted/70">{secondaryLabel(conn)}</p>
             )}
-            {conn.provider === 'kiro' && (
-              <div className="mt-1 flex flex-wrap items-center gap-1">
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                  {kiroMethodLabel(conn)}
-                </span>
-                {kiroRegion(conn) && (
-                  <span className="rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                    {kiroRegion(conn)}
-                  </span>
-                )}
-                <span
-                  className={cn(
-                    'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                    isInactive
-                      ? 'bg-surface-2 text-text-muted'
-                      : conn.testStatus === 'active' || conn.testStatus === 'success'
-                        ? 'bg-foreground/5 text-muted-foreground'
-                        : conn.testStatus === 'error' ||
-                            conn.testStatus === 'expired' ||
-                            conn.testStatus === 'unavailable'
-                          ? 'bg-red-500/10 text-red-600'
-                          : 'bg-surface-2 text-text-muted',
-                  )}
-                >
-                  {isInactive ? 'disabled' : conn.testStatus || 'unknown'}
-                </span>
-                {Boolean(conn.providerSpecificData?.profileArn) && (
-                  <button
-                    type="button"
-                    onClick={() => onCopy(String(conn.providerSpecificData?.profileArn), conn.id)}
-                    title={String(conn.providerSpecificData?.profileArn)}
-                    className="inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-text-muted transition-colors hover:text-primary"
-                  >
-                    <Icon name={copied === conn.id ? 'check' : 'content_copy'} className="text-[12px]" />
-                    <code className="truncate font-mono">{String(conn.providerSpecificData?.profileArn)}</code>
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
-            {(isCodex || claudeReset) && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onResetRequest(resetCreditCount)}
-                  disabled={resetCreditCount <= 0 || loading || busy}
-                  aria-label={
-                    resetCreditCount > 0
-                      ? `Use one ${resetLabel}. ${resetCreditCount} available.`
-                      : `No ${resetLabel}s available`
-                  }
-                  {...tooltip(
-                    resetCreditCount > 0
-                      ? claudeReset
-                        ? `Use your reset now (${resetCreditCount} left, use by ${formatCreditDate(claudeReset.expiresAt)}) · refills ${formatClaudeResetClears(claudeReset.clears)}`
-                        : `Use one ${resetLabel}. Available: ${resetCreditCount}`
-                      : `No ${resetLabel}s available`,
-                  )}
-                  className={cn(
-                    'flex h-8 min-w-10 cursor-pointer items-center justify-center gap-1 rounded-lg border px-2 text-[11px] font-medium tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-60',
-                    resetCreditCount > 0
-                      ? 'border-primary/30 bg-primary/5 text-primary hover:bg-primary/10'
-                      : 'border-black/10 bg-black/[0.02] text-text-muted',
-                  )}
-                >
-                  <Icon
-                    name={isResetting ? 'progress_activity' : 'restart_alt'}
-                    className={cn('text-[15px]', isResetting && 'animate-spin')}
-                  />
-                  <span>{resetCreditCount}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => (isCodex ? onViewCodexResets() : onViewClaudeResets(claudeReset))}
-                  disabled={loading || busy}
-                  aria-label={isCodex ? 'View Codex reset credit expiry' : 'View Claude Code reset expiry'}
-                  className={iconButtonClass}
-                  {...tooltip(isCodex ? 'View Codex reset credit expiry' : 'View Claude Code reset expiry')}
-                >
-                  <Icon name="schedule" className="text-[17px]" />
-                </button>
-              </>
+        {conn.provider === 'kiro' && (
+          <div className="mt-2 flex flex-wrap items-center gap-1">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+              {kiroMethodLabel(conn)}
+            </span>
+            {kiroRegion(conn) && (
+              <span className="rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                {kiroRegion(conn)}
+              </span>
             )}
-
-            {AUTO_PING_SETTINGS_KEYS[conn.provider] && conn.authType === 'oauth' && (
+            <span
+              className={cn(
+                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                isInactive
+                  ? 'bg-surface-2 text-text-muted'
+                  : conn.testStatus === 'active' || conn.testStatus === 'success'
+                    ? 'bg-foreground/5 text-muted-foreground'
+                    : conn.testStatus === 'error' ||
+                        conn.testStatus === 'expired' ||
+                        conn.testStatus === 'unavailable'
+                      ? 'bg-red-500/10 text-red-600'
+                      : 'bg-surface-2 text-text-muted',
+              )}
+            >
+              {isInactive ? 'disabled' : conn.testStatus || 'unknown'}
+            </span>
+            {Boolean(conn.providerSpecificData?.profileArn) && (
               <button
                 type="button"
-                onClick={onSchedule}
-                aria-label="Configure auto-ping"
-                className={cn(iconButtonClass, 'border-transparent hover:bg-black/5', autoPingActive ? 'text-primary' : 'text-text-muted')}
-                title={(() => {
-                  const modes: string[] = []
-                  if (isReactive) modes.push('On reset')
-                  if (isScheduled) {
-                    const summary = getScheduleSlotLabels(schedule).join(' / ')
-                    modes.push(`Scheduled (${summary || 'active'})`)
-                  }
-                  return modes.length
-                    ? `Auto-ping active: ${modes.join(' + ')}. Click to configure.`
-                    : conn.provider === 'codex'
-                      ? 'Auto-starts the next 5h Codex window after reset or on schedule. Click to configure.'
-                      : 'Auto-starts a new window on quota reset or fixed schedule. Click to configure.'
-                })()}
+                onClick={() => onCopy(String(conn.providerSpecificData?.profileArn), conn.id)}
+                title={String(conn.providerSpecificData?.profileArn)}
+                className="inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-text-muted transition-colors hover:text-primary"
               >
-                <Icon name="bolt" className="text-[18px]" />
+                <Icon name={copied === conn.id ? 'check' : 'content_copy'} className="text-[12px]" />
+                <code className="truncate font-mono">{String(conn.providerSpecificData?.profileArn)}</code>
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading || busy}
-              aria-label="Refresh quota"
-              className={cn(iconButtonClass, 'border-transparent hover:bg-black/5')}
-              title="Refresh quota"
-            >
-              <Icon name="refresh" className={cn('text-[18px] text-text-muted', loading && 'animate-spin')} />
-            </button>
-            <button
-              type="button"
-              onClick={onEdit}
-              disabled={busy}
-              aria-label="Edit connection"
-              className={cn(iconButtonClass, 'border-transparent text-text-muted hover:bg-black/5 hover:text-primary')}
-              title="Edit connection"
-            >
-              <Icon name="edit" className="text-[18px]" />
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={busy}
-              aria-label="Delete connection"
-              className={cn(iconButtonClass, 'border-transparent text-red-500 hover:bg-red-500/10')}
-              title="Delete connection"
-            >
-              <Icon name="delete" className={cn('text-[18px]', isDeleting && 'animate-pulse')} />
-            </button>
-            <div
-              className="inline-flex items-center pl-0.5"
-              title={(conn.isActive ?? true) ? 'Disable connection' : 'Enable connection'}
-            >
-              <Switch checked={conn.isActive ?? true} disabled={busy} onCheckedChange={onToggleActive} />
-            </div>
           </div>
+        )}
+
+        <div className="mt-2 flex flex-wrap items-center gap-0.5">
+          {(isCodex || claudeReset) && (
+            <>
+              <button
+                type="button"
+                onClick={() => onResetRequest(resetCreditCount)}
+                disabled={resetCreditCount <= 0 || loading || busy}
+                aria-label={
+                  resetCreditCount > 0
+                    ? `Use one ${resetLabel}. ${resetCreditCount} available.`
+                    : `No ${resetLabel}s available`
+                }
+                {...tooltip(
+                  resetCreditCount > 0
+                    ? claudeReset
+                      ? `Use your reset now (${resetCreditCount} left, use by ${formatCreditDate(claudeReset.expiresAt)}) · refills ${formatClaudeResetClears(claudeReset.clears)}`
+                      : `Use one ${resetLabel}. Available: ${resetCreditCount}`
+                    : `No ${resetLabel}s available`,
+                )}
+                className={cn(
+                  'flex h-7 min-w-9 cursor-pointer items-center justify-center gap-1 rounded-md px-1.5 text-[11px] font-medium tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                  resetCreditCount > 0
+                    ? 'bg-primary/10 text-primary hover:bg-primary/15'
+                    : 'text-text-muted hover:bg-foreground/10',
+                )}
+              >
+                <Icon
+                  name={isResetting ? 'progress_activity' : 'restart_alt'}
+                  className={cn('text-[15px]', isResetting && 'animate-spin')}
+                />
+                <span>{resetCreditCount}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => (isCodex ? onViewCodexResets() : onViewClaudeResets(claudeReset))}
+                disabled={loading || busy}
+                aria-label={isCodex ? 'View Codex reset credit expiry' : 'View Claude Code reset expiry'}
+                className={rowAction}
+                {...tooltip(isCodex ? 'View Codex reset credit expiry' : 'View Claude Code reset expiry')}
+              >
+                <Icon name="schedule" className="text-[17px]" />
+              </button>
+            </>
+          )}
+
+          {AUTO_PING_SETTINGS_KEYS[conn.provider] && conn.authType === 'oauth' && (
+            <button
+              type="button"
+              onClick={onSchedule}
+              aria-label="Configure auto-ping"
+              className={cn(rowAction, autoPingActive && 'text-primary hover:text-primary')}
+              title={(() => {
+                const modes: string[] = []
+                if (isReactive) modes.push('On reset')
+                if (isScheduled) {
+                  const summary = getScheduleSlotLabels(schedule).join(' / ')
+                  modes.push(`Scheduled (${summary || 'active'})`)
+                }
+                return modes.length
+                  ? `Auto-ping active: ${modes.join(' + ')}. Click to configure.`
+                  : conn.provider === 'codex'
+                    ? 'Auto-starts the next 5h Codex window after reset or on schedule. Click to configure.'
+                    : 'Auto-starts a new window on quota reset or fixed schedule. Click to configure.'
+              })()}
+            >
+              <Icon name="bolt" className="text-[18px]" />
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading || busy}
+            aria-label="Refresh quota"
+            className={rowAction}
+            title="Refresh quota"
+          >
+            <Icon name="refresh" className={cn('text-[18px]', loading && 'animate-spin')} />
+          </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            disabled={busy}
+            aria-label="Edit connection"
+            className={rowAction}
+            title="Edit connection"
+          >
+            <Icon name="edit" className="text-[18px]" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={busy}
+            aria-label="Delete connection"
+            className={cn(rowAction, 'text-red-500 hover:bg-red-500/10 hover:text-red-500')}
+            title="Delete connection"
+          >
+            <Icon name="delete" className={cn('text-[18px]', isDeleting && 'animate-pulse')} />
+          </button>
+          <div
+            className="ml-1 inline-flex items-center"
+            title={(conn.isActive ?? true) ? 'Disable connection' : 'Enable connection'}
+          >
+            <Switch checked={conn.isActive ?? true} disabled={busy} onCheckedChange={onToggleActive} />
+          </div>
+        </div>
       </div>
 
-      <div className="border-t border-black/[0.06] px-3.5 py-3">
+      <div className="min-w-0">
         {loading ? (
-          <div className="py-5 text-center text-text-muted">
-            <Icon name="progress_activity" className="animate-spin text-[28px]" />
+          <div className="flex items-center justify-center gap-2 py-6 text-xs text-text-muted">
+            <Icon name="progress_activity" className="animate-spin text-[18px]" />
+            Loading quotas
           </div>
         ) : error ? (
-          <div className="py-5 text-center">
-            <Icon name="error" className="text-[28px] text-red-500" />
-            <p className="mt-1.5 text-xs text-text-muted">{error}</p>
+          <div className="flex items-center gap-2 py-4 text-xs text-text-muted">
+            <Icon name="error" className="text-[16px] text-red-500" />
+            <span>{error}</span>
           </div>
         ) : quota?.message ? (
-          <div className="py-5 text-center">
-            <p className="text-xs text-text-muted">{quota.message}</p>
-          </div>
+          <p className="py-2 text-xs text-text-muted">{quota.message}</p>
         ) : (
           <QuotaTable
             quotas={visible}
@@ -1309,21 +1317,17 @@ function QuotaCard({
           />
         )}
 
-        {quota?.message && !error && !loading && (
-          <p className="mt-2 px-1 text-[10px] leading-relaxed text-text-muted">{quota.message}</p>
-        )}
-
         {hidden.length > 0 && (
-          <div className="mt-2 flex min-w-0 items-center gap-1 border-t border-black/5 pt-2 text-[10px] text-text-muted">
+          <div className="mt-2 flex min-w-0 items-center gap-1 text-[10px] text-text-muted">
             <Icon name="visibility_off" className="shrink-0 text-[14px]" />
             <span className="shrink-0">Hidden:</span>
-            <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap pb-2">
+            <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap">
               {hidden.map((row) => (
                 <button
                   key={getQuotaVisibilityKey(row)}
                   type="button"
                   onClick={() => onShowQuota(row)}
-                  className="shrink-0 cursor-pointer rounded-md border border-black/10 px-1.5 py-0.5 transition-colors hover:bg-black/5 hover:text-text-main"
+                  className="shrink-0 cursor-pointer rounded-md bg-foreground/5 px-1.5 py-0.5 transition-colors hover:bg-foreground/10 hover:text-text-main"
                   title="Show this quota row"
                 >
                   {row.name}
@@ -1333,7 +1337,7 @@ function QuotaCard({
           </div>
         )}
       </div>
-    </Card>
+    </div>
   )
 }
 
