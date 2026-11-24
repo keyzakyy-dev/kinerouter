@@ -143,21 +143,21 @@
     0 16px 48px -8px rgba(0, 0, 0, 0.55);
   --shadow-focus: 0 0 0 3px rgba(255, 255, 255, 0.16);
 
-  /* Charts keep the accent palette in dark; light mode is monochrome.
-     Six distinct hues so series read as separate categories on #262626. */
-  --chart-1: #e56a4a;
-  --chart-2: #38bdf8;
-  --chart-3: #34d399;
-  --chart-4: #fbbf24;
-  --chart-5: #a78bfa;
-  --chart-6: #fb7185;
+  /* Charts are monochrome in both themes. Six greys give usable separation
+     between series on #262626 without bringing hues back. */
+  --chart-1: #fafafa;
+  --chart-2: #d9d9d9;
+  --chart-3: #b3b3b3;
+  --chart-4: #8c8c8c;
+  --chart-5: #666666;
+  --chart-6: #a6a6a6;
 
-  /* Metric cards: one hue per card, matched to its label. */
-  --metric-violet: #a78bfa;
-  --metric-sky: #38bdf8;
-  --metric-emerald: #34d399;
-  --metric-amber: #fbbf24;
-  --metric-rose: #fb7185;
+  /* Metric cards: one grey per card, stepped by brightness. */
+  --metric-violet: #d4d4d4;
+  --metric-sky: #f0f0f0;
+  --metric-emerald: #a3a3a3;
+  --metric-amber: #c7c7c7;
+  --metric-rose: #8a8a8a;
 
   color-scheme: dark;
 }
