@@ -9,6 +9,15 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#e56a4a" />
+    <script>
+      // Set the class before the first paint so a saved dark theme never
+      // flashes light while React boots. Mirrors src/lib/use-theme.ts.
+      try {
+        var t = localStorage.getItem('theme')
+        var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.toggle('dark', dark)
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
