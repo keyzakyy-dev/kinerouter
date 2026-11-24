@@ -305,26 +305,28 @@ export default function CombosPage() {
               <Button variant="secondary" size="sm" onClick={() => setSearch('')}>Clear search</Button>
             </Card>
           ) : (
-            filtered.map((combo) => (
-              <ComboCard
-                key={combo.id}
-                combo={combo}
-                providers={providers}
-                connections={connections}
-                strategies={strategies}
-                comboByName={comboByName}
-                getCaps={getCaps}
-                selected={selectedIds.includes(combo.id)}
-                onToggleSelect={() =>
-                  setSelectedIds((prev) =>
-                    prev.includes(combo.id) ? prev.filter((x) => x !== combo.id) : [...prev, combo.id],
-                  )
-                }
-                onEdit={() => setDraft({ editing: combo })}
-                onDelete={() => setConfirmDelete([combo])}
-                onSetStrategy={(patch) => setStrategy(combo.name, patch)}
-              />
-            ))
+            <div className="flex max-h-[520px] flex-col gap-3 overflow-y-auto pr-1">
+              {filtered.map((combo) => (
+                <ComboCard
+                  key={combo.id}
+                  combo={combo}
+                  providers={providers}
+                  connections={connections}
+                  strategies={strategies}
+                  comboByName={comboByName}
+                  getCaps={getCaps}
+                  selected={selectedIds.includes(combo.id)}
+                  onToggleSelect={() =>
+                    setSelectedIds((prev) =>
+                      prev.includes(combo.id) ? prev.filter((x) => x !== combo.id) : [...prev, combo.id],
+                    )
+                  }
+                  onEdit={() => setDraft({ editing: combo })}
+                  onDelete={() => setConfirmDelete([combo])}
+                  onSetStrategy={(patch) => setStrategy(combo.name, patch)}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}
