@@ -95,6 +95,10 @@ func applyHeaderHooks(req Request, headers map[string]string) {
 			if req.Creds.AccessToken != "" && req.Creds.APIKey == "" {
 				headers["x-api-version"] = "1.0.0"
 			}
+		case "zcodeHeaders":
+			zcodeHeaders(req, headers)
+		case "freePiHeaders":
+			freePiHeaders(req, headers)
 		}
 	}
 }

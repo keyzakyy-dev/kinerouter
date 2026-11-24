@@ -4,6 +4,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 )
@@ -52,5 +54,29 @@ func TestEnvPort(t *testing.T) {
 func TestGatewayPathRequiresSibling(t *testing.T) {
 	if _, err := gatewayPath(); err == nil {
 		t.Skip("a sibling kinerouter exists next to the test binary; nothing to assert")
+	}
+}
+
+// npm leaves the previous versioned binary in place, so name order is not
+// version order: 0.1.9 sorts before 0.2.0 and must not win.
+func TestVersionedGatewayPicksNewest(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{
+		"kinerouter_0.1.9_linux_amd64",
+		"kinerouter_0.1.10_linux_amd64",
+		"kinerouter_0.2.0_linux_amd64",
+		"kinerouter-tray_0.2.0_linux_amd64",
+		"kinerouter_0.2.0_linux_amd64.sha256",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := filepath.Base(versionedGateway(dir, ""))
+	if got != "kinerouter_0.2.0_linux_amd64" {
+		t.Fatalf("versionedGateway picked %q, want 0.2.0", got)
+	}
+	if p := versionedGateway(t.TempDir(), ""); p != "" {
+		t.Fatalf("empty dir returned %q", p)
 	}
 }

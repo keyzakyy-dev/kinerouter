@@ -23,6 +23,8 @@ import (
 type Credentials struct {
 	APIKey       string
 	AccessToken  string
+	RefreshToken string
+	ExpiresAt    time.Time
 	ProxyURL     string
 	BaseURL      string         // override (custom nodes / ollama)
 	ProjectID    string         // Cloud Code Assist project (gemini-cli, antigravity)
@@ -44,6 +46,9 @@ type Request struct {
 	Body     []byte
 	Stream   bool
 	Creds    Credentials
+	// ConnectionID names the stored row, used by executors that need a
+	// per-connection directory (agy-acp).
+	ConnectionID string
 	// URLOverride replaces the registry-derived endpoint (embeddings, media
 	// endpoints carry their own base URL in providerMedia).
 	URLOverride string
@@ -87,6 +92,9 @@ func New() *Executor {
 // non-2xx upstream responses are returned as a Response so the caller can
 // apply the same account-fallback rules as the JS engine.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Response, error) {
+	if req.Provider == "agy-acp" {
+		return e.executeAGYACP(ctx, req)
+	}
 	// Bedrock signs per request and derives its URL from the resolved region, so
 	// it cannot go through build's registry-derived endpoint.
 	if _, ok := bedrockWire(req.Provider); ok {
@@ -132,6 +140,30 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Response, error) 
 			return nil, err
 		}
 	}
+	// ZCode inspects the request body: the plan endpoint only answers to the
+	// desktop client's identity system blocks and metadata.
+	if req.Provider == "zcode" {
+		if err := zcodeIdentityErr(); err != nil {
+			return nil, err
+		}
+		seed, _ := req.Creds.Extra["sessionSeed"].(string)
+		shaped, err := zcodeShapeBody(body, zcodeSessionID(req.Creds.SessionID, seed), zcodeDeviceID(req), zcodeAccountUUID(req))
+		if err != nil {
+			return nil, err
+		}
+		body = shaped
+	}
+	// Freebuff needs session admission and an agent run around every turn, so it
+	// bypasses the plain passthrough below.
+	if req.Provider == "freebuff" {
+		fbClient := e.client
+		if req.Creds.ProxyURL != "" {
+			if u, err := url.Parse(req.Creds.ProxyURL); err == nil {
+				fbClient = e.clientWithProxy(u)
+			}
+		}
+		return e.executeFreebuff(ctx, req, endpoint, headers, fbClient)
+	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -151,6 +183,26 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Response, error) 
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, err
+	}
+	// Free Pi answers 409 concurrent_session when the account holds its session
+	// cap. Release the other sessions once and replay the same request.
+	if req.Provider == "free-pi" && resp.StatusCode == http.StatusConflict {
+		conflict, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		_ = resp.Body.Close()
+		token := firstNonEmpty(req.Creds.APIKey, req.Creds.AccessToken)
+		if freePiIsConcurrent(conflict) && freePiResetConcurrent(ctx, client, token) {
+			retry, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(req.Body))
+			if err != nil {
+				return nil, err
+			}
+			retry.Header = httpReq.Header
+			resp, err = client.Do(retry)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			resp.Body = io.NopCloser(bytes.NewReader(conflict))
+		}
 	}
 	return &Response{Status: resp.StatusCode, Header: resp.Header, Body: resp.Body}, nil
 }
@@ -372,10 +424,14 @@ func bearerOrRaw(spec *providerdata.AuthSpec, token string) string {
 // provider connection, mirroring the fields the JS auth layer reads.
 func CredentialsFromConnection(c *store.Connection) Credentials {
 	cr := Credentials{
-		APIKey:      c.Str("apiKey"),
-		AccessToken: c.Str("accessToken"),
-		BaseURL:     c.Str("baseUrl"),
-		ProjectID:   c.Str("projectId"),
+		APIKey:       c.Str("apiKey"),
+		AccessToken:  c.Str("accessToken"),
+		RefreshToken: c.Str("refreshToken"),
+		BaseURL:      c.Str("baseUrl"),
+		ProjectID:    c.Str("projectId"),
+	}
+	if exp, err := time.Parse(time.RFC3339, c.Str("expiresAt")); err == nil {
+		cr.ExpiresAt = exp
 	}
 	if cr.ProjectID == "" {
 		cr.ProjectID = c.SpecificStr("projectId")

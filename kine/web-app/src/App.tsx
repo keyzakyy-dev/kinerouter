@@ -12,6 +12,8 @@ const ProviderDetailPage = lazy(() =>
   import('@/pages/provider-detail').then((m) => ({ default: m.ProviderDetailPage })),
 )
 const CombosPage = lazy(() => import('@/pages/combos'))
+const JailbreakPage = lazy(() => import('@/pages/jailbreak'))
+const TerminalPage = lazy(() => import('@/pages/terminal'))
 const UsagePage = lazy(() => import('@/pages/usage'))
 const SkillsPage = lazy(() => import('@/pages/skills'))
 const ConsoleLogPage = lazy(() => import('@/pages/console-log'))
@@ -55,6 +57,8 @@ export default function App() {
           <Route path="/dashboard/providers" element={<ProvidersPage />} />
           <Route path="/dashboard/providers/:id" element={<ProviderDetailPage />} />
           <Route path="/dashboard/combos" element={<CombosPage />} />
+          <Route path="/dashboard/jailbreak" element={<JailbreakPage />} />
+          <Route path="/dashboard/terminal" element={<TerminalPage />} />
           <Route path="/dashboard/usage" element={<UsagePage />} />
           <Route path="/dashboard/quota" element={<QuotaPage />} />
           <Route path="/dashboard/token-saver" element={<TokenSaverPage />} />

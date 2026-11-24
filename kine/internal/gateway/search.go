@@ -325,6 +325,22 @@ func buildSearchRequest(provider, base string, cfg map[string]any, p searchParam
 	case "xquik":
 		u := base + "?q=" + urlQueryEscape(p.query) + "&limit=" + strconv.Itoa(p.maxResults)
 		return u, http.MethodGet, auth(map[string]string{"Accept": "application/json"}), nil, nil
+	case "keenable":
+		// Keyless requests ride the /public lane and must name the app.
+		u := base
+		h := map[string]string{"Content-Type": "application/json", "X-Keenable-Title": "KineRouter"}
+		if p.token == "" {
+			u += "/public"
+		} else {
+			h["X-API-Key"] = p.token
+		}
+		b := map[string]any{"query": p.query, "max_results": p.maxResults}
+		return u, http.MethodPost, h, mustJSON(b), nil
+	case "zai-search":
+		b := map[string]any{"jsonrpc": "2.0", "id": "kinerouter", "method": "tools/call",
+			"params": map[string]any{"name": "web_search",
+				"arguments": map[string]any{"search_query": p.query, "count": p.maxResults}}}
+		return base, http.MethodPost, auth(jsonH), mustJSON(b), nil
 	}
 	return "", "", nil, nil, fmt.Errorf("search provider %q is not implemented", provider)
 }
@@ -350,7 +366,7 @@ func normalizeSearchResults(provider string, raw []byte, searchType string) []an
 			container, _ = m["news"].(map[string]any)
 		}
 		items = list(container["results"])
-	case "tavily", "exa", "linkup", "searxng", "ollama-search":
+	case "tavily", "exa", "linkup", "searxng", "ollama-search", "keenable":
 		items = list(m["results"])
 	case "google-pse":
 		items = list(m["items"])
@@ -366,7 +382,7 @@ func normalizeSearchResults(provider string, raw []byte, searchType string) []an
 		if len(items) == 0 {
 			items = list(m["results"])
 		}
-	case "glm":
+	case "glm", "zai-search":
 		items = parseGLMResults(m)
 	case "tinyfish":
 		items = list(m["results"])

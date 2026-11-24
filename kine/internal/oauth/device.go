@@ -23,7 +23,10 @@ import (
 // DeviceSession is one in-flight device authorization.
 type DeviceSession struct {
 	Provider   string
+	State      string
 	DeviceCode string
+	PollToken  string
+	Meta       map[string]string
 	Interval   int
 	CreatedAt  time.Time
 }
@@ -33,6 +36,15 @@ func (m *Manager) DeviceStart(ctx context.Context, provider string) (map[string]
 	o := m.reg.OAuthFor(provider)
 	if o == nil {
 		return nil, fmt.Errorf("provider %q has no OAuth configuration", provider)
+	}
+	if provider == "zcode" {
+		return m.zcodeDeviceStart(ctx, provider)
+	}
+	if provider == "free-pi" {
+		return m.freePiDeviceStart(ctx, provider)
+	}
+	if provider == "freebuff" {
+		return m.freebuffDeviceStart(ctx, provider)
 	}
 	deviceURL := o.DeviceCodeURL
 	if deviceURL == "" {
@@ -75,7 +87,7 @@ func (m *Manager) DeviceStart(ctx context.Context, provider string) (map[string]
 		interval = int(v)
 	}
 	m.mu.Lock()
-	m.devices[state] = &DeviceSession{Provider: provider, DeviceCode: deviceCode, Interval: interval, CreatedAt: time.Now()}
+	m.devices[state] = &DeviceSession{Provider: provider, State: state, DeviceCode: deviceCode, Interval: interval, CreatedAt: time.Now()}
 	m.mu.Unlock()
 	return map[string]any{
 		"state":                   state,
@@ -96,6 +108,15 @@ func (m *Manager) DevicePoll(ctx context.Context, st *store.Store, state string)
 	m.mu.Unlock()
 	if sess == nil {
 		return nil, fmt.Errorf("unknown or expired device session")
+	}
+	if sess.Provider == "zcode" {
+		return m.zcodeDevicePoll(ctx, st, sess)
+	}
+	if sess.Provider == "free-pi" {
+		return m.freePiDevicePoll(ctx, st, sess)
+	}
+	if sess.Provider == "freebuff" {
+		return m.freebuffDevicePoll(ctx, st, sess)
 	}
 	o := m.reg.OAuthFor(sess.Provider)
 	if o == nil {

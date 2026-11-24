@@ -17,6 +17,7 @@ package gateway
 //     target is refused unless it is loopback-free (netguard).
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	"github.com/keyzakyy-dev/kinerouter/internal/auth"
 	"github.com/keyzakyy-dev/kinerouter/internal/providerdata"
 	"github.com/keyzakyy-dev/kinerouter/internal/store"
+	"github.com/keyzakyy-dev/kinerouter/internal/updater"
 )
 
 func (g *Gateway) registerMiscAdminRoutes(mux *http.ServeMux) {
@@ -42,6 +44,9 @@ func (g *Gateway) registerMiscAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/combos/presets", r(g.handleComboPresetsPreview))
 	mux.HandleFunc("POST /api/combos/presets", r(g.handleComboPresetsCreate))
 	mux.HandleFunc("POST /api/shutdown", r(g.handleShutdown))
+	mux.HandleFunc("GET /api/version/check", r(g.handleVersionCheck))
+	mux.HandleFunc("GET /api/version/status", r(g.handleVersionStatus))
+	mux.HandleFunc("POST /api/version/auto-update", r(g.handleAutoUpdateToggle))
 	mux.HandleFunc("POST /api/version/update", r(g.handleVersionUpdate))
 	mux.HandleFunc("POST /api/version/shutdown", r(g.handleVersionShutdown))
 	mux.HandleFunc("POST /api/auth/reset-password", r(g.handleResetPassword))
@@ -297,18 +302,76 @@ func (g *Gateway) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	g.exitSoon()
 }
 
-// handleVersionUpdate is the CLI updater hook. KineRouter ships as a static Go
-// binary; there is no npm pack to swap in place, so the endpoint reports the
-// same production gate and exits, leaving the restart to the launcher.
+// handleVersionUpdate installs the newest release for this delivery channel,
+// then restarts the gateway. npm installs are replaced by npm; script installs
+// download and verify the release asset. The request is refused from a remote
+// client: replacing the binary is a local-operator action, like password reset.
 func (g *Gateway) handleVersionUpdate(w http.ResponseWriter, r *http.Request) {
-	if !g.devMode() {
+	if IsDevBuild() {
 		writeJSON(w, http.StatusForbidden, map[string]any{
-			"success": false, "message": "Update is only available in production build (kinerouter CLI)",
+			"success": false, "message": "Update is not available for a development build",
 		})
 		return
 	}
-	g.exitSoon()
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Updater started. This app will exit shortly."})
+	if !isLoopback(clientHost(r)) {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"success": false, "message": "Update is only available from the local machine",
+		})
+		return
+	}
+	latest := refreshLatestVersion()
+	if latest == "" || compareSemver(latest, Version) <= 0 {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"success": true, "status": "up_to_date", "version": Version,
+			"message": "KineRouter is already on the latest version",
+		})
+		return
+	}
+	if !g.beginUpdate() {
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"success": false, "message": "Another update is already running",
+		})
+		return
+	}
+	defer g.endUpdate()
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	exe, method, err := g.installUpdate(ctx, latest)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"success": false, "message": err.Error(), "installMethod": method,
+		})
+		return
+	}
+	// Spawn before replying so a failed restart is reported instead of leaving
+	// the dashboard waiting for a process that never comes back. The child
+	// sleeps (KINEROUTER_RESTART_DELAY) until this listener is gone.
+	if err := updater.Restart(exe); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"success": false, "message": "Update installed but restart failed: " + err.Error(),
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success": true, "status": "updated", "version": latest,
+		"installMethod": method, "message": "Update installed. Restarting...",
+	})
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		os.Exit(0)
+	}()
+}
+
+// installUpdate applies one release for this delivery channel and returns the
+// binary to start next. Shared by the dashboard button and the background loop.
+func (g *Gateway) installUpdate(ctx context.Context, latest string) (string, string, error) {
+	dataDir := ""
+	if g.cfg != nil {
+		dataDir = g.cfg.DataDir
+	}
+	method := InstallMethod()
+	exe, err := updater.Apply(ctx, method, latest, dataDir)
+	return exe, method, err
 }
 
 func (g *Gateway) handleVersionShutdown(w http.ResponseWriter, r *http.Request) {

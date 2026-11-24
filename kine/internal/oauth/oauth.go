@@ -38,10 +38,10 @@ var supported = map[string]bool{
 	"grok-cli": true, "kimi": true, "muse": true, "nous": true,
 	"minimax-code": true, "minimax-code-global": true, "github": true,
 	// Authorization-code providers with refresh support.
-	"antigravity": true, "iflow": true, "cline": true, "clinepass": true,
+	"antigravity": true, "agy-acp": true, "iflow": true, "cline": true, "clinepass": true,
 }
 var browserFlows = map[string]bool{
-	"claude": true, "codex": true, "gemini-cli": true, "antigravity": true,
+	"claude": true, "codex": true, "gemini-cli": true, "antigravity": true, "agy-acp": true,
 	"iflow": true, "gitlab": true, "cline": true, "clinepass": true, "kimchi": true,
 }
 

@@ -18,6 +18,42 @@ export type ApiKey = {
   accessAllow: string[]
 }
 
+
+/** Persona / jailbreak preset (agents.md-style system prompt injection). */
+export type JailbreakKeyword = { text: string; mode?: '' | 'partial' | 'regex' }
+export type JailbreakPreset = {
+  id?: string
+  name?: string
+  prompt: string
+  geminiSafety?: boolean
+  source?: string
+  kind?: string
+  keywords?: JailbreakKeyword[]
+  excludes?: JailbreakKeyword[]
+  position?: '' | 'system' | 'append'
+  mode?: '' | 'chat'
+  order?: number
+  syncOrigin?: string
+  syncPath?: string
+  createdAt?: string
+  updatedAt?: string
+}
+export type JailbreakBinding = { enabled: boolean; presetId?: string }
+export type JailbreakMatch = { injected: boolean; presetId?: string; presetName?: string; reason: string }
+export type JailbreakSyncSource = { repo: string; ref?: string; path?: string; enabled: boolean }
+
+
+/** Web terminal: one shell command per request. */
+export type TerminalInfo = {
+  cwd: string
+  user: string
+  host: string
+  shell: string
+  remote: boolean
+  allowed: boolean
+}
+export type TerminalResult = { output: string; exitCode: number; cwd: string }
+
 export type ProviderDisplay = {
   name: string
   icon?: string
@@ -494,6 +530,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
+/** One sponsored creative served by an ad-funded provider. */
+export type SponsoredAd = {
+  adId: string
+  clickUrl?: string
+  source?: string
+  creative: {
+    title?: string
+    body?: string
+    cta?: string
+    imageUrl?: string
+    sponsorName?: string
+    brandColor?: string
+  }
+}
+
 const json = (method: string, data: unknown): RequestInit => ({
   method,
   body: JSON.stringify(data),
@@ -504,6 +555,61 @@ export const api = {
   login: (password: string) => request<{ ok: boolean }>('/api/auth/login', json('POST', { password })),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 
+  /** Web terminal on the gateway host. */
+  terminalInfo: () => request<TerminalInfo>('/api/terminal'),
+  terminalExec: (command: string, cwd: string) =>
+    request<TerminalResult>('/api/terminal/exec', json('POST', { command, cwd })),
+  /** Persona / jailbreak presets, bindings and keyword rules. */
+  jailbreakPresets: () => request<JailbreakPreset[]>('/api/jailbreak/presets'),
+  jailbreakSavePreset: (preset: JailbreakPreset) =>
+    request<{ ok: boolean; preset: JailbreakPreset }>('/api/jailbreak/presets', json('PUT', preset)),
+  jailbreakDeletePreset: (id: string) =>
+    request<{ ok: boolean }>(`/api/jailbreak/presets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  jailbreakDuplicatePreset: (id: string) =>
+    request<{ ok: boolean; preset: JailbreakPreset }>(
+      `/api/jailbreak/presets/${encodeURIComponent(id)}/duplicate`,
+      json('POST', {}),
+    ),
+  jailbreakReorder: (order: string[]) =>
+    request<{ ok: boolean }>('/api/jailbreak/presets/order', json('PUT', { order })),
+  jailbreakUpload: (preset: { name: string; content: string; kind?: string }) =>
+    request<{ ok: boolean; preset: JailbreakPreset }>('/api/jailbreak/presets/upload', json('POST', preset)),
+  jailbreakBindings: () => request<Record<string, JailbreakBinding>>('/api/jailbreak/models'),
+  jailbreakModelCatalog: () => request<{ models: string[] }>('/api/jailbreak/models/catalog'),
+  jailbreakSetModel: (data: { id: string; enabled: boolean; presetId: string }) =>
+    request<{ ok: boolean }>('/api/jailbreak/models', json('PUT', data)),
+  jailbreakDeleteModel: (id: string) =>
+    request<{ ok: boolean }>('/api/jailbreak/models', json('DELETE', { id })),
+  jailbreakKeyBindings: (keyId: string) =>
+    request<Record<string, JailbreakBinding>>(
+      `/api/jailbreak/keys/bindings?keyId=${encodeURIComponent(keyId)}`,
+    ),
+  jailbreakSetKeyModel: (data: { keyId: string; id: string; enabled: boolean; presetId: string }) =>
+    request<{ ok: boolean }>('/api/jailbreak/keys/model', json('PUT', data)),
+  jailbreakExcludes: () => request<{ excludes: JailbreakKeyword[] }>('/api/jailbreak/excludes'),
+  jailbreakSaveExcludes: (excludes: JailbreakKeyword[]) =>
+    request<{ ok: boolean; excludes: JailbreakKeyword[] }>('/api/jailbreak/excludes', json('PUT', { excludes })),
+  jailbreakImport: (data: { url?: string; name?: string; text?: string; kind?: string }) =>
+    request<{ ok: boolean; imported: number; repo?: string }>('/api/jailbreak/import', json('POST', data)),
+  jailbreakResolve: (id: string, apiKeyId?: string) =>
+    request<JailbreakMatch>('/api/jailbreak/resolve', json('POST', { id, apiKeyId })),
+  jailbreakUsage: () => request<{ usage: Record<string, number> }>('/api/jailbreak/usage'),
+  jailbreakPreview: (id: string, messages: { role: string; content: string }[], apiKeyId?: string) =>
+    request<{ injected: boolean; reason: string; messages: unknown[]; presetId?: string; presetName?: string }>(
+      '/api/jailbreak/preview',
+      json('POST', { id, messages, apiKeyId }),
+    ),
+  jailbreakGithub: () => request<{ hasToken: boolean; apiBase: string }>('/api/jailbreak/github'),
+  jailbreakSaveGithub: (data: { token?: string; apiBase?: string }) =>
+    request<{ ok: boolean; hasToken: boolean }>('/api/jailbreak/github/token', json('PUT', data)),
+  jailbreakSources: () => request<{ sources: JailbreakSyncSource[] }>('/api/jailbreak/sync/sources'),
+  jailbreakSaveSources: (sources: JailbreakSyncSource[]) =>
+    request<{ ok: boolean; sources: JailbreakSyncSource[] }>('/api/jailbreak/sync/sources', json('PUT', { sources })),
+  jailbreakSyncRun: () =>
+    request<{ ok: boolean; results: { source: string; imported: number; removed: number; error?: string }[] }>(
+      '/api/jailbreak/sync/run',
+      json('POST', {}),
+    ),
   keys: () => request<{ keys: ApiKey[]; machineId: string }>('/api/keys'),
   createKey: (name: string) => request<ApiKey>('/api/keys', json('POST', { name })),
   // `access` is the reference route's shape (`{restricted, allow}`); the model
@@ -637,6 +743,15 @@ export const api = {
     request<OAuthDeviceStart>(`/api/oauth/${provider}/device`, { method: 'POST' }),
   oauthPoll: (provider: string, state: string) =>
     request<OAuthPoll>(`/api/oauth/${provider}/poll?state=${encodeURIComponent(state)}`),
+  /** Ad-funded providers: banner creative + verified impression report. */
+  freePiAd: (connectionId: string) =>
+    request<{ ad: SponsoredAd | null }>(`/api/free-pi/ad?connectionId=${encodeURIComponent(connectionId)}`),
+  freePiImpression: (connectionId: string, adId: string) =>
+    request<{ recorded: boolean }>('/api/free-pi/ad/impression', json('POST', { connectionId, adId })),
+  freebuffAd: (connectionId: string) =>
+    request<{ ad: SponsoredAd | null }>(`/api/freebuff/ad?connectionId=${encodeURIComponent(connectionId)}`),
+  freebuffImpression: (connectionId: string, adId: string) =>
+    request<{ recorded: boolean }>('/api/freebuff/ad/impression', json('POST', { connectionId, adId })),
   /** iflow: exchange a browser cookie for an API key and store a connection. */
   iflowCookie: (cookie: string) =>
     request<{ connection?: Connection; keys?: number }>('/api/oauth/iflow/cookie', json('POST', { cookie })),
@@ -723,7 +838,42 @@ export const api = {
       hasUpdate: boolean
       installMethod?: string
       installCommand?: string
+      releaseNotes?: string
     }>('/api/version'),
+
+  /** Fresh GitHub check; used when the modal opens. */
+  checkVersion: () =>
+    request<{
+      version: string
+      latestVersion: string
+      hasUpdate: boolean
+      installMethod?: string
+      installCommand?: string
+      releaseNotes?: string
+    }>('/api/version/check'),
+
+  /** Background updater state: opt-in flag, interval, last look. */
+  versionStatus: () =>
+    request<{
+      autoUpdateEnabled?: boolean
+      updateInProgress?: boolean
+      lastCheckTime?: string
+      checkIntervalHours?: number
+    }>('/api/version/status'),
+
+  /** Persist the opt-in for unattended updates. */
+  setAutoUpdate: (enabled: boolean) =>
+    request<{ success: boolean; autoUpdateEnabled?: boolean }>(
+      '/api/version/auto-update',
+      json('POST', { enabled }),
+    ),
+
+  /** Install the newest release for this delivery channel. */
+  triggerUpdate: () =>
+    request<{ success: boolean; status?: string; version?: string; message?: string }>(
+      '/api/version/update',
+      { method: 'POST' },
+    ),
 
   // CLI tools: one settings endpoint per tool (see internal/gateway/clitools.go).
   // The body shape differs per tool; pages own it.

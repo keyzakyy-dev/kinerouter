@@ -377,8 +377,17 @@ func (g *Gateway) handleGetProvider(w http.ResponseWriter, r *http.Request) {
 	// modelMeta carries the fields the dashboard needs per model but that live
 	// in server-side tables (thinking levels, capability badges), so the SPA
 	// never has to duplicate them.
+	// Entry-level models are optional; providerModels (keyed by alias) is the
+	// table the picker groups by, so fall back to it rather than serving null.
+	models := entry.Models
+	if len(models) == 0 {
+		models = g.reg.Models[entry.Alias]
+	}
+	if models == nil {
+		models = []providerdata.Model{}
+	}
 	modelMeta := map[string]any{}
-	for _, m := range entry.Models {
+	for _, m := range models {
 		c := providerdata.CapabilitiesFor(entry.ID, m.ID)
 		modelMeta[m.ID] = map[string]any{
 			"thinkingLevels": providerdata.ThinkingLevels(entry.ID, m.ID),
@@ -400,7 +409,7 @@ func (g *Gateway) handleGetProvider(w http.ResponseWriter, r *http.Request) {
 	mediaOut["category"] = entry.Category
 	mediaOut["authType"] = entry.AuthType
 	mediaOut["display"] = entry.Display
-	mediaOut["models"] = entry.Models
+	mediaOut["models"] = models
 	mediaOut["oauth"] = entry.OAuth
 	mediaOut["transport"] = entry.Transport
 	mediaOut["connections"] = connsOut

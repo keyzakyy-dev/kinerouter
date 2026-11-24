@@ -103,12 +103,18 @@ func ToGemini(raw map[string]any, model string, stream bool) (map[string]any, er
 		}
 		out.Tools = []map[string]any{{"functionDeclarations": decls}}
 	}
-	return map[string]any{
+	body := map[string]any{
 		"contents":          out.Contents,
 		"systemInstruction": out.SystemInstruction,
 		"generationConfig":  out.GenerationConfig,
 		"tools":             out.Tools,
-	}, nil
+	}
+	// Carried through untouched: Cloud Code reads it, and no client field
+	// maps to it, so it can only have been set by prompt injection.
+	if ss, ok := raw["safetySettings"]; ok {
+		body["safetySettings"] = ss
+	}
+	return body, nil
 }
 
 func geminiParts(m OpenAIMessage) []GeminiPart {

@@ -8,6 +8,7 @@
 # Frontend deps + Vite build (rebuilt by `npm run build`, embedded by go:embed)
 web-app/node_modules/
 web-app/dist/
+web-app/tsconfig.tsbuildinfo
 # Tracked: `npm ci` in the Dockerfile and CI both need the lockfile.
 !web-app/package-lock.json
 

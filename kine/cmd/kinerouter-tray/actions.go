@@ -66,23 +66,78 @@ func gatewayPath() (string, error) {
 	}
 	// Release assets and the npm package name the gateway with its version
 	// (kinerouter_0.1.1_windows_amd64.exe), so accept that shape too — still only
-	// from this directory, never from PATH.
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return "", err
-	}
+	// from this directory, never from PATH. npm never removes the previous
+	// version, so the highest version wins; a directory scan is name-ordered,
+	// which would happily launch 0.1.9 over 0.2.0.
 	suffix := ""
 	if runtime.GOOS == "windows" {
 		suffix = ".exe"
 	}
+	if p := versionedGateway(dir, suffix); p != "" {
+		return p, nil
+	}
+	return "", fmt.Errorf("%s not found next to the tray: install the two binaries in one directory", p)
+}
+
+// versionedGateway returns the newest kinerouter_<version>_<os>_<arch> file in
+// dir, or "" when none exists. Versions compare numerically, component by
+// component; a tie keeps the first name the scan returned.
+func versionedGateway(dir, suffix string) string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	best, bestVer := "", ""
 	for _, e := range entries {
 		n := e.Name()
 		if e.IsDir() || !strings.HasPrefix(n, "kinerouter_") || !strings.HasSuffix(n, suffix) {
 			continue
 		}
-		return filepath.Join(dir, n), nil
+		v := strings.TrimSuffix(strings.TrimPrefix(n, "kinerouter_"), suffix)
+		if i := strings.IndexByte(v, '_'); i >= 0 {
+			v = v[:i]
+		}
+		if best == "" || compareVersion(v, bestVer) > 0 {
+			best, bestVer = n, v
+		}
 	}
-	return "", fmt.Errorf("%s not found next to the tray: install the two binaries in one directory", p)
+	if best == "" {
+		return ""
+	}
+	return filepath.Join(dir, best)
+}
+
+// compareVersion orders dotted numeric versions. A non-numeric component
+// counts as 0, matching the gateway's own lenient update comparison.
+func compareVersion(a, b string) int {
+	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < 3; i++ {
+		x, y := 0, 0
+		if i < len(pa) {
+			x = atoiTray(pa[i])
+		}
+		if i < len(pb) {
+			y = atoiTray(pb[i])
+		}
+		if x != y {
+			if x > y {
+				return 1
+			}
+			return -1
+		}
+	}
+	return 0
+}
+
+func atoiTray(s string) int {
+	n := 0
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			break
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n
 }
 
 // probeState asks the gateway's own unauthenticated endpoint whether it is up.

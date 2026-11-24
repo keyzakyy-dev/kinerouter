@@ -110,6 +110,7 @@ func (g *Gateway) fetchPage(ctx context.Context, provider string, cfg map[string
 
 	start := time.Now()
 	reqURL, reqBody := "", []byte(nil)
+	method := http.MethodPost
 	headers := map[string]string{"Content-Type": "application/json"}
 	switch provider {
 	case "firecrawl":
@@ -139,11 +140,21 @@ func (g *Gateway) fetchPage(ctx context.Context, provider string, cfg map[string
 		reqURL = base
 		headers["X-API-Key"] = token
 		reqBody = mustJSON(map[string]any{"urls": []any{target}, "format": format})
+	case "keenable":
+		reqURL = base
+		headers["X-Keenable-Title"] = "KineRouter"
+		if token == "" {
+			reqURL += "/public"
+		} else {
+			headers["X-API-Key"] = token
+		}
+		reqURL += "?url=" + neturl.QueryEscape(target)
+		method = http.MethodGet
 	default:
 		return nil, fmt.Errorf("unsupported fetch provider %q", provider)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(reqBody))
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, err
 	}
@@ -232,6 +243,12 @@ func fetchExtract(provider string, raw []byte) (title, text string, meta map[str
 		text, _ = m["content"].(string)
 		if text == "" {
 			return "", "", meta, &statusError{status: http.StatusBadGateway, msg: "ollama returned no content"}
+		}
+	case "keenable":
+		text, _ = m["content"].(string)
+		title, _ = m["title"].(string)
+		if text == "" {
+			return "", "", meta, &statusError{status: http.StatusBadGateway, msg: "keenable returned no content"}
 		}
 		title, _ = m["title"].(string)
 	case "tinyfish":

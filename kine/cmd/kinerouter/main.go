@@ -104,6 +104,7 @@ func main() {
 	// Tunnel auto-resume (settings.tunnelEnabled / tailscaleEnabled) runs in the
 	// background, like runHeavyStartup's deferred resume.
 	gw.ResumeTunnels()
+	gw.StartAutoUpdate(refreshCtx)
 	addr := cfg.Host + ":" + strconv.Itoa(cfg.Port)
 	srv := &http.Server{
 		Addr:              addr,

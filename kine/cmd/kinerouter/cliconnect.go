@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/keyzakyy-dev/kinerouter/internal/config"
-	"github.com/keyzakyy-dev/kinerouter/internal/gateway"
 
 	toml "github.com/pelletier/go-toml/v2"
 	"golang.org/x/term"
@@ -43,6 +42,8 @@ Usage:
   kinerouter show [tool...] [--json]
   kinerouter mitm-server        (internal: privileged MITM proxy)
   kinerouter tray               Start the desktop tray icon (needs kinerouter-tray)
+  kinerouter version            Show this version and the newest release
+  kinerouter update             Install the newest release for this channel
 
 options (the login entry runs --tray --skip-update):
   -p, --port <port>  Port to serve on (default: 20128, or $PORT)
@@ -107,8 +108,9 @@ func runCLI(args []string) (handled bool, code int) {
 		// this one without breaking the CGO_ENABLED=0 cross-build.
 		return true, runTray(args[1:])
 	case "version", "-v", "--version":
-		fmt.Printf("kinerouter %s\n", gateway.Version)
-		return true, 0
+		return true, runVersion()
+	case "update":
+		return true, runUpdate()
 	case "help", "-h", "--help":
 		fmt.Print(cliHelp)
 		return true, 0

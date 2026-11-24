@@ -51,6 +51,7 @@ var codeFlows = map[string]*codeFlow{
 	"codex":       {exchange: codexExchange},
 	"gemini-cli":  {authorize: googleAuthorize, exchange: googleExchange},
 	"antigravity": {authorize: googleAuthorize, exchange: googleExchange},
+	"agy-acp":     {authorize: googleAuthorize, exchange: googleExchange},
 	"iflow":       {authorize: iflowAuthorize, exchange: iflowExchange},
 	"gitlab":      {authorize: gitlabAuthorize, exchange: gitlabExchange},
 	"cline":       {authorize: clineAuthorize, noPKCE: true, exchange: clineExchange},

@@ -57,6 +57,8 @@ func pickSpecific(raw map[string]any) map[string]any {
 	allow := map[string]bool{
 		"connectionProxyEnabled": true, "connectionProxyUrl": true, "connectionNoProxy": true,
 		"proxyPoolId": true, "defaultModel": true, "nodeName": true,
+		// agy-acp: credential source, worker isolation and permission mode.
+		"sourceConnection": true, "permissionMode": true, "agyPath": true, "accountRoot": true,
 		// Credential shape the executors read (aws.go, quirks.go's azure lane,
 		// systemone.go, usageadmin.go). None of these reach a URL by themselves:
 		// azureEndpoint is re-validated by checkPublicURL below.

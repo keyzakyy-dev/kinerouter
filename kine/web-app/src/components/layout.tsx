@@ -30,6 +30,7 @@ const gatewayItems: NavItem[] = [
   { href: '/dashboard/endpoint', label: 'Endpoint & Key', icon: 'key' },
   { href: '/dashboard/providers', label: 'Providers', icon: 'dns' },
   { href: '/dashboard/combos', label: 'Combo & Vision Adapter', icon: 'layers' },
+  { href: '/dashboard/jailbreak', label: 'Persona', icon: 'psychology' },
 ]
 
 const insightItems: NavItem[] = [
@@ -48,6 +49,7 @@ const systemItems: NavItem[] = [
 const debugItems: NavItem[] = [
   { href: '/dashboard/console-log', label: 'Console Log', icon: 'receipt_long' },
   { href: '/dashboard/translator', label: 'Translator', icon: 'translate' },
+  { href: '/dashboard/terminal', label: 'Terminal', icon: 'terminal' },
 ]
 
 const MEDIA_PROVIDER_KINDS = [
@@ -197,6 +199,12 @@ export function AppShell() {
   const [latestVersion, setLatestVersion] = useState('')
   const [installCmd, setInstallCmd] = useState(INSTALL_CMD)
   const [showUpdate, setShowUpdate] = useState(false)
+  const [updating, setUpdating] = useState(false)
+  const [updateMsg, setUpdateMsg] = useState('')
+  const [releaseNotes, setReleaseNotes] = useState('')
+  const [autoUpdate, setAutoUpdate] = useState(false)
+  const [autoBusy, setAutoBusy] = useState(false)
+  const [autoInterval, setAutoInterval] = useState(6)
   const [countdown, setCountdown] = useState(0)
   const [disconnected, setDisconnected] = useState(false)
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) !== 'open')
@@ -210,6 +218,7 @@ export function AppShell() {
       .then((v) => {
         setVersion(v.version)
         if (v.installCommand) setInstallCmd(v.installCommand)
+        if (v.releaseNotes) setReleaseNotes(v.releaseNotes)
         if (v.hasUpdate) setLatestVersion(v.latestVersion || v.latest)
       })
       .catch(() => {})
@@ -238,6 +247,43 @@ export function AppShell() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  // A stale hour-long cache must not hide a release the user just asked about,
+  // so opening the modal re-checks GitHub.
+  const openUpdate = () => {
+    setShowUpdate(true)
+    setUpdateMsg('')
+    api
+      .versionStatus()
+      .then((v) => {
+        setAutoUpdate(Boolean(v.autoUpdateEnabled))
+        if (v.checkIntervalHours) setAutoInterval(v.checkIntervalHours)
+      })
+      .catch(() => {})
+    api
+      .checkVersion()
+      .then((v) => {
+        if (v.latestVersion) setLatestVersion(v.latestVersion)
+        if (v.installCommand) setInstallCmd(v.installCommand)
+        if (v.releaseNotes) setReleaseNotes(v.releaseNotes)
+      })
+      .catch(() => {})
+  }
+
+  // Run the channel-aware updater, then wait for the replacement process to
+  // bind and reload into it.
+  const runUpdate = async () => {
+    setUpdating(true)
+    setUpdateMsg('')
+    try {
+      const res = await api.triggerUpdate()
+      setUpdateMsg(res.message || 'Update installed. Restarting…')
+      setTimeout(() => globalThis.location.reload(), 6000)
+    } catch (err) {
+      setUpdateMsg(err instanceof Error ? err.message : 'Update failed')
+      setUpdating(false)
+    }
+  }
 
   // Copy the install command, count down, then stop the server so the user can
   // upgrade the binary. Same one-way flow as the reference sidebar.
@@ -282,7 +328,7 @@ export function AppShell() {
           {latestVersion && (
             <UpdateBanner
               latestVersion={latestVersion}
-              onUpdate={() => setShowUpdate(true)}
+              onUpdate={openUpdate}
               onCopy={() => copy(installCmd)}
               copied={copied}
             />
@@ -381,6 +427,44 @@ export function AppShell() {
           <code className="break-all rounded-lg border border-border bg-surface-2 p-3 font-mono text-xs text-text-main">
             {installCmd}
           </code>
+          {installCmd.startsWith('docker') ? (
+            <p className="text-xs text-text-muted">
+              Docker images cannot replace themselves. Run the command above, then reload.
+            </p>
+          ) : (
+            <p className="text-xs text-text-muted">
+              Update now replaces this binary and restarts the server automatically.
+            </p>
+          )}
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3">
+            <input
+              type="checkbox"
+              checked={autoUpdate}
+              disabled={autoBusy || installCmd.startsWith('docker')}
+              onChange={(e) => {
+                const next = e.target.checked
+                setAutoUpdate(next)
+                setAutoBusy(true)
+                api
+                  .setAutoUpdate(next)
+                  .catch(() => setAutoUpdate(!next))
+                  .finally(() => setAutoBusy(false))
+              }}
+              className="mt-0.5 size-4 accent-[var(--color-primary)]"
+            />
+            <span className="text-xs text-text-muted">
+              <span className="block font-medium text-text-main">Install updates automatically</span>
+              {installCmd.startsWith('docker')
+                ? 'Docker images cannot update themselves; pull the new image instead.'
+                : `Checks every ${autoInterval}h and installs stable releases, then restarts. Prereleases are never picked up automatically.`}
+            </span>
+          </label>
+          {releaseNotes && (
+            <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-surface-2 p-3 text-xs leading-relaxed text-text-muted">
+              {releaseNotes}
+            </div>
+          )}
+          {updateMsg && <p className="text-xs text-text-muted">{updateMsg}</p>}
           <div className="flex items-center justify-end gap-2">
             <button
               onClick={() => setShowUpdate(false)}
@@ -393,10 +477,19 @@ export function AppShell() {
                 setShowUpdate(false)
                 copyAndShutdown()
               }}
-              className="cursor-pointer rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white"
+              className="cursor-pointer rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-main hover:bg-surface-2"
             >
               Copy &amp; shut down
             </button>
+            {!installCmd.startsWith('docker') && (
+              <button
+                onClick={runUpdate}
+                disabled={updating}
+                className="cursor-pointer rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {updating ? 'Updating…' : 'Update now'}
+              </button>
+            )}
           </div>
         </div>
       </Modal>

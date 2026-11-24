@@ -5,6 +5,46 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-11-24
+
+### Added
+
+- **Channel-aware self-update.** `kinerouter update` and the dashboard's
+  **Update now** button install the newest `kine-v*` release for the way this
+  copy was delivered: npm upgrades through npm, a script install downloads the
+  release asset and verifies its `checksums.txt` sha256 before an atomic swap
+  (with rollback), and Docker prints the pull command instead of pretending it
+  can replace its own image. The gateway restarts itself through a detached
+  wrapper, so npm's versioned runtime is never replaced from inside the server.
+- **Opt-in unattended updates.** `AUTO_UPDATE` / the dashboard toggle enables a
+  background check (`AUTO_UPDATE_INTERVAL_HOURS`, default 6h) that installs
+  stable releases only. `GET /api/version/status` reports the flag, interval,
+  in-flight state and last check; `POST /api/version/auto-update` persists it.
+- **Release notes in the update modal**, read from the GitHub release body of
+  the tag that is actually offered.
+- **Full prerelease-aware SemVer comparison**: `1.9.7-rc1 < 1.9.7`,
+  `rc.2 < rc.10`, build metadata ignored.
+- **Providers `agy-acp`, `free-pi`, `freebuff`, `zcode`, `keenable` and
+  `zai-search`**, with their OAuth/device flows, icons and executors. The
+  embedded registry now holds 165 providers.
+- **Sponsored creatives for the ad-funded providers** (`free-pi`, `freebuff`):
+  a creative is recorded only when served and reported only after it was
+  painted, so an impression cannot be reported twice or without a view.
+- **Persona / jailbreak presets**: a dashboard library, per-model bindings and
+  keyword rules. Injection is opt-in and off by default.
+- **Web terminal**: one shell command per request, dashboard-session auth,
+  loopback-only unless `terminalAllowRemote` is set. Stateless; no PTY.
+- **`POST /v1/search` and `POST /v1/web/fetch`** endpoints backed by the
+  registry's search providers and a netguard-validated extractor.
+- Tray picks the highest-versioned runtime binary instead of the first match.
+
+### Fixed
+
+- The update trigger is refused for development builds, and install-channel
+  detection now recognises a custom `DATA_DIR` runtime layout.
+- The release check filters `kine-v*` tags from the releases list, so a tag
+  from another track can no longer be offered as an update.
+
 ## [0.1.10] — 2026-11-24
 
 ### Added

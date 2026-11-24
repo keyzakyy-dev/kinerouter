@@ -38,6 +38,11 @@ type Gateway struct {
 
 	proxyMu   sync.Mutex
 	proxyNext map[string]int // per-provider cursor for rotateStrategy=round-robin
+
+	// Background updater state (see autoupdate.go).
+	updMu        sync.Mutex
+	updUpdating  bool
+	updLastCheck time.Time
 }
 
 func New(cfg *config.Config, st *store.Store, static http.Handler) *Gateway {
@@ -179,6 +184,9 @@ func (g *Gateway) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/usage/stream", g.requireAuth(g.handleUsageStream))
 
 	g.registerUsageAdminRoutes(mux)
+	g.registerAdRoutes(mux)
+	g.registerJailbreakRoutes(mux)
+	g.registerTerminalRoutes(mux)
 	g.registerConsoleLogRoutes(mux)
 	g.registerModelsAdminRoutes(mux)
 	g.registerMiscAdminRoutes(mux)

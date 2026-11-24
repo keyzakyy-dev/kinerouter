@@ -76,6 +76,7 @@ function UsageStats({ period }: { period: string }) {
     Promise.all([api.providers(), api.providerNodes()])
       .then(([p, n]) => {
         const nodeName: Record<string, string> = {}
+        const nodes = new Map<string, (typeof n.nodes)[number]>((n.nodes || []).map((node) => [node.id, node]))
         for (const node of n.nodes || []) if (node.name) nodeName[node.id] = node.name
         setNodeNames(nodeName)
         const seen = new Set<string>()
@@ -100,7 +101,20 @@ function UsageStats({ period }: { period: string }) {
         const free = (p.providers || [])
           .filter((s) => s.noAuth && !s.hidden && !seen.has(s.id) && isLLM(s))
           .map((s) => ({ provider: s.id, name: s.display?.name || s.id, color: s.display?.color, textIcon: s.display?.textIcon }))
-        setProviders([...unique, ...free])
+        // Custom endpoint nodes live outside the registry, so the summary
+        // lookup above drops them. Add the ones with a connection.
+        const custom = ((p.connections || []) as Connection[])
+          .filter((c) => {
+            const node = nodes.get(c.provider)
+            if (!node || node.type === 'custom-embedding' || c.isActive === false || seen.has(c.provider)) return false
+            seen.add(c.provider)
+            return true
+          })
+          .map((c) => {
+            const name = nodes.get(c.provider)?.name || c.provider
+            return { provider: c.provider, name, textIcon: name.slice(0, 2).toUpperCase() }
+          }) as TopoProvider[]
+        setProviders([...unique, ...custom, ...free])
       })
       .catch(() => {})
   }, [])

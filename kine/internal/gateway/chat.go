@@ -74,6 +74,7 @@ func (g *Gateway) handleRaw(w http.ResponseWriter, r *http.Request, raw map[stri
 	modelStr = stripContextMarker(modelStr)
 
 	apiKey := extractAPIKey(r)
+	apiKeyID := ""
 	settings, err := g.store.GetSettings()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "settings unavailable")
@@ -93,6 +94,7 @@ func (g *Gateway) handleRaw(w http.ResponseWriter, r *http.Request, raw map[stri
 			writeErr(w, http.StatusUnauthorized, "Invalid API key")
 			return
 		}
+		apiKeyID = key.ID
 		if !g.keyAllows(key, modelStr) {
 			writeErr(w, http.StatusForbidden, "API key is not allowed to use this model")
 			return
@@ -116,6 +118,7 @@ func (g *Gateway) handleRaw(w http.ResponseWriter, r *http.Request, raw map[stri
 	// requested id is resolved through the alias table first.
 	modelStr = g.resolveAliasChain(modelStr)
 	if combo, err := g.store.GetComboByName(modelStr); err == nil && combo != nil && len(combo.Models) > 0 {
+		g.applyJailbreak(raw, apiKeyID, g.jailbreakCandidateIDs(modelStr, combo, nil), clientFormat)
 		g.handleCombo(w, r, combo, raw, apiKey, clientFormat, stream)
 		return
 	}
@@ -125,6 +128,7 @@ func (g *Gateway) handleRaw(w http.ResponseWriter, r *http.Request, raw map[stri
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	g.applyJailbreak(raw, apiKeyID, g.jailbreakCandidateIDs(modelStr, nil, targets), clientFormat)
 	// A single model that cannot serve the request's modality falls back to the
 	// capacity-adapter pool first, as in the solo path.
 	if required := detectRequiredCapabilities(raw); len(required) > 0 {
@@ -487,6 +491,29 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 	defer cancel()
 
 	creds := executor.CredentialsFromConnection(conn)
+	// agy-acp signs in with the antigravity Google client but keeps its own
+	// rows. A connection may reference an antigravity account instead of
+	// carrying tokens, so resolve (and refresh) that source here.
+	if t.Provider == "agy-acp" {
+		if src := conn.SpecificStr("sourceConnection"); src != "" && src != conn.ID {
+			ref, rerr := g.store.GetConnection(src)
+			if rerr != nil || ref == nil || ref.Provider != "antigravity" {
+				return dispatchResult{}, &upstreamError{status: http.StatusBadRequest,
+					message: "agy-acp: source connection must be an antigravity connection",
+					raw:     string(mustJSON(map[string]any{"error": map[string]any{"message": "agy-acp: source connection must be an antigravity connection", "type": "invalid_request_error"}}))}
+			}
+			if _, rerr := g.oauth.RefreshOne(ctx, g.store, ref, 2*time.Minute); rerr == nil {
+				if fresh, ferr := g.store.GetConnection(src); ferr == nil && fresh != nil {
+					ref = fresh
+				}
+			}
+			creds.AccessToken = ref.Str("accessToken")
+			creds.RefreshToken = ref.Str("refreshToken")
+			if exp, perr := time.Parse(time.RFC3339, ref.Str("expiresAt")); perr == nil {
+				creds.ExpiresAt = exp
+			}
+		}
+	}
 	// MiniMax desktop lease: the connection stores no token, so borrow one
 	// from the running desktop broker (cached until it nears expiry).
 	leaseDir := ""
@@ -545,12 +572,13 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 		}
 	}
 	execReq := executor.Request{
-		Provider: t.Provider,
-		Model:    t.Model,
-		Format:   wire,
-		Body:     bodyBytes,
-		Stream:   streamUpstream,
-		Creds:    creds,
+		Provider:     t.Provider,
+		Model:        t.Model,
+		Format:       wire,
+		Body:         bodyBytes,
+		Stream:       streamUpstream,
+		Creds:        creds,
+		ConnectionID: conn.ID,
 	}
 	// A custom node owns its endpoint (baseUrl + /chat/completions, /responses
 	// or /messages), which the registry cannot derive.

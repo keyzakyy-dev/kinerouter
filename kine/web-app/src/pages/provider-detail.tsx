@@ -5,6 +5,7 @@ import { fmtTime } from '@/lib/format'
 import { useNotify } from '@/lib/toast'
 import { ProviderIcon } from '@/components/provider-icon'
 import { CapacityBadges } from '@/components/capacity-badges'
+import { SponsoredAdBanner } from '@/components/sponsored-ad'
 import { Icon } from '@/components/icon'
 import { CopyButton } from '@/components/copy-button'
 import { Modal, ConfirmModal } from '@/components/modal'
@@ -862,6 +863,12 @@ export function ProviderDetailPage() {
                     Select all
                   </label>
                 </div>
+                {(detail.id === 'free-pi' || detail.id === 'freebuff') && detail.connections[0] && (
+                  <SponsoredAdBanner
+                    provider={detail.id}
+                    connectionId={detail.connections[0].id}
+                  />
+                )}
                 <div className="flex flex-col gap-2">
                   {detail.connections.map((c, i) => (
                     <ConnectionRow
@@ -2385,7 +2392,7 @@ function OAuthModal({
 
   useEffect(() => {
     let cancelled = false
-    const isDevice = ['grok-cli', 'kimi', 'muse', 'nous', 'github', 'minimax-code', 'minimax-code-global'].includes(provider)
+    const isDevice = ['grok-cli', 'kimi', 'muse', 'nous', 'github', 'minimax-code', 'minimax-code-global', 'zcode', 'free-pi', 'freebuff'].includes(provider)
 
     const run = async () => {
       try {
