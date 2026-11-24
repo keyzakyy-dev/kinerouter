@@ -2017,10 +2017,28 @@ export function AddApiKeyModal({
       <div className="flex flex-col gap-3">
         {authHint && <p className="text-[11px] text-text-muted">{authHint}</p>}
         {!isCompatible && (
-          <label className="flex items-center gap-2 text-xs text-text-muted">
-            <input type="checkbox" checked={bulk} onChange={(e) => setBulk(e.target.checked)} />
-            Bulk add (name|key per line; cloudflare adds |accountId)
-          </label>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-0.5 rounded-md bg-surface-2 p-0.5">
+              {([false, true] as const).map((v) => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  onClick={() => setBulk(v)}
+                  className={cn(
+                    'rounded px-2.5 py-1 text-xs font-medium transition-colors',
+                    bulk === v ? 'bg-surface text-text-main shadow-sm' : 'text-text-muted hover:text-text-main',
+                  )}
+                >
+                  {v ? 'Bulk add' : 'Single key'}
+                </button>
+              ))}
+            </div>
+            {bulk && (
+              <span className="font-mono text-[11px] text-text-muted">
+                {isCloudflare ? 'name|key|accountId' : 'name|key'} per line
+              </span>
+            )}
+          </div>
         )}
         {bulk ? (
           <textarea
