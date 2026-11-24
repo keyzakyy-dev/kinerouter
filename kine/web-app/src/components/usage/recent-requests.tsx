@@ -20,16 +20,14 @@ function TimeAgo({ timestamp }: { timestamp: string }) {
 export function RecentRequests({ requests = [] }: { requests?: RecentRequest[] }) {
   return (
     <section className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-surface" style={{ height: 480 }}>
-      <div className="flex shrink-0 items-baseline gap-2 px-4 py-3">
+      <div className="flex shrink-0 items-center gap-2 px-4 py-3">
+        <Icon name="schedule" className="text-[15px] text-text-muted" />
         <h2 className="text-sm font-semibold text-text-main">Recent requests</h2>
-        <span className="font-mono text-[10px] text-text-muted">
-          {requests.length} {requests.length === 1 ? 'entry' : 'entries'}
-        </span>
-        <span className="ml-auto text-[10px] text-text-muted">in / out</span>
+        <span className="ml-auto font-mono text-[11px] text-text-muted">{requests.length}</span>
       </div>
 
       {!requests.length ? (
-        <div className="m-4 flex flex-1 flex-col items-center justify-center gap-2 rounded-xl bg-surface-2 p-6 text-center text-xs text-text-muted">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl bg-surface-2 p-6 text-center text-xs text-text-muted">
           <Icon name="schedule" className="text-[24px] text-text-muted/60" />
           <span>No requests yet. Send one from Endpoint &amp; Key.</span>
         </div>
@@ -38,39 +36,17 @@ export function RecentRequests({ requests = [] }: { requests?: RecentRequest[] }
           {requests.map((r, i) => {
             const ok = !r.status || r.status === 'ok' || r.status === 'success'
             return (
-              <li
-                key={i}
-                className="flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-surface-2/40"
-              >
-                <span
-                  className={`mt-1 h-7 w-0.5 shrink-0 rounded-full ${ok ? 'bg-emerald-500' : 'bg-danger'}`}
-                />
-                <div className="min-w-0 flex-1">
-                  <code className="block truncate font-mono text-[11px] leading-4 text-text-main" title={r.model}>
-                    {r.model}
-                  </code>
-                  <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] leading-3 text-text-muted">
-                    {r.provider && (
-                      <>
-                        <span className="max-w-[45%] truncate">{r.provider}</span>
-                        <span aria-hidden>·</span>
-                      </>
-                    )}
-                    <span>
-                      <TimeAgo timestamp={r.timestamp} />
-                    </span>
-                    {r.cachedTokens > 0 && (
-                      <>
-                        <span aria-hidden>·</span>
-                        <span className="font-mono">{fmt(r.cachedTokens)} cached</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="shrink-0 text-right font-mono text-[10px] leading-4">
-                  <div className="text-text-main">{fmt(r.promptTokens)}</div>
-                  <div className="text-text-muted">{fmt(r.completionTokens)}</div>
-                </div>
+              <li key={i} className="flex items-center gap-2 px-4 py-2 transition-colors hover:bg-surface-2/40">
+                <span className={`size-1.5 shrink-0 rounded-full ${ok ? 'bg-success' : 'bg-danger'}`} />
+                <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-main" title={r.model}>
+                  {r.model}
+                </code>
+                <span className="shrink-0 font-mono text-[10px] text-text-muted">
+                  {fmt(r.promptTokens)}↑ {fmt(r.completionTokens)}↓
+                </span>
+                <span className="w-14 shrink-0 text-right font-mono text-[10px] text-text-muted">
+                  <TimeAgo timestamp={r.timestamp} />
+                </span>
               </li>
             )
           })}
