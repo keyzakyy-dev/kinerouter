@@ -125,7 +125,7 @@ function Brand({ version }: { version: string }) {
           </span>
           <span className="flex items-center gap-1.5 text-[11px] leading-tight text-text-muted">
             <span className="size-1.5 rounded-full bg-success" />
-            {version ? `v${version}` : 'local gateway'}
+            {version ? (version.endsWith('-dev') ? `dev · ${version.replace(/-dev$/, '')}` : `v${version}`) : 'local gateway'}
           </span>
         </span>
       )}

@@ -23,6 +23,15 @@ import (
 //	go build -ldflags "-X .../internal/gateway.Version=0.2.0"
 var Version = "0.1.0"
 
+// IsDevBuild reports a working-copy build: a `-dev` version suffix (see the
+// dev build command below) or KINEROUTER_DEV set. Dev builds never advertise
+// an update, because their version string is a git rev, not a release number.
+//
+//	go build -ldflags "-X .../internal/gateway.Version=$(git rev-parse --short HEAD)-dev"
+func IsDevBuild() bool {
+	return strings.Contains(Version, "-dev") || os.Getenv("KINEROUTER_DEV") != ""
+}
+
 const versionCacheTTL = time.Hour
 
 var (
@@ -113,7 +122,11 @@ func atoiSafe(s string) int {
 
 // UpdateInfo returns the newest release and whether it is newer than this
 // build. One call, one network attempt, shared by the launcher and the API.
+// A dev build never has an update: it is ahead of the last release by design.
 func UpdateInfo() (string, bool) {
+	if IsDevBuild() {
+		return "", false
+	}
 	latest := latestVersionCached()
 	return latest, latest != "" && compareSemver(latest, Version) > 0
 }
@@ -161,8 +174,13 @@ func InstallCommand() string {
 }
 
 func (g *Gateway) handleVersion(w http.ResponseWriter, r *http.Request) {
-	latest := latestVersionCached()
-	hasUpdate := latest != "" && compareSemver(latest, Version) > 0
+	dev := IsDevBuild()
+	latest := ""
+	hasUpdate := false
+	if !dev {
+		latest = latestVersionCached()
+		hasUpdate = latest != "" && compareSemver(latest, Version) > 0
+	}
 	// Both field naming schemes: KineRouter clients read currentVersion/latestVersion,
 	// this repo's SPA and older clients read version/latest.
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -172,6 +190,7 @@ func (g *Gateway) handleVersion(w http.ResponseWriter, r *http.Request) {
 		"currentVersion":  Version,
 		"latestVersion":   latest,
 		"hasUpdate":       hasUpdate,
+		"channel":         map[bool]string{true: "dev", false: "release"}[dev],
 		"installMethod":   InstallMethod(),
 		"installCommand":  InstallCommand(),
 	})
