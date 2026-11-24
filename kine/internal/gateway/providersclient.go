@@ -31,6 +31,9 @@ func (g *Gateway) registerProvidersClientRoutes(mux *http.ServeMux) {
 }
 
 func (g *Gateway) usageEligible(c *store.Connection) bool {
+	if demoQuota() {
+		return true
+	}
 	e, ok := g.reg.ByID[c.Provider]
 	if !ok || !e.UsageSupported() {
 		return false
