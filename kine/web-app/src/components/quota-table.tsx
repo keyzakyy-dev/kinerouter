@@ -7,13 +7,13 @@ const PAGE_SIZE = 10
 
 /** Monochrome ramp: the bar dims as the allowance drains. */
 function meterTone(remaining: number) {
-  if (remaining > 70) return 'bg-foreground'
-  if (remaining >= 30) return 'bg-muted-foreground'
-  return 'bg-muted-foreground/50'
+  if (remaining > 70) return { bar: 'bg-foreground', dot: 'bg-foreground' }
+  if (remaining >= 30) return { bar: 'bg-muted-foreground', dot: 'bg-muted-foreground' }
+  return { bar: 'bg-muted-foreground/50', dot: 'bg-muted-foreground/40' }
 }
 
 /**
- * Per-account quota tiles: name, remaining meter, used/total, reset countdown,
+ * Per-account quota rows: name, remaining meter, used/total, reset countdown,
  * and a hide action.
  */
 export function QuotaTable({
@@ -58,41 +58,35 @@ export function QuotaTable({
     <div className="space-y-2">
       {showSortLabel && (
         <div className="flex justify-end">
-          <span className="rounded-md bg-foreground/5 px-2 py-1 text-[10px] text-text-muted">
+          <div className="rounded-md bg-foreground/5 px-2 py-1 text-[10px] text-text-muted">
             Sorted by account remaining
-          </span>
+          </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="divide-y divide-black/[0.06]">
         {rows.map((quota) => {
           const isUnlimited = quota.unlimited === true
           const isCredit = quota.isCreditBalance === true
           const tone = meterTone(quota.colorPercentage ?? quota.remaining)
           const countdown = quota.neverExpires ? '-' : formatResetTime(quota.resetAt)
           const seeDetails = !quota.neverExpires && !quota.resetAt && Boolean(quota.detailUrl)
+          const resetDisplay = quota.emptyMessage
+            ? quota.emptyMessage
+            : quota.neverExpires
+              ? 'Never expires'
+              : seeDetails
+                ? 'See details'
+                : null
           const recurring = quota.recurring !== false
           const countdownLabel = recurring ? `in ${countdown}` : `expires in ${countdown}`
 
           return (
-            <div
-              key={`${quota.name}-${quota.index}`}
-              className="group/tile min-w-0 rounded-lg bg-foreground/[0.045] px-2.5 py-2"
-            >
-              <div className="flex items-baseline gap-1.5">
+            <div key={`${quota.name}-${quota.index}`} className="group/row py-2.5 first:pt-0 last:pb-0">
+              <div className="flex items-center gap-2">
+                <span className={cn('size-1.5 shrink-0 rounded-full', isCredit ? 'bg-muted-foreground' : tone.dot)} />
                 <span className="truncate text-[11.5px] font-medium text-text-main">{quota.name}</span>
-                {canHide && (
-                  <button
-                    type="button"
-                    onClick={() => onHideQuota?.(quota)}
-                    className="inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded text-text-muted opacity-0 transition-opacity hover:text-text-main group-hover/tile:opacity-100 max-sm:opacity-100"
-                    title="Hide this quota row"
-                    aria-label={`Hide quota ${quota.name}`}
-                  >
-                    <Icon name="visibility_off" className="text-[12px]" />
-                  </button>
-                )}
-                <span className="ml-auto shrink-0 text-right">
+                <span className="ml-auto flex shrink-0 items-center gap-1.5">
                   {isUnlimited ? (
                     <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                       Unlimited
@@ -103,15 +97,26 @@ export function QuotaTable({
                       <span className="ml-1 text-[10px] font-medium text-text-muted">{quota.currency || ''}</span>
                     </span>
                   ) : (
-                    <span className="text-[13px] font-semibold tabular-nums text-text-main">{quota.remaining}%</span>
+                    <span className="text-[11px] font-semibold tabular-nums text-text-main">{quota.remaining}%</span>
+                  )}
+                  {canHide && (
+                    <button
+                      type="button"
+                      onClick={() => onHideQuota?.(quota)}
+                      className="inline-flex size-4 cursor-pointer items-center justify-center rounded text-text-muted opacity-0 transition-opacity hover:text-text-main focus-visible:opacity-100 group-hover/row:opacity-100 max-sm:opacity-100"
+                      title="Hide this quota row"
+                      aria-label={`Hide quota ${quota.name}`}
+                    >
+                      <Icon name="visibility_off" className="text-[12px]" />
+                    </button>
                   )}
                 </span>
               </div>
 
               {!isUnlimited && !isCredit && (
-                <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-foreground/[0.07]">
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-foreground/[0.07]">
                   <div
-                    className={cn('h-full rounded-full transition-all duration-300', tone)}
+                    className={cn('h-full rounded-full transition-all duration-300', tone.bar)}
                     style={{ width: `${Math.min(quota.remaining, 100)}%` }}
                   />
                 </div>
@@ -127,25 +132,25 @@ export function QuotaTable({
                           quota.unit ? ` ${quota.unit}` : ''
                         }`}
                 </span>
-                {isCredit || quota.neverExpires ? (
-                  <span className="shrink-0">{isCredit ? 'No reset' : 'Never expires'}</span>
-                ) : countdown !== '-' ? (
+                {isCredit ? null : countdown !== '-' ? (
                   <span className="inline-flex shrink-0 items-center gap-1 tabular-nums">
                     <Icon name="schedule" className="text-[11px]" />
                     {countdownLabel}
                   </span>
-                ) : seeDetails && quota.detailUrl ? (
-                  <a
-                    href={quota.detailUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex shrink-0 items-center gap-0.5 hover:text-text-main hover:underline"
-                  >
-                    See details
-                    <Icon name="open_in_new" className="text-[11px]" />
-                  </a>
-                ) : quota.emptyMessage ? (
-                  <span className="shrink-0">{quota.emptyMessage}</span>
+                ) : resetDisplay ? (
+                  seeDetails && quota.detailUrl ? (
+                    <a
+                      href={quota.detailUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center gap-0.5 hover:text-text-main hover:underline"
+                    >
+                      {resetDisplay}
+                      <Icon name="open_in_new" className="text-[11px]" />
+                    </a>
+                  ) : (
+                    <span className="shrink-0">{resetDisplay}</span>
+                  )
                 ) : (
                   <span className="shrink-0 italic">N/A</span>
                 )}
@@ -156,7 +161,7 @@ export function QuotaTable({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 pt-1 text-[10px] text-text-muted">
+        <div className="flex items-center justify-between gap-2 border-t border-black/[0.06] pt-2 text-[10px] text-text-muted">
           <span>
             {pageStart}-{pageEnd} of {sorted.length}
           </span>
