@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type TerminalInfo } from '@/lib/api'
 import { useNotify } from '@/lib/toast'
+import { ansiSpans } from '@/lib/ansi'
 import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/layout'
 import { Icon } from '@/components/icon'
@@ -124,8 +125,6 @@ export default function TerminalPage() {
     }
   }
 
-  const prompt = `${info?.user ?? 'user'}@${info?.host ?? 'host'}:${shortPath(cwd, info?.user)}$`
-
   return (
     <div>
       <PageHeader
@@ -181,10 +180,26 @@ export default function TerminalPage() {
           {entries.map((entry) => (
             <div key={entry.id} className="mb-2 font-mono text-xs leading-relaxed">
               <p className="text-code-foreground/70">
-                <span className="text-primary">{promptAt(entry.cwd, info)}</span>{' '}
+                <Prompt cwd={entry.cwd} info={info} />
+                {' '}
                 <span className="text-code-foreground">{entry.command}</span>
               </p>
-              {entry.output && <pre className="whitespace-pre-wrap break-words text-code-foreground">{entry.output}</pre>}
+              {entry.output && (
+                <pre className="whitespace-pre-wrap break-words text-code-foreground">
+                  {ansiSpans(entry.output).map((part, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        color: part.fg,
+                        fontWeight: part.bold ? 700 : undefined,
+                        opacity: part.dim ? 0.6 : undefined,
+                      }}
+                    >
+                      {part.text}
+                    </span>
+                  ))}
+                </pre>
+              )}
               {entry.exitCode !== 0 && (
                 <p className="text-[10px] text-danger">exit {entry.exitCode}</p>
               )}
@@ -192,13 +207,15 @@ export default function TerminalPage() {
           ))}
           {busy && (
             <p className="font-mono text-xs text-code-foreground/60">
-              <span className="text-primary">{prompt}</span> <span className="animate-pulse">running…</span>
+              <Prompt cwd={cwd} info={info} /> <span className="animate-pulse">running…</span>
             </p>
           )}
         </div>
 
         <div className="flex items-center gap-2 border-t border-border bg-code-background px-3 py-2">
-          <span className="shrink-0 font-mono text-xs text-primary">{prompt}</span>
+          <span className="shrink-0 font-mono text-xs">
+            <Prompt cwd={cwd} info={info} />
+          </span>
           <input
             ref={inputRef}
             value={command}
@@ -228,9 +245,18 @@ export default function TerminalPage() {
   )
 }
 
-/** promptAt renders the prompt that was live when the command was typed. */
-function promptAt(cwd: string, info: TerminalInfo | null): string {
-  return `${info?.user ?? 'user'}@${info?.host ?? 'host'}:${shortPath(cwd, info?.user)}$`
+/** Classic shell prompt: green user@host, blue path, muted sigil. */
+function Prompt({ cwd, info }: { cwd: string; info: TerminalInfo | null }) {
+  return (
+    <>
+      <span className="text-success">
+        {info?.user ?? 'user'}@{info?.host ?? 'host'}
+      </span>
+      <span className="text-code-foreground/50">:</span>
+      <span className="text-info">{shortPath(cwd, info?.user)}</span>
+      <span className="text-code-foreground/50">$</span>
+    </>
+  )
 }
 
 /** shortPath collapses the home prefix to ~ and keeps the tail readable. */

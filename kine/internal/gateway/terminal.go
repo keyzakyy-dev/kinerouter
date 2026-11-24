@@ -107,7 +107,10 @@ func (g *Gateway) handleTerminalExec(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	cmd := terminalShell(ctx, command)
 	cmd.Dir = cwd
-	cmd.Env = append(os.Environ(), "TERM=dumb", "CLICOLOR=0", "NO_COLOR=1")
+	// TERM stays colourful so tools the operator explicitly forces
+	// (`ls --color=always`) keep their escapes; the browser renders the SGR
+	// codes. Output is not a tty, so nothing colours itself unprompted.
+	cmd.Env = append(os.Environ(), "TERM=xterm-256color", "COLORTERM=truecolor")
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf
 	if err := cmd.Start(); err != nil {
