@@ -292,7 +292,7 @@ export default function JailbreakPage() {
   const bindingRows = Object.entries(bindings)
 
   return (
-    <div className="px-4 py-5 sm:px-6">
+    <div>
       <PageHeader
         title="Persona / Jailbreak"
         description="Prompt documents injected into a model's outbound request. Off until a model or API key is bound to a preset."
@@ -347,7 +347,7 @@ export default function JailbreakPage() {
             <Card className="p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-medium text-text-main">{draft.id ? `Editing ${draft.id}` : 'New preset'}</p>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <Button size="sm" variant="ghost" disabled={!draft.id || busy} onClick={runPreview}>
                     <Icon name="visibility" /> Preview
                   </Button>

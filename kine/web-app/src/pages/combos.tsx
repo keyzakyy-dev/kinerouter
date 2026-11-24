@@ -420,8 +420,8 @@ function ComboCard({
                 <span className="text-xs italic text-text-muted">No models</span>
               ) : (
                 combo.models.slice(0, 3).map((m, i) => (
-                  <code key={`${m}-${i}`} className="inline-flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-text-muted">
-                    <span>{m}</span>
+                  <code key={`${m}-${i}`} className="inline-flex max-w-full min-w-0 items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-text-muted">
+                    <span className="truncate">{m}</span>
                     <CapacityBadges caps={comboByName[m] ? aggregateComboCapabilities(comboByName[m], comboByName, getCaps) : getCaps(m)} />
                   </code>
                 ))
@@ -655,8 +655,8 @@ function CapacityAdapterCap({
       {models.length === 0 ? (
         <div className="mx-4 mb-3 flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2 text-xs text-text-muted">
           <Icon name="info" className="shrink-0 text-[14px]" />
-          <span className={cn('min-w-0 truncate', !enabled && 'opacity-50')}>
-            No models yet. Requests fall back to <code className="font-mono text-text-main">{DEFAULT_FALLBACK_MODEL}</code>.
+          <span className={cn('min-w-0', !enabled && 'opacity-50')}>
+            No models yet. Requests fall back to <code className="break-all font-mono text-text-main">{DEFAULT_FALLBACK_MODEL}</code>.
           </span>
         </div>
       ) : (

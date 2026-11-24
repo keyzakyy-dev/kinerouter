@@ -4,7 +4,8 @@ import '@testing-library/dom'
 if (!window.matchMedia) {
   window.matchMedia = (query: string) =>
     ({
-      matches: false,
+      // jsdom is a desktop viewport: min-width queries match, media prefs do not.
+      matches: query.includes('min-width'),
       media: query,
       onchange: null,
       addEventListener: () => {},

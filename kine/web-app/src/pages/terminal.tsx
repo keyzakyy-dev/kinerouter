@@ -127,7 +127,7 @@ export default function TerminalPage() {
   const prompt = `${info?.user ?? 'user'}@${info?.host ?? 'host'}:${shortPath(cwd, info?.user)}$`
 
   return (
-    <div className="px-4 py-5 sm:px-6">
+    <div>
       <PageHeader
         title="Terminal"
         description="Shell on the gateway host, run as the gateway's own OS user. Every command is a separate request."

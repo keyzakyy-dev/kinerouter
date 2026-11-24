@@ -215,6 +215,8 @@ export function AppShell() {
   const [countdown, setCountdown] = useState(0)
   const [disconnected, setDisconnected] = useState(false)
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) !== 'open')
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { copied, copy } = useCopyToClipboard()
   const { theme, setTheme } = useTheme()
@@ -242,6 +244,23 @@ export function AppShell() {
   useEffect(() => {
     localStorage.setItem(COLLAPSE_KEY, collapsed ? 'closed' : 'open')
   }, [collapsed])
+
+  // The rail becomes an off-canvas drawer below lg; close it on navigation.
+  useEffect(() => setMobileOpen(false), [pathname])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const sync = () => setIsDesktop(mq.matches)
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+
+  useEffect(() => {
+    if (!mobileOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMobileOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mobileOpen])
 
   // Cmd/Ctrl+B, the habit from the previous rail. Skipped while typing.
   useEffect(() => {
@@ -319,12 +338,23 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen">
-      <div className="sticky top-0 h-screen">
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          aria-hidden
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] lg:hidden"
+        />
+      )}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 h-screen transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:translate-x-0 ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
         <Sidebar
           variant="collapsible"
           width={256}
           collapsedWidth={64}
-          collapsed={collapsed}
+          collapsed={isDesktop ? collapsed : false}
           onCollapsedChange={setCollapsed}
           aria-label="Dashboard"
           className="bg-[var(--color-sidebar)] backdrop-blur-xl"
@@ -402,12 +432,20 @@ export function AppShell() {
       </div>
 
       <main className="min-w-0 flex-1 bg-[#fafafa] dark:bg-bg">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 bg-[var(--color-sidebar)] px-6 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-2 bg-[var(--color-sidebar)] px-4 backdrop-blur-xl sm:gap-3 sm:px-6">
+          <button
+            onClick={() => setMobileOpen(true)}
+            title="Open menu"
+            aria-label="Open menu"
+            className="grid size-8 shrink-0 cursor-pointer place-items-center rounded text-text-main transition-colors hover:bg-surface-2 lg:hidden"
+          >
+            <Icon name="menu" className="text-[20px] leading-none" />
+          </button>
           <button
             onClick={() => setCollapsed((v) => !v)}
             title="Toggle sidebar (Ctrl+B)"
             aria-label="Toggle sidebar"
-            className="grid size-6 shrink-0 cursor-pointer place-items-center rounded text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main"
+            className="hidden size-6 shrink-0 cursor-pointer place-items-center rounded text-text-muted transition-colors hover:bg-surface-2 hover:text-text-main lg:grid"
           >
             <Icon
               name={collapsed ? 'left_panel_open' : 'left_panel_close'}
@@ -415,8 +453,8 @@ export function AppShell() {
             />
           </button>
           <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
-            <span className="text-text-muted">Dashboard</span>
-            <span className="text-text-muted/50" aria-hidden>
+            <span className="hidden text-text-muted sm:inline">Dashboard</span>
+            <span className="hidden text-text-muted/50 sm:inline" aria-hidden>
               /
             </span>
             <span className="truncate font-medium text-text-main">{currentLabel ?? 'Overview'}</span>
@@ -445,7 +483,7 @@ export function AppShell() {
             ))}
           </div>
         </header>
-        <div className="mx-auto w-full max-w-7xl px-8 py-8">
+        <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
           <Outlet />
         </div>
       </main>
@@ -560,12 +598,12 @@ export function PageHeader({
   actions?: React.ReactNode
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-      <div>
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+      <div className="min-w-0">
         <h1 className="text-xl font-semibold tracking-tight text-text-main">{title}</h1>
         {description && <p className="mt-1 text-xs text-text-muted">{description}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }

@@ -66,6 +66,7 @@ import {
   IconLock,
   IconLockOpen,
   IconLogout,
+  IconMenu2,
   IconMessage,
   IconMicrophone,
   IconMicrophone2,
@@ -262,6 +263,7 @@ const ICONS: Record<string, TablerIcon> = {
   wifi_tethering: IconWifi,
   left_panel_close: IconLayoutSidebarLeftCollapse,
   left_panel_open: IconLayoutSidebarLeftExpand,
+  menu: IconMenu2,
 }
 
 /** 1em sizing so existing `text-[Npx]` classes keep working. */

@@ -262,8 +262,8 @@ export default function TranslatorPage() {
   }
 
   return (
-    <div className="space-y-3 p-8">
-      <div className="mb-2 flex items-center justify-between">
+    <div className="space-y-3">
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text-main">Translator Debug</h1>
           <p className="mt-1 text-sm text-text-muted">Replay request flow, matching log files</p>
@@ -287,10 +287,10 @@ export default function TranslatorPage() {
         return (
           <Card key={step.id}>
             <div className="space-y-3 p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <button
                   onClick={() => toggle(step.id)}
-                  className="group flex flex-1 cursor-pointer items-center gap-2 text-left"
+                  className="group flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
                 >
                   <Icon
                     name={isExpanded ? 'expand_more' : 'chevron_right'}
@@ -298,7 +298,7 @@ export default function TranslatorPage() {
                   />
                   <span className="w-4 font-mono text-xs text-text-muted/60">{step.id}</span>
                   <h3 className="text-sm font-semibold text-text-main">{step.label}</h3>
-                  <span className="font-mono text-xs text-text-muted/60">{step.file}</span>
+                  <span className="truncate font-mono text-xs text-text-muted/60">{step.file}</span>
                   {content && <span className="text-xs text-muted-foreground">({content.length} chars)</span>}
                 </button>
                 {!isExpanded && (
