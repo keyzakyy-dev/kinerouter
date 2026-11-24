@@ -5,6 +5,24 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-11-25
+
+### Changed
+
+- **Chat request logs follow the KeyRouter layout.** Each request is three
+  tidy rows: `▶` start (provider/model, wire format, stream mode, message and
+  tool counts, thinking level, account), `⚙` for each token saver that actually
+  rewrote the body, and `DONE` with TTFT, input (cache read/write), output and
+  token rate. Routing fallbacks log as `⇄` with the reason (`CANCELED`,
+  `FAILED`, `UNAVAILABLE (status) → NEXT ACCOUNT`, `NO ACCOUNT`), and upstream
+  error text stays on the debug level.
+
+### Fixed
+
+- **Console log level column showed raw `INF`/`WRN`/`ERR` text.** Each row now
+  shows the level icon with its own colour, with the label kept in the tooltip
+  and ARIA name.
+
 ## [0.2.2] — 2026-11-24
 
 ### Fixed
