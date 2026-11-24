@@ -5,6 +5,44 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-11-24
+
+### Added
+
+- **Usage snapshot override.** A connection can carry
+  `providerSpecificData.usageSnapshot` (`plan` plus per-quota `used`, `total`,
+  `resetInMinutes`); the quota tracker serves those rows instead of calling the
+  provider, and the dashboard keeps the countdowns live. Such a connection is
+  also usage-eligible even when its provider has no quota handler.
+- **Web terminal output** renders ANSI SGR colours, uses a classic prompt, and
+  refocuses the command input once a command finishes.
+- **Console log page parity** with 9router-go: level filters, search, copy and
+  export; level chips are icon-only tinted boxes and each row carries a coloured
+  level icon.
+
+### Changed
+
+- **Dashboard restyle.** Dark mode uses a monochrome primary accent and a grey
+  chart ramp while status badges keep their hues; light mode keeps real status
+  colours. Focus rings and hover borders are gone from inputs, selects,
+  buttons, cards, tabs and chips. The theme defaults to the system preference,
+  survives a reload on any route, and the toggle moved from Settings to the
+  navbar.
+- **Login screen** rebuilt as a split brand panel with a "Sign in" title.
+- **Quota tracker toolbar and pagination footer** are flat, borderless rows:
+  provider/account filters on the left, bulk actions and refresh on the right.
+  The hidden-quota strip is compact, and quota cards keep equal box sizes.
+- Combo lists and provider connection lists scroll past five and fifteen rows;
+  tab triggers stay on one line.
+
+### Fixed
+
+- Model availability: stale "unavailable" status resets and `__all` can be
+  cleared.
+- Mobile layout for dashboard pages, toast content alignment, and error toasts
+  for a failed proxy test.
+- Em dashes replaced with plain punctuation in UI copy.
+
 ## [0.2.0] — 2026-11-24
 
 ### Added
