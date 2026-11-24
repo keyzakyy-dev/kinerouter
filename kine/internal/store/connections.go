@@ -148,7 +148,13 @@ func (s *Store) ListConnections(provider string, activeOnly bool) ([]*Connection
 		if pi != pj {
 			return pi < pj
 		}
-		return out[i].UpdatedAt > out[j].UpdatedAt
+		if out[i].UpdatedAt != out[j].UpdatedAt {
+			return out[i].UpdatedAt > out[j].UpdatedAt
+		}
+		// Rows written in the same millisecond otherwise keep the order SQLite
+		// happens to return, which differs between a fresh insert and a vacuumed
+		// database. A stable tie-break makes "first active account" reproducible.
+		return out[i].ID < out[j].ID
 	})
 	return out, rows.Err()
 }

@@ -112,10 +112,19 @@ func TestChatHonoursConnectionPin(t *testing.T) {
 	if err := g.store.SaveProviderNode(node); err != nil {
 		t.Fatalf("node: %v", err)
 	}
-	for id, base := range map[string]string{"c1": first.URL + "/v1", "c2": second.URL + "/v1"} {
+	// Ordered and prioritised, not a map: the router picks the lowest priority
+	// first, and two upserts in the same loop can land in different milliseconds,
+	// which made the unpinned assertion below depend on timing.
+	for _, c := range []struct {
+		id, base string
+		prio     int
+	}{
+		{"c1", first.URL + "/v1", 1},
+		{"c2", second.URL + "/v1", 2},
+	} {
 		if err := g.store.UpsertConnection(&store.Connection{
-			ID: id, Provider: node.ID, AuthType: "apikey", IsActive: true,
-			Data: map[string]any{"apiKey": "k", "providerSpecificData": map[string]any{"baseUrl": base, "prefix": "tst"}},
+			ID: c.id, Provider: node.ID, AuthType: "apikey", IsActive: true, Priority: c.prio,
+			Data: map[string]any{"apiKey": "k", "providerSpecificData": map[string]any{"baseUrl": c.base, "prefix": "tst"}},
 		}); err != nil {
 			t.Fatalf("conn: %v", err)
 		}
