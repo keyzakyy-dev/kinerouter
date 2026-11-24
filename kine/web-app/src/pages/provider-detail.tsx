@@ -1169,7 +1169,10 @@ export function ProviderDetailPage() {
                               onClick={() => void testModel(m.id)}
                               title="Test"
                             >
-                              <Icon name={testingModels.includes(m.id) ? 'progress_activity' : 'science'} className="text-[16px]" />
+                              <Icon
+                                name={testingModels.includes(m.id) ? 'progress_activity' : 'science'}
+                                className={testingModels.includes(m.id) ? 'animate-spin text-[16px]' : 'text-[16px]'}
+                              />
                             </button>
                           )}
                         </div>
@@ -1784,7 +1787,7 @@ function ModelRow({
             onClick={onTest}
             title="Test model"
           >
-            <Icon name={testing ? 'progress_activity' : 'science'} className="text-[16px]" />
+            <Icon name={testing ? 'progress_activity' : 'science'} className={testing ? 'animate-spin text-[16px]' : 'text-[16px]'} />
           </button>
         )}
         {onSetAlias && (
