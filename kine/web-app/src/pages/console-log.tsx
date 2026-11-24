@@ -52,7 +52,7 @@ function parseLine(line: string, seq: number): Entry {
 const LEVEL_META: Record<Level, { label: string; icon: string; text: string; on: string }> = {
   error: { label: 'ERR', icon: 'error', text: 'text-danger', on: 'bg-danger/15 text-danger hover:bg-danger/25' },
   warn: { label: 'WRN', icon: 'warning', text: 'text-warning', on: 'bg-warning/15 text-warning hover:bg-warning/25' },
-  info: { label: 'INF', icon: 'info', text: 'text-text-main', on: 'bg-info/15 text-info hover:bg-info/25' },
+  info: { label: 'INF', icon: 'info', text: 'text-info', on: 'bg-info/15 text-info hover:bg-info/25' },
   debug: { label: 'DBG', icon: 'code', text: 'text-text-muted', on: 'bg-surface-3 text-text-muted hover:bg-surface-3/80' },
 }
 
@@ -61,7 +61,6 @@ const LEVEL_ORDER: Level[] = ['error', 'warn', 'info', 'debug']
 export default function ConsoleLogPage() {
   const notify = useNotify()
   const [lines, setLines] = useState<string[]>([])
-  const [connected, setConnected] = useState(false)
   const [query, setQuery] = useState('')
   const [wrap, setWrap] = useState(false)
   const [muted, setMuted] = useState<Set<Level>>(new Set())
@@ -129,8 +128,6 @@ export default function ConsoleLogPage() {
 
   useEffect(() => {
     const es = new EventSource('/api/translator/console-logs/stream')
-    es.onopen = () => setConnected(true)
-
     es.onmessage = (e) => {
       const msg = JSON.parse(e.data) as
         | { type: 'init'; logs: string[] }
@@ -148,7 +145,6 @@ export default function ConsoleLogPage() {
         setLines([])
       }
     }
-    es.onerror = () => setConnected(false)
 
     return () => es.close()
   }, [])
@@ -198,15 +194,7 @@ export default function ConsoleLogPage() {
             })}
           </div>
 
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-text-muted">
-            <span
-              className={cn('size-1.5 rounded-full', connected ? 'bg-success' : 'bg-text-subtle')}
-              aria-hidden
-            />
-            {connected ? 'Live' : 'Disconnected'}
-          </span>
-
-          <div className="relative ml-auto w-full sm:w-64">
+          <div className="relative w-full flex-1 basis-56">
             <Icon
               name="search"
               className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[14px] text-text-muted"
@@ -300,7 +288,9 @@ export default function ConsoleLogPage() {
                 return (
                   <div key={entry.seq} className="flex items-baseline gap-3 px-3 py-1 hover:bg-surface-3/40">
                     <span className="shrink-0 select-none tabular-nums text-[11px] text-text-muted">{entry.time}</span>
-                    <span className={cn('w-8 shrink-0 text-[11px] font-bold', meta.text)}>{meta.label}</span>
+                    <span className={cn('w-8 shrink-0 select-none', meta.text)} title={meta.label}>
+                      <Icon name={meta.icon} className="text-[13px]" />
+                    </span>
                     <span
                       className={cn(
                         'min-w-0 flex-1',
