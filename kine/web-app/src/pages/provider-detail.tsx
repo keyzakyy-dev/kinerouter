@@ -1154,7 +1154,7 @@ export function ProviderDetailPage() {
                     >
                       <Icon
                         name={modelTestResults[m.id] === 'ok' ? 'check_circle' : modelTestResults[m.id] === 'error' ? 'cancel' : 'science'}
-                        className={cn('shrink-0 text-[15px]', modelTestResults[m.id] === 'ok' ? 'text-success' : modelTestResults[m.id] === 'error' ? 'text-danger' : 'text-text-muted')}
+                        className={cn('shrink-0 text-[15px]', modelTestResults[m.id] === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : modelTestResults[m.id] === 'error' ? 'text-danger' : 'text-text-muted')}
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-text-main">{m.id}</p>
@@ -1776,7 +1776,7 @@ function ModelRow({
       {testStatus && (
         <Icon
           name={testStatus === 'ok' ? 'check_circle' : 'cancel'}
-          className={cn('shrink-0 text-[15px]', testStatus === 'ok' ? 'text-success' : 'text-danger')}
+          className={cn('shrink-0 text-[15px]', testStatus === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : 'text-danger')}
         />
       )}
       <div className="flex shrink-0 items-center">
