@@ -45,6 +45,12 @@ export default function TerminalPage() {
     if (el) el.scrollTop = el.scrollHeight
   }, [entries, busy])
 
+  // The input is disabled while a command runs, so focusing it must wait for
+  // the next render; focusing inside run() is a no-op on a disabled field.
+  useEffect(() => {
+    if (!busy) inputRef.current?.focus()
+  }, [busy])
+
   const run = async () => {
     const cmd = command.trim()
     if (!cmd || busy) return
@@ -78,7 +84,6 @@ export default function TerminalPage() {
       ])
     } finally {
       setBusy(false)
-      inputRef.current?.focus()
     }
   }
 
