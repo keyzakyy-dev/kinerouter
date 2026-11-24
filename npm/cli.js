@@ -32,7 +32,17 @@ if (!require("fs").existsSync(target)) {
 // Tells the gateway it was installed through npm, so its own update advice uses
 // `npm i -g` instead of the install script. Otherwise both suggestions would be
 // followed by some users and the machine ends up with two install paths.
-const env = { ...process.env, KINEROUTER_INSTALL: "npm" };
+//
+// KINEROUTER_NODE / KINEROUTER_SHIM let the login entry run this shim instead of
+// the downloaded binary: npm v7+ never runs uninstall scripts, so an autostart
+// entry pointing into DATA_DIR would keep booting the app after
+// `npm uninstall -g kinerouter`. The shim path vanishes with the package.
+const env = {
+  ...process.env,
+  KINEROUTER_INSTALL: "npm",
+  KINEROUTER_NODE: process.execPath,
+  KINEROUTER_SHIM: __filename,
+};
 
 const res = spawnSync(target, process.argv.slice(2), { stdio: "inherit", env });
 if (res.error) {

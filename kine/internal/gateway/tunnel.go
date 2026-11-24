@@ -349,6 +349,24 @@ func pidAlive(pid int) bool {
 	return p.Signal(syscall.Signal(0)) == nil
 }
 
+// Shutdown stops the tunnels this router started, so quitting does not leave a
+// cloudflared (or a userspace tailscaled) whose public URL points at a port that
+// nothing serves. Mirrors KeyRouter's killTunnelByPidFile on exit.
+//
+// Only processes this router recorded are stopped: a tailscale daemon the user
+// installed system-wide is theirs, and funnel is reset instead of the daemon
+// being killed. Best effort, never blocks exit.
+func (t *tunnelManager) Shutdown() {
+	if pid := t.loadPid(); pid > 0 && pidAlive(pid) {
+		t.killCloudflared(t.activePort)
+	}
+	if t.st.SettingBool("tailscaleEnabled", false) {
+		// `funnel --bg reset` only tears down the funnel; the daemon and the
+		// login the user made stay as they were.
+		t.stopFunnel()
+	}
+}
+
 func (t *tunnelManager) isRunning() bool { return pidAlive(t.loadPid()) }
 
 func (t *tunnelManager) killCloudflared(port int) {

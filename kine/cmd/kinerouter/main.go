@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,17 +30,13 @@ func main() {
 	log.SetOutput(io.MultiWriter(os.Stderr, logbuf.Default()))
 
 	// `--tray` is the detached handoff target used by the launcher's "Hide to
-	// tray": serve, show the icon, and never show the menu. It is removed
-	// before subcommand dispatch so runCLI does not print its help for it.
-	trayMode := false
-	var cliArgs []string
-	for _, a := range os.Args[1:] {
-		if a == "--tray" {
-			trayMode = true
-			continue
-		}
-		cliArgs = append(cliArgs, a)
-	}
+	// tray": serve, show the icon, and never show the menu. `--skip-update`
+	// suppresses the update check, which is what the login entry passes so a
+	// background start never waits on the network. `-p/--port` and `-H/--host`
+	// match KeyRouter's server options. All of them are removed before subcommand
+	// dispatch so runCLI does not print its help for them.
+	opts, cliArgs := parseServerFlags(os.Args[1:])
+	trayMode, skipUpdate := opts.tray, opts.skipUpdate
 
 	// CLI subcommands (connect / show) run instead of, and before, the server.
 	if handled, code := runCLI(cliArgs); handled {
@@ -49,6 +46,13 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("config: %v", err)
+	}
+	// Flags win over the environment, like `-p` in KeyRouter's cli.js.
+	if opts.port > 0 {
+		cfg.Port = opts.port
+	}
+	if opts.host != "" {
+		cfg.Host = opts.host
 	}
 	if trayMode {
 		// The launcher spawns this copy and then stops, so wait for its
@@ -66,7 +70,7 @@ func main() {
 		// No record means an older build (or a manually started copy) owns the
 		// port; attaching to it beats dying with "bind: address already in use".
 		log.Printf("KineRouter %s is already running on port %d", v, cfg.Port)
-		runLauncher(cfg.Port, false)
+		runLauncher(cfg.Port, false, skipUpdate)
 		return
 	}
 	st, err := store.Open(cfg.DBPath())
@@ -111,6 +115,13 @@ func main() {
 
 	go func() {
 		log.Printf("KineRouter %s listening on http://%s (data dir %s)", gateway.Version, addr, cfg.DataDir)
+		// KeyRouter prints the same warning: 0.0.0.0 is the default, so a user who
+		// never thought about it is reachable from the whole LAN and should know.
+		if cfg.Host == "0.0.0.0" || cfg.Host == "" {
+			if ip := lanIP(); ip != "" {
+				log.Printf("network-exposed: reachable at http://%s:%d — bind -H 127.0.0.1 for local-only", ip, cfg.Port)
+			}
+		}
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("serve: %v", err)
 		}
@@ -134,16 +145,101 @@ func main() {
 	} else {
 		// Interactive launcher: Web UI / CLI / tray. Skipped when stdin is not a
 		// terminal, so Docker and systemd keep the old behaviour.
-		go runLauncher(cfg.Port, true)
+		go runLauncher(cfg.Port, true, skipUpdate)
 	}
 
 	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	// SIGHUP is in the list for the same reason KeyRouter handles it: closing the
+	// terminal that started the gateway sends one, and without cleanup the MITM
+	// server on :443 and the tunnels outlive the gateway.
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	<-stop
+
+	// Stop what this process spawned before the listener closes, in KeyRouter's
+	// cleanup() order: tunnels and the privileged MITM proxy point at this port,
+	// so leaving them up would advertise a URL that answers nothing. Best effort,
+	// and neither writes a setting.
+	gw.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
+}
+
+// parseServerFlags pulls the launcher flags out of argv before CLI dispatch.
+// `--tray` and `--skip-update` mirror KeyRouter's login entry; `-p/--port` and
+// `-H/--host` mirror its server options, so an autostart line written by hand
+// (or copied from KeyRouter) works instead of dying on "unknown flag".
+//
+// A subcommand wins: `kinerouter connect ... --password x` keeps its argv
+// untouched, because connect has flags of its own.
+func parseServerFlags(args []string) (opts serverOpts, rest []string) {
+	if len(args) > 0 && isSubcommand(args[0]) {
+		return opts, args
+	}
+	for i := 0; i < len(args); i++ {
+		switch a := args[i]; a {
+		case "--tray", "-t":
+			opts.tray = true
+		case "--skip-update":
+			opts.skipUpdate = true
+		case "--port", "-p":
+			if i+1 < len(args) {
+				i++
+				opts.port = atoiOr(args[i], 0)
+			}
+		case "--host", "-H":
+			if i+1 < len(args) {
+				i++
+				opts.host = args[i]
+			}
+		default:
+			rest = append(rest, a)
+		}
+	}
+	return opts, rest
+}
+
+type serverOpts struct {
+	tray       bool
+	skipUpdate bool
+	port       int
+	host       string
+}
+
+func isSubcommand(a string) bool {
+	switch a {
+	case "connect", "show", "mitm-server", "tray", "version", "help", "-v", "--version", "-h", "--help":
+		return true
+	}
+	return false
+}
+
+func atoiOr(s string, def int) int {
+	n, err := strconv.Atoi(s)
+	if err != nil || n <= 0 {
+		return def
+	}
+	return n
+}
+
+// lanIP returns the first non-internal IPv4 address, the address a remote peer
+// actually reaches when the server binds 0.0.0.0. Empty when there is none
+// (offline machine, container without a network), in which case no warning is
+// printed rather than a wrong one.
+func lanIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, a := range addrs {
+		n, ok := a.(*net.IPNet)
+		if !ok || n.IP.IsLoopback() || n.IP.To4() == nil {
+			continue
+		}
+		return n.IP.String()
+	}
+	return ""
 }

@@ -38,10 +38,18 @@ import (
 
 const cliHelp = `
 Usage:
+  kinerouter [options]
   kinerouter connect <server-url> [options]
   kinerouter show [tool...] [--json]
   kinerouter mitm-server        (internal: privileged MITM proxy)
   kinerouter tray               Start the desktop tray icon (needs kinerouter-tray)
+
+options (the login entry runs --tray --skip-update):
+  -p, --port <port>  Port to serve on (default: 20128, or $PORT)
+  -H, --host <host>  Address to bind (default: 0.0.0.0, or $HOST)
+  -t, --tray         Serve headless and show the tray icon, no menu
+  --skip-update      Skip the release check; used at login so startup never
+                     waits on the network
 
 connect points THIS machine's CLI tools at a remote KineRouter server.
 show prints the router settings each local tool currently holds (read-only).
@@ -106,8 +114,9 @@ func runCLI(args []string) (handled bool, code int) {
 		return true, 0
 	}
 	if strings.HasPrefix(args[0], "-") {
-		// No server flags exist: every setting is an env var. Silently starting the
-		// server here would swallow `kinerouter --port 3000` and serve on 20128 anyway.
+		// Everything else is still an env var, so an unknown flag is a typo and
+		// not a silently ignored option: starting the server anyway would swallow
+		// `kinerouter --porrt 3000` and serve on 20128 regardless.
 		fmt.Fprintf(os.Stderr, "unknown flag %q\n\n%s", args[0], cliHelp)
 		return true, 2
 	}

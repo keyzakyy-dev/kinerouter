@@ -15,6 +15,7 @@ import (
 	"github.com/keyzakyy-dev/kinerouter/internal/auth"
 	"github.com/keyzakyy-dev/kinerouter/internal/config"
 	"github.com/keyzakyy-dev/kinerouter/internal/executor"
+	"github.com/keyzakyy-dev/kinerouter/internal/mitm"
 	"github.com/keyzakyy-dev/kinerouter/internal/oauth"
 	"github.com/keyzakyy-dev/kinerouter/internal/providerdata"
 	"github.com/keyzakyy-dev/kinerouter/internal/store"
@@ -62,6 +63,20 @@ func (g *Gateway) tunnels() *tunnelManager { return g.tunnel }
 
 // ResumeTunnels re-enables whatever was on when the process last stopped.
 func (g *Gateway) ResumeTunnels() { g.tunnel.resume() }
+
+// Shutdown releases what this process started outside itself: the Cloudflare /
+// Tailscale tunnels and the privileged MITM proxy on :443. KeyRouter does the
+// same in cleanup(), and for the same reason — both point at this port, so
+// leaving them running advertises a URL that answers nothing, and the MITM
+// server also leaves tool hosts redirected in /etc/hosts.
+//
+// Called on every exit path (signal, quit from the tray). Settings are not
+// touched, so the user's tunnel/MITM choices survive a restart. Best effort:
+// a failure here never blocks exit.
+func (g *Gateway) Shutdown() {
+	g.tunnel.Shutdown()
+	mitm.Shutdown(g.mitmPaths(), mitm.LoadEncryptedPassword())
+}
 
 // Handler returns the root mux with API routes and SPA/static fallback.
 func (g *Gateway) Handler() http.Handler {

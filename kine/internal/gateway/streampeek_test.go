@@ -56,13 +56,13 @@ func TestStreamPeekerInbandError(t *testing.T) {
 
 func TestHasSSEContent(t *testing.T) {
 	for chunk, want := range map[string]bool{
-		`data: {"choices":[{"delta":{"content":"x"}}]}`:    true,
-		`data: {"choices":[{"delta":{"content":""}}]}`:     false,
-		`data: {"choices":[{"delta":{"reasoning":"r"}}]}`:  true,
-		`data: {"delta":{"tool_calls":[{"id":"t"}]}}`:      true,
-		`data: {"delta":{"tool_calls":[]}}`:                false,
+		`data: {"choices":[{"delta":{"content":"x"}}]}`:                                   true,
+		`data: {"choices":[{"delta":{"content":""}}]}`:                                    false,
+		`data: {"choices":[{"delta":{"reasoning":"r"}}]}`:                                 true,
+		`data: {"delta":{"tool_calls":[{"id":"t"}]}}`:                                     true,
+		`data: {"delta":{"tool_calls":[]}}`:                                               false,
 		`data: {"type":"content_block_delta","delta":{"type":"thinking","thinking":"t"}}`: true,
-		`data: {"response":{"output_text.delta":"x"}}`:     false,
+		`data: {"response":{"output_text.delta":"x"}}`:                                    false,
 	} {
 		if got := hasSSEContent([]byte(chunk)); got != want {
 			t.Errorf("hasSSEContent(%q) = %v, want %v", chunk, got, want)

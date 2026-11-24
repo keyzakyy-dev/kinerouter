@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -123,6 +124,58 @@ func normalizeV1(base string) string {
 		return base
 	}
 	return base + "/v1"
+}
+
+// loopbackUnsafeTools are CLI tools whose HTTP stacks resolve "localhost" to
+// ::1 first and do not retry over IPv4. The gateway listens on 0.0.0.0, which
+// is IPv4 only, so a config pointing at "localhost:<port>" is refused by them
+// even though the browser reaches the same URL fine. KeyRouter hit this first
+// and keeps "localhost" in the UI while writing 127.0.0.1 into these five
+// configs; we do the same.
+var loopbackUnsafeTools = map[string]bool{
+	"openclaw":     true,
+	"hermes":       true,
+	"grok-build":   true,
+	"jcode":        true,
+	"deepseek-tui": true,
+}
+
+// ipv4Loopback rewrites a "localhost" host to 127.0.0.1 while preserving
+// scheme, port, path and query. Anything else (127.0.0.1, LAN IP, remote
+// domain) is returned untouched so remote and tunnel setups never change.
+func ipv4Loopback(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return raw
+	}
+	hadScheme := strings.Contains(s, "://")
+	parsed := s
+	if !hadScheme {
+		parsed = "http://" + s
+	}
+	u, err := url.Parse(parsed)
+	if err != nil || !strings.EqualFold(u.Hostname(), "localhost") {
+		return raw
+	}
+	if port := u.Port(); port != "" {
+		u.Host = "127.0.0.1:" + port
+	} else {
+		u.Host = "127.0.0.1"
+	}
+	out := u.String()
+	if !hadScheme {
+		out = strings.TrimPrefix(out, "http://")
+	}
+	return out
+}
+
+// cliToolBase prepares a base URL for a tool config file: fragile tools get the
+// IPv4 loopback literal, and every tool gets the /v1 suffix.
+func cliToolBase(toolID, baseURL string) string {
+	if loopbackUnsafeTools[toolID] {
+		baseURL = ipv4Loopback(baseURL)
+	}
+	return normalizeV1(baseURL)
 }
 
 // toolInstalled mirrors `which <cmd>` with a config-file fallback.
@@ -1541,7 +1594,7 @@ func (g *Gateway) handleCliOpenclawPost(w http.ResponseWriter, r *http.Request) 
 	models := section(settings, "models")
 	providers := section(models, "providers")
 
-	normalized := normalizeV1(baseURL)
+	normalized := cliToolBase("openclaw", baseURL)
 	fullModel := "kinerouter/" + model
 	for k := range allow {
 		if strings.HasPrefix(k, "kinerouter/") {

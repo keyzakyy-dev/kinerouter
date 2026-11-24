@@ -1,6 +1,9 @@
 # Build output
 /kinerouter
 /kinerouter.exe
+# Dev build from the README's two-server setup (DATA_DIR=~/.kinerouter-dev).
+/kinerouter-dev
+/kinerouter-dev.exe
 
 # Frontend deps + Vite build (rebuilt by `npm run build`, embedded by go:embed)
 web-app/node_modules/

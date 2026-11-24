@@ -14,8 +14,9 @@
 //     which is unauthenticated; the dashboard password is never involved.
 //   - It starts only its own sibling `kinerouter` binary, resolved next to the
 //     tray executable. A same-named program earlier on PATH is not trusted.
-//   - "Quit Tray" releases the icon only. It does not stop a gateway it did not
-//     start, and it does not stop one it did.
+//   - "Quit" stops the gateway that spawned this tray (KINEROUTER_OWNER_PID),
+//     like KeyRouter's menu Quit. A gateway the tray started itself is stopped
+//     too; one it never owned is left alone.
 //   - Unreadable state renders as unknown, never as "stopped".
 package main
 

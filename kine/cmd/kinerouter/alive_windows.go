@@ -21,3 +21,7 @@ func signalTerm(pid int) error {
 	}
 	return exec.Command("taskkill", "/F", "/PID", strconv.Itoa(pid)).Run()
 }
+
+// signalKill is the escalation step; on Windows Kill() is already forceful, so
+// this is the same call and exists only to keep the call site portable.
+func signalKill(pid int) error { return signalTerm(pid) }

@@ -85,7 +85,7 @@ func onReady() {
 			if autostart.Enabled() {
 				autostart.Disable()
 			} else if exe, err := gatewayPath(); err == nil {
-				autostart.Enable(exe)
+				autostart.EnableInstall(exe)
 			}
 			refresh()
 		case <-quit.ClickedCh:

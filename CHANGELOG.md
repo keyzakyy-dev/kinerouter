@@ -3,6 +3,61 @@
 All notable changes to KineRouter. Format based on Keep a Changelog;
 versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
+## [Unreleased]
+
+## [0.1.10] — 2026-11-24
+
+### Added
+
+- **Server flags `-p/--port` and `-H/--host`**, matching KeyRouter's `cli.js`.
+  A port or bind address on the command line now wins over `$PORT` / `$HOST`
+  instead of failing with `unknown flag`, so an autostart line or systemd unit
+  written for KeyRouter works unchanged. `kinerouter --help` lists them, and
+  subcommands (`connect`, `show`) keep their own argv untouched.
+- **The LAN address is printed when binding `0.0.0.0`**, like KeyRouter's
+  "network-exposed" warning. The default bind is all interfaces, so a user who
+  never chose it should see that the dashboard answers from the whole network;
+  `-H 127.0.0.1` keeps it local.
+
+### Fixed
+
+- **Exit now stops the tunnel and the MITM proxy.** KeyRouter's `cleanup()` kills
+  `cloudflared`/`tailscale` and the privileged MITM server; KineRouter left both
+  running, so quitting produced a root process still owning `:443` (and its
+  `/etc/hosts` redirects still in place) plus a public URL pointing at a port
+  nothing served. `Gateway.Shutdown()` runs on every exit path, keeps the user's
+  tunnel/MITM settings so they resume on the next start, and only tears down the
+  funnel rather than a tailscale daemon the user installed.
+- **SIGHUP is handled.** Closing the terminal that started the gateway used to
+  kill it without cleanup; it now takes the same shutdown path as SIGINT and
+  SIGTERM.
+- **The tray is escalated to SIGKILL if it ignores SIGTERM** before a handoff,
+  matching KeyRouter's `killTray`, so no ghost icon is left in the macOS menu
+  bar.
+- **`npm uninstall -g kinerouter` now actually stops the app.** npm v7+ never
+  runs uninstall scripts, and the login entry written by Hide to Tray pointed
+  at the downloaded binary in `<data dir>/runtime`, which uninstalling the
+  package does not remove: the gateway came back at the next login. The entry
+  now runs the npm launcher (`node .../kinerouter/cli.js --tray --skip-update`),
+  whose path disappears with the package, matching KeyRouter. Plain
+  script/release installs keep pointing at their own binary. README and
+  `npm/README.md` gained an Uninstall section; older entries need one `rm`
+  (documented there).
+- **Autostart now follows KeyRouter's rules.** npm installs validate that the
+  node binary and `cli.js` still exist before writing an entry (so a stale
+  package can never produce a login entry), the entry runs the same
+  `--tray --skip-update` argv as KeyRouter, paths are quoted for Desktop Entry,
+  VBScript and plist rules, and the macOS toggle skips `launchctl unload` when
+  this process sits under the agent it is about to reload — otherwise disabling
+  auto-start from the tray would kill its own menu.
+- **CLI tool configs for OpenClaw, Hermes, Grok Build, jcode and DeepSeek TUI
+  are written with `127.0.0.1` instead of `localhost`.** Those clients resolve
+  `localhost` to `::1` first and never retry over IPv4, while the gateway
+  listens on `0.0.0.0` (IPv4 only), so the endpoint they were given was
+  refused. The dashboard keeps advertising `localhost:20128`, remote and tunnel
+  base URLs are left untouched, and status detection still recognises configs
+  written with either host. Same fix KeyRouter ships as `normalizeLocalhost`.
+
 ## [0.1.10] — 2026-11-23
 
 ### Changed

@@ -308,6 +308,36 @@ func Start(p Paths, apiKey, sudoPass string, forceKill443 bool) (int, error) {
 	return pid, nil
 }
 
+// Shutdown stops a MITM server left running by a previous session and removes
+// the hosts entries it installed. Mirrors KeyRouter's killProxyByPidFile, which
+// runs on every exit: quitting must not leave a root process on :443 pointing
+// at a port nobody serves, nor tool hosts redirected to a dead proxy.
+//
+// Unlike Stop() this never touches the mitmEnabled setting — the user's choice
+// survives a restart; only the process and the hosts lines go. Best effort: with
+// no sudo password, killing a root process and rewriting /etc/hosts fail
+// silently, exactly like the JS.
+func Shutdown(p Paths, sudoPass string) {
+	if b, err := os.ReadFile(p.PIDFile); err == nil {
+		pid, _ := strconv.Atoi(strings.TrimSpace(string(b)))
+		if pid > 0 && pid != os.Getpid() && isAlive(pid) {
+			// SIGTERM first: the server strips its own hosts entries on the way
+			// out, so a graceful stop leaves /etc/hosts clean even if this
+			// process cannot rewrite it.
+			killProcesses(pid, false, sudoPass)
+			deadline := time.Now().Add(1500 * time.Millisecond)
+			for isAlive(pid) && time.Now().Before(deadline) {
+				time.Sleep(100 * time.Millisecond)
+			}
+			if isAlive(pid) {
+				killProcesses(pid, true, sudoPass)
+			}
+			os.Remove(p.PIDFile)
+		}
+	}
+	RemoveAllDNS(sudoPass)
+}
+
 // Stop removes DNS entries for every tool, then terminates the server.
 func Stop(p Paths, sudoPass string) error {
 	runMu.Lock()

@@ -44,6 +44,22 @@ and stops the server first), Web UI, Terminal UI, Hide to Tray and Exit. Hide to
 entry and detaches the gateway, so closing the terminal leaves it running; the
 tray's Quit stops it.
 
+## Uninstall
+
+```bash
+npm uninstall -g kinerouter
+```
+
+The login entry installed by Hide to Tray runs this shim (`node .../cli.js
+--tray`), not the downloaded binary, so removing the package disables the entry
+too. npm v7+ runs no uninstall scripts, which is why the entry is written this
+way. Leftovers, if you also want them gone:
+
+```bash
+rm -f  ~/.config/autostart/kinerouter.desktop   # older builds pointed this at ~/.kinerouter/runtime instead
+rm -rf ~/.kinerouter                            # runtime binaries, SQLite DB, API keys
+```
+
 ## Notes
 
 - No runtime dependencies; the Go binary is static.

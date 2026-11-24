@@ -203,7 +203,7 @@ func forgeSimpleStatus(cmd, dir string, headerMarker string) map[string]any {
 	if strings.TrimSpace(raw) != "" {
 		cfg = parseTomlMap(raw)
 	}
-	has := strings.Contains(raw, headerMarker) || strings.Contains(raw, "localhost:20128")
+	has := strings.Contains(raw, headerMarker) || localhostRe.MatchString(raw)
 	return map[string]any{"installed": true, "config": cfg, "hasKineRouter": has, "configPath": path}
 }
 
@@ -287,7 +287,7 @@ func (g *Gateway) handleCliDeepseekPost(w http.ResponseWriter, r *http.Request) 
 	}
 	// Literal template, exactly as the JS builds it.
 	content := "provider = \"openai\"\n\n[providers.openai]\n" +
-		"base_url = \"" + normalizeV1(baseURL) + "\"\n" +
+		"base_url = \"" + cliToolBase("deepseek-tui", baseURL) + "\"\n" +
 		"api_key = \"" + g.resolveCliAPIKey(str(body, "apiKey")) + "\"\n" +
 		"model = \"" + model + "\"\n"
 	path := deepseekPath()
@@ -331,7 +331,7 @@ func jcodeHasKineRouter(m map[string]any) bool {
 		return true
 	}
 	for _, v := range provs {
-		if p := objMap(v); p != nil && strings.Contains(str(p, "base_url"), "localhost:20128") {
+		if p := objMap(v); p != nil && localhostRe.MatchString(str(p, "base_url")) {
 			return true
 		}
 	}
@@ -401,7 +401,7 @@ func (g *Gateway) handleCliJcodePost(w http.ResponseWriter, r *http.Request) {
 	cfg := parseTomlMap(readTextOrEmpty(jcodeConfigPath()))
 	provs := tomlSection(cfg, "providers")
 	provs["kinerouter"] = map[string]any{
-		"type": "openai-compatible", "base_url": normalizeV1(baseURL), "auth": "bearer",
+		"type": "openai-compatible", "base_url": cliToolBase("jcode", baseURL), "auth": "bearer",
 		"api_key_env": "JCODE_9ROUTER_API_KEY", "env_file": "provider-kinerouter.env",
 		"default_model": firstNonEmpty(func() string {
 			if len(models) > 0 {
@@ -822,7 +822,7 @@ func (g *Gateway) handleCliGrokPost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	os.MkdirAll(grokDir(), 0o700)
-	next := grokApply(readTextOrEmpty(grokConfigPath()), normalizeV1(baseURL), g.resolveCliAPIKey(str(body, "apiKey")), model, cw, subagents)
+	next := grokApply(readTextOrEmpty(grokConfigPath()), cliToolBase("grok-build", baseURL), g.resolveCliAPIKey(str(body, "apiKey")), model, cw, subagents)
 	if err := writeAtomic(grokConfigPath(), []byte(next)); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to update grok-build settings"})
 		return
@@ -898,7 +898,7 @@ func ompBuildProviderYAML(baseURL, apiKey string) string {
 }
 
 func ompHasKineRouter(content string) bool {
-	return strings.Contains(content, grokMainSlot+":") || strings.Contains(content, "localhost:20128")
+	return strings.Contains(content, grokMainSlot+":") || localhostRe.MatchString(content)
 }
 
 func (g *Gateway) cliOmpStatus() map[string]any {
@@ -1509,7 +1509,7 @@ func (g *Gateway) handleCliHermesPost(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "audio.model is required when enabling audio transcription"})
 		return
 	}
-	normalized := normalizeV1(baseURL)
+	normalized := cliToolBase("hermes", baseURL)
 
 	applyToAll := truthy(body["applyToAll"]) || truthy(r.URL.Query().Get("applyToAll"))
 	if applyToAll {

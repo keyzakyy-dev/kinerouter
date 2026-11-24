@@ -50,7 +50,10 @@ func ensureTray() bool {
 }
 
 // stopTray removes the icon before a handoff, so the detached copy never runs
-// two trays (9Router's cleanup does the same).
+// two trays (9Router's cleanup does the same). Escalation matches KeyRouter's
+// killTray: SIGTERM, then SIGKILL if the icon has not gone — a systray process
+// that ignores SIGTERM otherwise leaves a ghost icon in the macOS menu bar
+// until logout.
 func stopTray() {
 	trayMu.Lock()
 	pid := trayPID
@@ -60,8 +63,17 @@ func stopTray() {
 		return
 	}
 	_ = signalTerm(pid)
-	for i := 0; i < 30 && processAlive(pid); i++ {
-		time.Sleep(100 * time.Millisecond)
+	deadline := time.Now().Add(800 * time.Millisecond)
+	for processAlive(pid) && time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if processAlive(pid) {
+		_ = signalKill(pid)
+		// Wait briefly so the next tray can register (macOS releases the status
+		// item only after the process is really gone).
+		for i := 0; i < 20 && processAlive(pid); i++ {
+			time.Sleep(50 * time.Millisecond)
+		}
 	}
 }
 
@@ -90,7 +102,7 @@ func recordInstance(pid int) {
 // ownsServer is false when another instance already holds the port; the menu
 // still works against it, but offers no tray/continue options that would
 // pretend this process owns the gateway.
-func runLauncher(port int, ownsServer bool) {
+func runLauncher(port int, ownsServer bool, skipUpdate bool) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		return
 	}
@@ -106,7 +118,11 @@ func runLauncher(port int, ownsServer bool) {
 
 	// Update check runs once, in parallel with the menu being read. Its 4s
 	// timeout is the only network wait here; an offline host just gets no item.
-	latest, hasUpdate := gateway.UpdateInfo()
+	// A login entry passes --skip-update so a background start never waits.
+	latest, hasUpdate := "", false
+	if !skipUpdate {
+		latest, hasUpdate = gateway.UpdateInfo()
+	}
 
 	base := "http://127.0.0.1:" + strconv.Itoa(port)
 	in := bufio.NewReader(os.Stdin)
@@ -194,13 +210,14 @@ func runLauncher(port int, ownsServer bool) {
 }
 
 // enableAutostart installs the OS login entry now that the user asked for the
-// background mode; 9Router enables autostart at that same moment.
+// background mode; 9Router enables autostart at that same moment. npm installs
+// point the entry at the npm launcher so `npm uninstall` removes it too.
 func enableAutostart() {
 	self, err := os.Executable()
 	if err != nil {
 		return
 	}
-	autostart.Enable(self)
+	autostart.EnableInstall(self)
 }
 
 // showUpdate prints the one update command that matches how this binary was
@@ -280,7 +297,9 @@ func hideToTray(port int) bool {
 		fmt.Printf("background: %v\n", err)
 		return false
 	}
-	cmd := exec.Command(self, "--tray")
+	// Same argv as KeyRouter's handoff and as the login entry: tray mode with the
+	// update check off, so the background copy never waits on the network.
+	cmd := exec.Command(self, autostart.LoginArgs...)
 	cmd.Env = append(os.Environ(), "PORT="+strconv.Itoa(port))
 	// nil stdio gives the child the null device; with a new session it has no
 	// controlling terminal to receive SIGHUP from.

@@ -222,13 +222,36 @@ the server first, because Windows locks a running `.exe` and every platform
 would otherwise keep serving the old binary. Exit stops the gateway this
 process owns.
 
+Flags — the same ones KeyRouter's `cli.js` accepts:
+
+```bash
+kinerouter -p 20129          # port (default 20128, or $PORT)
+kinerouter -H 127.0.0.1      # bind address (default 0.0.0.0, or $HOST)
+kinerouter -t                # tray mode, no menu
+kinerouter --skip-update     # skip the release check
+```
+
+A flag beats the environment, and everything else stays an env var (`HOST`,
+`INITIAL_PASSWORD`, `DATA_DIR`, …). Binding the default `0.0.0.0` prints the
+LAN address at startup, so it is never a surprise that the dashboard is
+reachable from the network — use `-H 127.0.0.1` for local-only.
+
+**Every exit cleans up.** SIGINT, SIGTERM and SIGHUP (closing the terminal) all
+stop what the process started outside itself: the Cloudflare/Tailscale tunnel
+and the privileged MITM proxy on `:443`, including its `/etc/hosts` lines.
+Without that, quitting would leave a root process and a public URL pointing at
+a port nobody serves. Settings are not touched, so the tunnel and MITM choices
+survive a restart.
+
 Hide to Tray does three things, like 9Router: install the OS login entry
 (`~/.config/autostart`, `~/Library/LaunchAgents`, or the Windows Startup
 folder), hand the gateway to a detached process in a new session
 (`kinerouter --tray`, null stdio), then stop the foreground copy so the child
 can claim the port. Closing the terminal leaves the gateway and the tray icon
 running. macOS keeps the process in the login session instead, because a fully
-detached status item does not render there.
+detached status item does not render there. An npm install writes the entry
+against the npm launcher rather than the downloaded binary, so removing the
+package removes the autostart with it — see [Uninstall](#uninstall).
 
 The tray menu is the same four entries: status, Open Dashboard, Enable/✓
 Auto-start, Quit. Quit stops the gateway it belongs to; if the gateway dies
@@ -252,6 +275,28 @@ Dashboard: `http://localhost:20128/dashboard` · API: `http://localhost:20128/v1
 **Next:** log in with `INITIAL_PASSWORD` (default `123456`), connect a provider,
 create an API key, point your CLI at `http://localhost:20128/v1`, and use a model
 id like `kr/claude-sonnet-4.5`, `cc/claude-opus-4-7` or `my-combo`.
+
+### Uninstall
+
+```bash
+npm uninstall -g kinerouter
+```
+
+npm v7+ never runs uninstall scripts, so KineRouter does not rely on one: the
+login entry written by Hide to Tray runs the **npm launcher**
+(`node .../node_modules/kinerouter/cli.js --tray`), not the downloaded binary.
+Uninstalling the package removes that launcher, so the entry stops working and
+the gateway does not come back at the next login.
+
+Leftovers you may want to remove by hand:
+
+```bash
+rm -f  ~/.config/autostart/kinerouter.desktop   # older builds pointed this at the binary in ~/.kinerouter/runtime
+rm -rf ~/.kinerouter                            # gateway, runtime binaries, SQLite DB (providers + API keys)
+```
+
+Script and release installs: quit the tray first, then delete the login entry,
+`/usr/local/bin/kinerouter`, `/usr/local/bin/kinerouter-tray` and `~/.kinerouter`.
 
 ---
 
