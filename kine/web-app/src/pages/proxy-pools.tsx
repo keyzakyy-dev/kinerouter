@@ -236,7 +236,8 @@ export default function ProxyPoolsPage() {
         return
       }
       await fetchPools()
-      notify.success(data.ok ? 'Proxy test passed' : 'Proxy test failed')
+      if (data.ok) notify.success('Proxy test passed')
+      else notify.error('Proxy test failed')
     } catch {
       notify.error('Failed to test proxy')
     } finally {

@@ -67,11 +67,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="slide-in-right pointer-events-auto flex items-start gap-2.5 rounded-lg bg-surface p-3 shadow-[var(--shadow-elevated)]"
+            className="slide-in-right pointer-events-auto flex items-center gap-2.5 rounded-lg bg-surface p-3 shadow-[var(--shadow-elevated)]"
           >
             <Icon
               name={STYLES[toast.type].icon}
-              className={cn('mt-px shrink-0 text-[16px]', STYLES[toast.type].className)}
+              className={cn('shrink-0 text-[16px]', STYLES[toast.type].className)}
             />
             <div className="min-w-0 flex-1">
               {toast.title && (
@@ -89,7 +89,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => remove(toast.id)}
               aria-label="Dismiss"
-              className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded p-1 text-text-muted transition-colors hover:text-text-main"
+              className="-mr-1 shrink-0 cursor-pointer rounded p-1 text-text-muted transition-colors hover:text-text-main"
             >
               <Icon name="close" className="text-[14px]" />
             </button>
