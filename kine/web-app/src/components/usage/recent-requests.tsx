@@ -55,7 +55,7 @@ export function RecentRequests({
                     </span>
                   )}
                 </div>
-                <span className="shrink-0 pt-0.5 pl-2 text-right font-mono text-[10px]">
+                <span className="shrink-0 pt-0.5 pl-4 text-right font-mono text-[10px]">
                   <span className="text-sky-600 dark:text-sky-400">{fmt(r.promptTokens)}↑</span>{' '}
                   <span className="text-emerald-600 dark:text-emerald-400">{fmt(r.completionTokens)}↓</span>
                 </span>
