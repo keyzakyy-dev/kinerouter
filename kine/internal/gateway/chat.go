@@ -342,17 +342,22 @@ func (g *Gateway) dispatch(w http.ResponseWriter, r *http.Request, targets []tar
 			var upErr *upstreamError
 			if !errors.As(err, &upErr) {
 				// Transport failure: next account.
+				logWarn("fallback", "upstream failed provider=%s model=%s error=%v", t.Provider, t.Model, err)
 				continue
 			}
 			if upErr.status == http.StatusUnauthorized || upErr.status == http.StatusForbidden ||
 				upErr.status == http.StatusTooManyRequests || upErr.status == http.StatusPaymentRequired {
 				g.markUnavailable(conn, upErr.status, upErr.message, t.Model)
+				logWarn("fallback", "upstream failed provider=%s model=%s status=%d error=%s conn=%s",
+					t.Provider, t.Model, upErr.status, upErr.message, conn.ID)
 				last = dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
 				continue
 			}
 			if upErr.status >= 500 {
 				// A 5xx (including an unusable 200 body) is retryable: another
 				// account or combo member may answer.
+				logWarn("fallback", "upstream failed provider=%s model=%s status=%d conn=%s",
+					t.Provider, t.Model, upErr.status, conn.ID)
 				last = dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
 				continue
 			}
@@ -1069,6 +1074,8 @@ func (g *Gateway) recordUsage(conn *store.Connection, t target, apiKey, endpoint
 		"cached_tokens":     u.CacheRead,
 	}
 	g.saveDetail(conn, t, u, start, "success", "")
+	logInfo("usage", "logged provider=%s model=%s prompt=%d completion=%d cached=%d cost=%.6f conn=%s",
+		t.Provider, t.Model, u.PromptTokens+u.CacheRead+u.CacheCreation, u.CompletionTokens, u.CacheRead, cost, conn.ID)
 	g.store.SaveUsage(store.UsageRecord{
 		Timestamp:        time.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00"),
 		Provider:         t.Provider,

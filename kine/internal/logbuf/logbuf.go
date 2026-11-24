@@ -1,40 +1,102 @@
-// Package logbuf captures process log lines for the dashboard console viewer
-// (/dashboard/console-log), the Go counterpart of src/lib/consoleLogBuffer.js.
+// Package logbuf captures process log entries for the dashboard console
+// viewer (/dashboard/console-log), the Go counterpart of 9router-go's
+// internal/log console buffer.
 //
-// It is an io.Writer, so it plugs into log.SetOutput via io.MultiWriter and
-// keeps working for every log.Printf in the process without extra call sites.
+// It is an io.Writer, so every log.Printf in the process lands here via
+// log.SetOutput, and it also takes structured Emit calls that carry a level
+// and a tag. Levels are stamped at emit time, never guessed from the text.
 package logbuf
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
 // MaxLines matches CONSOLE_LOG_CONFIG.maxLines in the dashboard.
 const MaxLines = 200
 
-// Event is one message on the console feed: "line" or "clear".
+// Level mirrors the dashboard's four severities, ordered by verbosity.
+type Level int
+
+const (
+	Debug Level = iota
+	Info
+	Warn
+	Error
+)
+
+func (l Level) String() string {
+	switch l {
+	case Debug:
+		return "debug"
+	case Warn:
+		return "warn"
+	case Error:
+		return "error"
+	default:
+		return "info"
+	}
+}
+
+// ParseLevel accepts the names the dashboard sends.
+func ParseLevel(s string) (Level, bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "debug":
+		return Debug, true
+	case "info":
+		return Info, true
+	case "warn", "warning":
+		return Warn, true
+	case "error":
+		return Error, true
+	}
+	return Info, false
+}
+
+// Entry is one captured line plus the metadata known at emit time.
+type Entry struct {
+	Time  string `json:"time"`
+	Level string `json:"level"`
+	Tag   string `json:"tag,omitempty"`
+	Line  string `json:"line"`
+}
+
+// Event is one message on the console feed: a new entry or a clear notice.
 type Event struct {
-	Line  string
+	Entry Entry
 	Clear bool
 }
 
 type buffer struct {
 	mu      sync.Mutex
-	lines   []string
+	entries []Entry
 	subs    map[int]chan Event
 	nextID  int
+	level   Level
 	partial []byte
 }
 
-var global = &buffer{subs: map[int]chan Event{}}
+var global = &buffer{subs: map[int]chan Event{}, level: Info}
 
 // Default returns the process-wide buffer.
 func Default() *buffer { return global }
 
-// Write implements io.Writer: complete lines are appended, a trailing partial
-// line is held until its newline arrives.
+// Emit appends one structured entry when it passes the active level filter.
+func (b *buffer) Emit(level Level, tag, format string, args ...any) {
+	b.append(Entry{
+		Time:  time.Now().Format("15:04:05.000"),
+		Level: level.String(),
+		Tag:   tag,
+		Line:  fmt.Sprintf(format, args...),
+	})
+}
+
+// Write implements io.Writer for log.Printf output. Those lines carry no
+// level or tag of their own, so they are recorded as info and split on a
+// leading "TAG:" the caller may have written.
 func (b *buffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -47,29 +109,55 @@ func (b *buffer) Write(p []byte) (int, error) {
 		}
 		line := strings.TrimRight(string(b.partial[:i]), "\r")
 		b.partial = b.partial[i+1:]
-		if line == "" {
+		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		b.lines = append(b.lines, line)
-		if len(b.lines) > MaxLines {
-			b.lines = append([]string(nil), b.lines[len(b.lines)-MaxLines:]...)
+		// log.Ltime already stamped this line; the row carries its own clock,
+		// so drop the duplicate prefix.
+		if len(line) > 9 && line[2] == ':' && line[5] == ':' && line[8] == ' ' {
+			line = line[9:]
 		}
-		for _, ch := range b.subs {
-			select {
-			case ch <- Event{Line: line}:
-			default: // slow subscriber: drop rather than block logging
-			}
-		}
+		b.push(Entry{Time: time.Now().Format("15:04:05.000"), Level: Info.String(), Line: line})
 	}
 	return len(p), nil
 }
 
-// Lines returns a copy of the buffered lines (empty slice, never nil, so the
-// dashboard always receives an array).
-func (b *buffer) Lines() []string {
+func (b *buffer) append(e Entry) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return append(make([]string, 0, len(b.lines)), b.lines...)
+	b.push(e)
+}
+
+// push appends under the caller's lock.
+func (b *buffer) push(e Entry) {
+	if levelOf(e.Level) < b.level {
+		return
+	}
+	b.entries = append(b.entries, e)
+	if len(b.entries) > MaxLines {
+		b.entries = append([]Entry(nil), b.entries[len(b.entries)-MaxLines:]...)
+	}
+	for _, ch := range b.subs {
+		select {
+		case ch <- Event{Entry: e}:
+		default: // slow subscriber: drop rather than block logging
+		}
+	}
+}
+
+func levelOf(name string) Level {
+	if l, ok := ParseLevel(name); ok {
+		return l
+	}
+	return Info
+}
+
+// Entries returns a copy of the buffered entries (never nil, so the dashboard
+// always receives an array).
+func (b *buffer) Entries() []Entry {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append(make([]Entry, 0, len(b.entries)), b.entries...)
 }
 
 // Subscribe returns a channel of events and its cancel func.
@@ -94,11 +182,25 @@ func (b *buffer) Subscribe() (<-chan Event, func()) {
 func (b *buffer) Clear() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.lines = nil
+	b.entries = nil
 	for _, ch := range b.subs {
 		select {
 		case ch <- Event{Clear: true}:
 		default:
 		}
 	}
+}
+
+// Level returns the active capture level.
+func (b *buffer) Level() Level {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.level
+}
+
+// SetLevel drops entries below l before they are buffered.
+func (b *buffer) SetLevel(l Level) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.level = l
 }

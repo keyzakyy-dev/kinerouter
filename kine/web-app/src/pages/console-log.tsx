@@ -5,50 +5,20 @@ import { Button } from '@/components/ui/button'
 import { useNotify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
-/** Matches CONSOLE_LOG_CONFIG.maxLines in the dashboard. */
+/** Matches logbuf.MaxLines on the server. */
 const MAX_LINES = 200
 
 type Level = 'debug' | 'info' | 'warn' | 'error'
 
 interface Entry {
-  seq: number
   time: string
   level: Level
-  tag: string
-  message: string
+  tag?: string
+  line: string
 }
 
-/**
- * Port of 9router-go's console rows: the logger's level and tag are split out
- * so a row reads time / level / tag / message. Lines that never went through a
- * level-aware logger fall back to a text prefix, then to "info".
- */
-function parseLine(line: string, seq: number): Entry {
-  const stamp = line.match(/^(\d{2}:\d{2}:\d{2})\s+(.*)$/)
-  const time = stamp?.[1] ?? ''
-  let body = stamp?.[2] ?? line
+const LEVELS: Level[] = ['debug', 'info', 'warn', 'error']
 
-  const tagMatch = body.match(/^\[([^\]]+)\]\s*/)
-  const tag = tagMatch?.[1] ?? ''
-  if (tagMatch) body = body.slice(tagMatch[0].length)
-
-  let level: Level = 'info'
-  const prefix = body.match(/^(DBG|DEBUG|INF|INFO|WRN|WARN|ERR|ERROR)(?=\s)/)
-  if (prefix) {
-    const first = prefix[1][0]
-    level = first === 'E' ? 'error' : first === 'W' ? 'warn' : first === 'D' ? 'debug' : 'info'
-    body = body.slice(prefix[0].length)
-  } else if (tag) {
-    const lower = tag.toLowerCase()
-    if (lower.startsWith('err')) level = 'error'
-    else if (lower.startsWith('wrn') || lower.startsWith('warn')) level = 'warn'
-    else if (lower.startsWith('dbg') || lower === 'debug') level = 'debug'
-  }
-
-  return { seq, time, level, tag, message: body }
-}
-
-/** Chips are icon-only: the tinted box carries the level, the tooltip names it. */
 const LEVEL_META: Record<Level, { label: string; icon: string; text: string; on: string }> = {
   error: { label: 'ERR', icon: 'error', text: 'text-danger', on: 'bg-danger/15 text-danger hover:bg-danger/25' },
   warn: { label: 'WRN', icon: 'warning', text: 'text-warning', on: 'bg-warning/15 text-warning hover:bg-warning/25' },
@@ -60,14 +30,13 @@ const LEVEL_ORDER: Level[] = ['error', 'warn', 'info', 'debug']
 
 export default function ConsoleLogPage() {
   const notify = useNotify()
-  const [lines, setLines] = useState<string[]>([])
+  const [entries, setEntries] = useState<Entry[]>([])
   const [query, setQuery] = useState('')
   const [wrap, setWrap] = useState(false)
   const [muted, setMuted] = useState<Set<Level>>(new Set())
   const [following, setFollowing] = useState(true)
+  const [captureLevel, setCaptureLevel] = useState<Level>('info')
   const logRef = useRef<HTMLDivElement>(null)
-
-  const entries = useMemo(() => lines.map((line, i) => parseLine(line, i)), [lines])
 
   const counts = useMemo(() => {
     const out: Record<Level, number> = { debug: 0, info: 0, warn: 0, error: 0 }
@@ -80,9 +49,7 @@ export default function ConsoleLogPage() {
     return entries.filter(
       (entry) =>
         !muted.has(entry.level) &&
-        (!needle ||
-          entry.message.toLowerCase().includes(needle) ||
-          entry.tag.toLowerCase().includes(needle)),
+        (!needle || entry.line.toLowerCase().includes(needle) || (entry.tag ?? '').toLowerCase().includes(needle)),
     )
   }, [entries, muted, query])
 
@@ -95,6 +62,23 @@ export default function ConsoleLogPage() {
     })
   }
 
+  const setServerLevel = async (level: Level) => {
+    const previous = captureLevel
+    setCaptureLevel(level)
+    try {
+      const res = await fetch('/api/translator/console-logs/level', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level }),
+      })
+      if (!res.ok) throw new Error(String(res.status))
+      notify.success(`Capture level set to ${level}.`)
+    } catch {
+      setCaptureLevel(previous)
+      notify.error('Could not change the server log level.')
+    }
+  }
+
   const clear = async () => {
     try {
       await fetch('/api/translator/console-logs', { method: 'DELETE' })
@@ -105,7 +89,9 @@ export default function ConsoleLogPage() {
   }
 
   const plainText = () =>
-    visible.map((entry) => [entry.time, LEVEL_META[entry.level].label, entry.tag && `[${entry.tag}]`, entry.message].filter(Boolean).join(' ')).join('\n')
+    visible
+      .map((entry) => [entry.time, entry.level.toUpperCase(), entry.tag && `[${entry.tag}]`, entry.line].filter(Boolean).join(' '))
+      .join('\n')
 
   const copy = async () => {
     try {
@@ -127,22 +113,28 @@ export default function ConsoleLogPage() {
   }
 
   useEffect(() => {
+    fetch('/api/translator/console-logs/level')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { level?: Level } | null) => {
+        if (body?.level && LEVELS.includes(body.level)) setCaptureLevel(body.level)
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
     const es = new EventSource('/api/translator/console-logs/stream')
     es.onmessage = (e) => {
       const msg = JSON.parse(e.data) as
-        | { type: 'init'; logs: string[] }
-        | { type: 'line'; line: string }
-        | { type: 'lines'; lines: string[] }
+        | { type: 'init'; entries: Entry[] }
+        | { type: 'line'; entry: Entry }
         | { type: 'clear' }
 
       if (msg.type === 'init') {
-        setLines(msg.logs.slice(-MAX_LINES))
+        setEntries(msg.entries.slice(-MAX_LINES))
       } else if (msg.type === 'line') {
-        setLines((prev) => [...prev, msg.line].slice(-MAX_LINES))
-      } else if (msg.type === 'lines') {
-        setLines((prev) => [...prev, ...msg.lines].slice(-MAX_LINES))
+        setEntries((prev) => [...prev, msg.entry].slice(-MAX_LINES))
       } else if (msg.type === 'clear') {
-        setLines([])
+        setEntries([])
       }
     }
 
@@ -162,7 +154,7 @@ export default function ConsoleLogPage() {
         title="Console Log"
         description="Live stdout from the gateway process, last 200 lines."
         actions={
-          <Button size="sm" variant="ghost" onClick={clear} disabled={lines.length === 0}>
+          <Button size="sm" variant="ghost" onClick={clear} disabled={entries.length === 0}>
             <Icon name="delete" className="text-[16px]" />
             Clear
           </Button>
@@ -184,11 +176,12 @@ export default function ConsoleLogPage() {
                   title={`${off ? 'Show' : 'Hide'} ${meta.label} lines (${counts[level]})`}
                   onClick={() => toggleLevel(level)}
                   className={cn(
-                    'grid size-7 cursor-pointer place-items-center rounded-md transition-colors',
+                    'flex h-7 cursor-pointer items-center gap-1 rounded-md px-1.5 transition-colors',
                     off ? 'bg-surface-2 text-text-subtle hover:bg-surface-3' : meta.on,
                   )}
                 >
                   <Icon name={meta.icon} className="text-[15px]" />
+                  <span className="tabular-nums text-[11px] font-medium">{counts[level]}</span>
                 </button>
               )
             })}
@@ -221,6 +214,20 @@ export default function ConsoleLogPage() {
               </button>
             )}
           </div>
+
+          <select
+            value={captureLevel}
+            onChange={(e) => setServerLevel(e.target.value as Level)}
+            title="Lines below this level are not buffered"
+            aria-label="Server capture level"
+            className="h-7 cursor-pointer rounded-md border border-border bg-surface px-1.5 text-xs text-text-main focus:outline-none"
+          >
+            {LEVELS.map((level) => (
+              <option key={level} value={level}>
+                {level}
+              </option>
+            ))}
+          </select>
 
           <button
             type="button"
@@ -258,8 +265,8 @@ export default function ConsoleLogPage() {
               <Icon name="terminal" className="text-[22px] text-text-muted" />
               <p className="text-sm text-text-main">No console output yet</p>
               <p className="max-w-md text-xs text-text-muted">
-                Nothing has been logged since the server started or the last clear. Send a request and rows appear
-                here live.
+                Nothing has been logged since the server started or the last clear. Send a request, or set the level
+                to <span className="font-mono">debug</span>, and rows appear here live.
               </p>
             </div>
           ) : visible.length === 0 ? (
@@ -286,11 +293,9 @@ export default function ConsoleLogPage() {
               {visible.map((entry) => {
                 const meta = LEVEL_META[entry.level]
                 return (
-                  <div key={entry.seq} className="flex items-baseline gap-3 px-3 py-1 hover:bg-surface-3/40">
+                  <div key={`${entry.time}-${entry.line}`} className="flex items-baseline gap-3 px-3 py-1 hover:bg-surface-3/40">
                     <span className="shrink-0 select-none tabular-nums text-[11px] text-text-muted">{entry.time}</span>
-                    <span className={cn('grid size-4 shrink-0 select-none place-items-center', meta.text)} title={meta.label}>
-                      <Icon name={meta.icon} className="text-[13px]" />
-                    </span>
+                    <span className={cn('w-7 shrink-0 select-none text-[11px] font-bold', meta.text)}>{meta.label}</span>
                     <span
                       className={cn(
                         'min-w-0 flex-1',
@@ -298,8 +303,7 @@ export default function ConsoleLogPage() {
                         entry.level === 'error' ? 'text-danger' : 'text-text-main',
                       )}
                     >
-                      {entry.tag && <span className="opacity-70">[{entry.tag}]</span>}{' '}
-                      {entry.message}
+                      {entry.tag && <span className="opacity-70">{entry.tag}</span>} {entry.line}
                     </span>
                   </div>
                 )

@@ -5,9 +5,10 @@ package gateway
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/keyzakyy-dev/kinerouter/internal/auth"
 	"github.com/keyzakyy-dev/kinerouter/internal/config"
 	"github.com/keyzakyy-dev/kinerouter/internal/executor"
+	"github.com/keyzakyy-dev/kinerouter/internal/logbuf"
 	"github.com/keyzakyy-dev/kinerouter/internal/mitm"
 	"github.com/keyzakyy-dev/kinerouter/internal/oauth"
 	"github.com/keyzakyy-dev/kinerouter/internal/providerdata"
@@ -87,7 +89,7 @@ func (g *Gateway) Shutdown() {
 func (g *Gateway) Handler() http.Handler {
 	mux := http.NewServeMux()
 	g.routes(mux)
-	return g.withPeerTrust(g.withCORS(mux))
+	return g.withRequestLog(g.withPeerTrust(g.withCORS(mux)))
 }
 
 func (g *Gateway) routes(mux *http.ServeMux) {
@@ -341,6 +343,87 @@ func errType(status int) string {
 
 func corsPreflight(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }
 
-func logf(format string, args ...any) { log.Printf(format, args...) }
+// Leveled log helpers: the console viewer shows the severity and tag the call
+// site names, so a row never has its level guessed from the text. Every line
+// still goes to stderr for `kinerouter logs` and a foreground CLI.
+func logAt(level logbuf.Level, tag, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	prefix := level.String()[:3]
+	prefix = strings.ToUpper(prefix)
+	if tag != "" {
+		fmt.Fprintf(os.Stderr, "%s %s %s\n", prefix, tag, msg)
+	} else {
+		fmt.Fprintf(os.Stderr, "%s %s\n", prefix, msg)
+	}
+	logbuf.Default().Emit(level, tag, "%s", msg)
+}
+
+func logf(format string, args ...any) { logAt(logbuf.Info, "", format, args...) }
+
+func logInfo(tag, format string, args ...any) { logAt(logbuf.Info, tag, format, args...) }
+
+func logWarn(tag, format string, args ...any) { logAt(logbuf.Warn, tag, format, args...) }
+
+func logError(tag, format string, args ...any) { logAt(logbuf.Error, tag, format, args...) }
+
+func logDebug(tag, format string, args ...any) { logAt(logbuf.Debug, tag, format, args...) }
+
+// statusWriter remembers the status code so the request line can report it.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	if w.status == 0 {
+		w.status = code
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+func (w *statusWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// withRequestLog prints one row per finished request, the reference's
+// "request POST /chat/completions status=200 duration=…" line. Streams are
+// skipped: their duration is the whole turn and the line would arrive late.
+func (g *Gateway) withRequestLog(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/console-logs/stream") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Static assets and the favicon would bury the request rows an
+		// operator actually reads.
+		if strings.HasPrefix(r.URL.Path, "/assets/") || r.URL.Path == "/favicon.ico" || r.URL.Path == "/favicon.svg" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		start := time.Now()
+		sw := &statusWriter{ResponseWriter: w}
+		next.ServeHTTP(sw, r)
+		status := sw.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		elapsed := time.Since(start)
+		line := fmt.Sprintf("%s %s status=%d duration=%s", r.Method, r.URL.Path, status, elapsed)
+		if status >= 400 {
+			logWarn("request", "%s", line)
+		} else {
+			logInfo("request", "%s", line)
+		}
+	})
+}
 
 var _ = time.Now
