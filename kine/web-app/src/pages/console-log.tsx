@@ -288,7 +288,7 @@ export default function ConsoleLogPage() {
                 return (
                   <div key={entry.seq} className="flex items-baseline gap-3 px-3 py-1 hover:bg-surface-3/40">
                     <span className="shrink-0 select-none tabular-nums text-[11px] text-text-muted">{entry.time}</span>
-                    <span className={cn('w-8 shrink-0 select-none', meta.text)} title={meta.label}>
+                    <span className={cn('grid size-4 shrink-0 select-none place-items-center', meta.text)} title={meta.label}>
                       <Icon name={meta.icon} className="text-[13px]" />
                     </span>
                     <span
