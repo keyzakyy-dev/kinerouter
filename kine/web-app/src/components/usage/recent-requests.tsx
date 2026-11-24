@@ -17,7 +17,13 @@ function TimeAgo({ timestamp }: { timestamp: string }) {
 }
 
 /** Live tail of the last few completed requests. */
-export function RecentRequests({ requests = [] }: { requests?: RecentRequest[] }) {
+export function RecentRequests({
+  requests = [],
+  providerNames = {},
+}: {
+  requests?: RecentRequest[]
+  providerNames?: Record<string, string>
+}) {
   return (
     <section className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-surface" style={{ height: 480 }}>
       <div className="flex shrink-0 items-center gap-2 px-4 py-3">
@@ -35,16 +41,24 @@ export function RecentRequests({ requests = [] }: { requests?: RecentRequest[] }
         <ul className="custom-scrollbar flex-1 divide-y divide-border overflow-y-auto border-t border-border">
           {requests.map((r, i) => {
             const ok = !r.status || r.status === 'ok' || r.status === 'success'
+            const provider = providerNames[r.provider] || r.provider
             return (
-              <li key={i} className="flex items-center gap-2 px-4 py-2 transition-colors hover:bg-surface-2/40">
-                <span className={`size-1.5 shrink-0 rounded-full ${ok ? 'bg-success' : 'bg-danger'}`} />
-                <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-main" title={r.model}>
-                  {r.model}
-                </code>
-                <span className="shrink-0 font-mono text-[10px] text-text-muted">
+              <li key={i} className="flex items-start gap-2 px-4 py-2 transition-colors hover:bg-surface-2/40">
+                <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${ok ? 'bg-success' : 'bg-danger'}`} />
+                <div className="min-w-0 flex-1">
+                  <code className="block truncate font-mono text-[11px] leading-4 text-text-main" title={r.model}>
+                    {r.model}
+                  </code>
+                  {provider && (
+                    <span className="block truncate text-[10px] leading-3 text-text-muted" title={provider}>
+                      {provider}
+                    </span>
+                  )}
+                </div>
+                <span className="shrink-0 pt-0.5 font-mono text-[10px] text-text-muted">
                   {fmt(r.promptTokens)}↑ {fmt(r.completionTokens)}↓
                 </span>
-                <span className="w-14 shrink-0 text-right font-mono text-[10px] text-text-muted">
+                <span className="w-14 shrink-0 pt-0.5 text-right font-mono text-[10px] text-text-muted">
                   <TimeAgo timestamp={r.timestamp} />
                 </span>
               </li>

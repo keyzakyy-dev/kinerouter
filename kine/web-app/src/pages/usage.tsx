@@ -257,7 +257,12 @@ function UsageStats({ period }: { period: string }) {
             lastProvider={stats.recentRequests?.[0]?.provider || ''}
             errorProvider={stats.errorProvider || ''}
           />
-          <RecentRequests requests={stats.recentRequests || []} />
+          <RecentRequests
+            requests={stats.recentRequests || []}
+            providerNames={Object.fromEntries(
+              providers.map((p) => [p.provider, p.nodeName || p.name || p.provider]),
+            )}
+          />
         </div>
       )}
 
