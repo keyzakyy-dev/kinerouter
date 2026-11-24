@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MetricChart, formatCompact, type MetricAccent, type SeriesPoint } from './metric-chart'
 
 export interface ProgressMetricCardProps {
@@ -10,14 +10,11 @@ export interface ProgressMetricCardProps {
   className?: string
 }
 
-/** Ease-out count from the previous value; respects reduced motion. */
-function useCountUp(target: number, duration = 1400) {
+/** Counts up from zero with a decelerating tail; respects reduced motion. */
+function useCountUp(target: number, duration = 1600) {
   const [display, setDisplay] = useState(0)
-  const fromRef = useRef(0)
   useEffect(() => {
-    const from = fromRef.current
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      fromRef.current = target
       setDisplay(target)
       return
     }
@@ -25,9 +22,8 @@ function useCountUp(target: number, duration = 1400) {
     let raf = 0
     const step = (now: number) => {
       const p = Math.min(1, (now - start) / duration)
-      const next = from + (target - from) * (1 - (1 - p) ** 3)
-      fromRef.current = next
-      setDisplay(next)
+      // Quintic ease-out: fast off the mark, long slow settle at the top.
+      setDisplay(target * (1 - (1 - p) ** 5))
       if (p < 1) raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)
