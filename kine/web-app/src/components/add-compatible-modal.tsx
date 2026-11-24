@@ -50,7 +50,7 @@ export function AddCompatibleModal({
   const [name, setName] = useState('')
   const [prefix, setPrefix] = useState('')
   const [apiType, setApiType] = useState('chat')
-  const [baseUrl, setBaseUrl] = useState<string>(config.defaultBaseUrl)
+  const [baseUrl, setBaseUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [checkKey, setCheckKey] = useState('')
   const [checkModelId, setCheckModelId] = useState('')
@@ -58,10 +58,10 @@ export function AddCompatibleModal({
   const [validation, setValidation] = useState<{ valid: boolean; error?: string; method?: string } | null>(null)
   const [error, setError] = useState('')
 
-  // The reference defaults the base URL to the OpenAI endpoint and re-applies it
-  // whenever apiType changes (both API types share the host).
+  // Base URL starts empty; the default is ghost text in the placeholder so the
+  // field never submits a value the user did not choose.
   useEffect(() => {
-    if (config.hasApiType) setBaseUrl(config.defaultBaseUrl)
+    setBaseUrl('')
   }, [config.hasApiType, config.defaultBaseUrl, apiType])
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export function AddCompatibleModal({
     setName('')
     setPrefix('')
     setApiType('chat')
-    setBaseUrl(config.defaultBaseUrl)
+    setBaseUrl('')
     setCheckKey('')
     setCheckModelId('')
     setValidation(null)
