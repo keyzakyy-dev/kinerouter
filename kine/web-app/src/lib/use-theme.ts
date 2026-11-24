@@ -13,7 +13,7 @@ function systemDark() {
 
 export function readTheme(): Theme {
   const saved = localStorage.getItem(KEY)
-  return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'light'
+  return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system'
 }
 
 export function applyTheme(theme: Theme) {

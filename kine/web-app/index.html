@@ -14,7 +14,7 @@
       // flashes light while React boots. Mirrors src/lib/use-theme.ts.
       try {
         var t = localStorage.getItem('theme')
-        var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+        var dark = t === 'dark' || ((t === 'system' || !t) && matchMedia('(prefers-color-scheme: dark)').matches)
         document.documentElement.classList.toggle('dark', dark)
       } catch (e) {}
     </script>
