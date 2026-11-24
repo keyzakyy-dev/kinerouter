@@ -869,7 +869,7 @@ export function ProviderDetailPage() {
                     connectionId={detail.connections[0].id}
                   />
                 )}
-                <div className="flex flex-col gap-2">
+                <div className="flex max-h-[1132px] flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
                   {detail.connections.map((c, i) => (
                     <ConnectionRow
                       key={c.id}
