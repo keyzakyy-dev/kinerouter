@@ -810,7 +810,7 @@ export default function TokenSaverPage() {
                   onBlur={handleCustomPromptBlur}
                   rows={4}
                   placeholder="e.g. Prefer editing existing files over creating new ones."
-                  className="w-full resize-y rounded-lg bg-surface-2 p-2.5 text-xs text-text-main outline-none placeholder:text-text-muted focus-visible:ring-1 focus-visible:ring-ring"
+                  className="w-full resize-y rounded-lg bg-surface-2 p-2.5 text-xs text-text-main outline-none placeholder:text-text-muted"
                 />
                 <p className="mt-1.5 text-[11px] text-text-muted">
                   Applied to every provider and model. Sent as-is upstream; an empty prompt injects

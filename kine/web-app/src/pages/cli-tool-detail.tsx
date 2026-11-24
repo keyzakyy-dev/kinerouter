@@ -53,7 +53,7 @@ const INSTALL_COMMANDS: Record<string, string> = {
 }
 
 const SELECT_CLS =
-  'h-9 w-full cursor-pointer rounded-lg border-0 bg-surface-2 px-3 text-sm text-text-main shadow-none focus:ring-1 focus:ring-ring'
+  'h-9 w-full cursor-pointer rounded-lg border-0 bg-surface-2 px-3 text-sm text-text-main shadow-none'
 const INPUT_CLS = 'border-0 bg-surface-2 shadow-none'
 
 export default function CliToolDetailPage() {
@@ -1502,7 +1502,7 @@ function Dropdown({
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-9 w-full cursor-pointer rounded-lg border-0 bg-surface-2 px-3 text-sm text-text-main shadow-none focus:ring-1 focus:ring-ring">
+      <SelectTrigger className="h-9 w-full cursor-pointer rounded-lg border-0 bg-surface-2 px-3 text-sm text-text-main shadow-none">
         <SelectValue />
       </SelectTrigger>
       <SelectContent className="custom-scrollbar rounded-lg border-0 bg-card shadow-lg">

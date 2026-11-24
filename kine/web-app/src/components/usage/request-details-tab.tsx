@@ -100,7 +100,7 @@ export function RequestDetailsTab() {
 
   const hasFilters = !!(filters.provider || filters.startDate || filters.endDate)
   const fieldCls =
-    'h-9 w-full min-w-0 cursor-pointer rounded-lg border-0 bg-surface-2 px-3 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-ring'
+    'h-9 w-full min-w-0 cursor-pointer rounded-lg border-0 bg-surface-2 px-3 text-sm text-text-main focus:outline-none'
   const labelCls = 'text-[11px] font-medium uppercase tracking-wide text-text-muted'
 
   const from = pagination.totalItems ? (pagination.page - 1) * pagination.pageSize + 1 : 0

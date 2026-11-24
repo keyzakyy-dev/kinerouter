@@ -932,7 +932,7 @@ export default function SettingsPage() {
                           placeholder={'-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----'}
                           value={samlForm.cert}
                           onChange={(e) => setSamlForm((p) => ({ ...p, cert: e.target.value }))}
-                          className="w-full resize-y rounded-lg border-0 bg-surface-2 p-2.5 font-mono text-[11px] text-text-main outline-none placeholder:text-text-muted focus-visible:ring-1 focus-visible:ring-ring"
+                          className="w-full resize-y rounded-lg border-0 bg-surface-2 p-2.5 font-mono text-[11px] text-text-main outline-none placeholder:text-text-muted"
                           disabled={samlLoading}
                         />
                         <input

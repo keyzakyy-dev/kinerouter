@@ -980,7 +980,7 @@ export function ProviderDetailPage() {
                   <SelectTrigger
                     aria-label="Thinking level"
                     title="Appends (level) suffix to copied model names"
-                    className="h-7 w-auto gap-1.5 rounded-lg border-0 bg-surface-2 px-2 text-[11px] text-text-muted hover:bg-surface-3 hover:text-text-main focus:ring-1"
+                    className="h-7 w-auto gap-1.5 rounded-lg border-0 bg-surface-2 px-2 text-[11px] text-text-muted hover:bg-surface-3 hover:text-text-main"
                   >
                     <span className="flex items-center gap-1.5">
                       <Icon name="psychology" className="text-[14px] text-violet-600 dark:text-violet-400" />
@@ -1537,7 +1537,7 @@ export function NoAuthProxyCard({
           <div className="flex flex-col gap-1">
             <p className="text-[11px] text-text-muted">Proxy Pool</p>
             <Select value={poolId || 'none'} onValueChange={(v) => void save(v === 'none' ? '' : v, strategy)} disabled={rotating}>
-              <SelectTrigger className="h-9 rounded-lg border-0 bg-surface-2 px-3 focus:ring-1">
+              <SelectTrigger className="h-9 rounded-lg border-0 bg-surface-2 px-3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1557,7 +1557,7 @@ export function NoAuthProxyCard({
           <div className="flex flex-col gap-1">
             <p className="text-[11px] text-text-muted">Rotation Strategy</p>
             <Select value={strategy} onValueChange={(v) => void save(poolId, v)}>
-              <SelectTrigger className="h-9 rounded-lg border-0 bg-surface-2 px-3 focus:ring-1">
+              <SelectTrigger className="h-9 rounded-lg border-0 bg-surface-2 px-3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

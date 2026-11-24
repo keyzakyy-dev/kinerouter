@@ -850,7 +850,7 @@ export default function ProxyPoolsPage() {
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
               placeholder={'http://user:pass@127.0.0.1:7897\n127.0.0.1:7897:user:pass'}
-              className="min-h-[180px] w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-main transition-all focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+              className="min-h-[180px] w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-main transition-all focus:outline-none"
             />
             <p className="mt-1 text-xs text-text-muted">
               Supported formats: protocol://user:pass@host:port, host:port:user:pass

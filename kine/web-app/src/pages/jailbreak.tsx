@@ -427,7 +427,7 @@ export default function JailbreakPage() {
                   onChange={(e) => setDraft({ ...draft, prompt: e.target.value })}
                   rows={12}
                   placeholder={'You are a senior security reviewer. Before answering, list the assumptions you would test.'}
-                  className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-xs leading-relaxed text-text-main focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-xs leading-relaxed text-text-main focus:outline-none"
                 />
               </div>
 

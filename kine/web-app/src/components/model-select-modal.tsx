@@ -315,7 +315,7 @@ export function ModelSelectModal({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search models (e.g. claude -haiku, /regex/)…"
-            className="w-full rounded border border-border bg-surface py-1.5 pl-8 pr-20 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="w-full rounded border border-border bg-surface py-1.5 pl-8 pr-20 text-xs focus:outline-none"
           />
           <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
             {parsed.isRegex && <span className="rounded bg-primary/10 px-1 font-mono text-[10px] text-primary">regex</span>}

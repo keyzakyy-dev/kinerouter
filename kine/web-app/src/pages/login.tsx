@@ -103,7 +103,7 @@ export default function LoginPage() {
                 type={reveal ? 'text' : 'password'}
                 autoFocus
                 autoComplete="current-password"
-                className="pr-11 focus-visible:ring-border"
+                className="pr-11"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -113,7 +113,7 @@ export default function LoginPage() {
                 onClick={() => setReveal((v) => !v)}
                 aria-label={reveal ? 'Hide password' : 'Show password'}
                 aria-pressed={reveal}
-                className="absolute inset-y-0 right-1 flex w-9 items-center justify-center rounded-md text-text-muted transition-colors hover:text-text-main focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-border"
+                className="absolute inset-y-0 right-1 flex w-9 items-center justify-center rounded-md text-text-muted transition-colors hover:text-text-main focus-visible:outline-hidden"
               >
                 <Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[16px]" />
               </button>

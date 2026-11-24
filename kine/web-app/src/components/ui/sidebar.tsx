@@ -258,7 +258,6 @@ const itemBaseClasses = cn(
   "group/sidebar-item relative flex w-full items-center gap-2.5 rounded-[var(--primitive-radius-item,0.625rem)] px-3 py-[7px]",
   "text-[13.5px] font-medium leading-none outline-none select-none whitespace-nowrap",
   "transition-colors duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]",
-  "focus-visible:ring-2 focus-visible:ring-[color:var(--primitive-ring,color-mix(in_srgb,var(--foreground)_45%,transparent))] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]",
   "disabled:pointer-events-none disabled:opacity-40",
 );
 
@@ -489,7 +488,6 @@ export const SidebarHeader = React.forwardRef<
                   "cursor-pointer select-none outline-none rounded-[var(--primitive-radius-item,0.625rem)]",
                   "[transition:background-color_150ms_cubic-bezier(0.23,1,0.32,1),transform_120ms_cubic-bezier(0.23,1,0.32,1)]",
                   "hover:bg-[color-mix(in_srgb,var(--foreground)_5%,transparent)]",
-                  "focus-visible:ring-2 focus-visible:ring-[color:var(--primitive-ring,color-mix(in_srgb,var(--foreground)_45%,transparent))] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]",
                   "active:[transform:scale(0.97)]",
                   "motion-reduce:active:[transform:none]",
                 ),
@@ -881,7 +879,6 @@ export const SidebarToggle = React.forwardRef<
           "flex size-7 shrink-0 items-center justify-center rounded-[var(--primitive-radius-control-sm,0.625rem)] outline-none",
           "text-[var(--muted-foreground)]",
           "hover:bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] hover:text-[var(--foreground)]",
-          "focus-visible:ring-2 focus-visible:ring-[color:var(--primitive-ring,color-mix(in_srgb,var(--foreground)_45%,transparent))] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]",
           "[transition:transform_120ms_cubic-bezier(0.23,1,0.32,1),color_150ms_ease,background-color_150ms_ease]",
           "active:[transform:scale(0.96)]",
           "motion-reduce:active:[transform:none]",
