@@ -3,7 +3,7 @@
 
   # KineRouter — One Binary AI Gateway
 
-  **One OpenAI-compatible endpoint. 145 providers. Zero runtime.**
+  **One OpenAI-compatible endpoint. 165 providers. Zero runtime.**
 
   **Cost-optimize with RTK token compression, 3-tier fallback, multi-account
   rotation and automatic OAuth refresh — all in a single static Go binary with
@@ -78,7 +78,7 @@ both ship RTK/Headroom/Caveman/Ponytail. The difference is the runtime.
 | Runtime | one static Go binary | Node.js + Next.js app |
 | Install | download binary / script / Docker | `npm install` / Docker |
 | Dashboard | embedded (`go:embed`) | bundled Next.js build |
-| Providers | 145 in the registry | 40+ providers, 100+ models |
+| Providers | 165 in the registry | 40+ providers, 100+ models |
 | Wire formats | OpenAI, Claude, Gemini, Responses, Vertex, Kiro, Cursor, Ollama, CommandCode | OpenAI, Claude, Gemini, Responses, Cursor, Kiro, Vertex, Antigravity, Ollama |
 | Storage | SQLite, schema v2 | SQLite |
 | Token savers | RTK, Headroom, Pxpipe, Caveman, Ponytail, custom | RTK, Headroom, Caveman, Ponytail |
@@ -151,7 +151,7 @@ irm https://raw.githubusercontent.com/keyzakyy-dev/kinerouter/main/kine/install.
 ### Prebuilt binary
 
 ```bash
-VERSION=0.1.5   # newest kine-vX.Y.Z from the releases page
+VERSION=0.1.10  # newest kine-vX.Y.Z from the releases page
 base=https://github.com/keyzakyy-dev/kinerouter/releases/download/kine-v$VERSION
 curl -fLO "$base/kinerouter_${VERSION}_linux_amd64"
 curl -fLO "$base/kinerouter-tray_${VERSION}_linux_amd64"
@@ -172,7 +172,7 @@ The tray needs GTK3 + AppIndicator on Linux and nothing extra on macOS/Windows.
 docker run -d --name kinerouter -p 20128:20128 \
   -e INITIAL_PASSWORD='choose-something' \
   -v kinerouter-data:/data \
-  ghcr.io/keyzakyy-dev/kinerouter:0.1.5
+  ghcr.io/keyzakyy-dev/kinerouter:0.1.10
 ```
 
 The release workflow publishes `X.Y.Z`, `X.Y` and `latest` tags. Docker has no
@@ -216,11 +216,12 @@ covers Claude Code, Codex, Droid, Open Claw, OpenCode and Hermes; Settings
 toggles the tunnel, Token Saver (RTK), Headroom, password reset and auth mode.
 Every submenu has a `← Back` row at the top, and Esc behaves the same way.
 
-Update prints the command for **the way this copy was installed**
-(`npm i -g kinerouter@latest --prefer-online` or the install script) and stops
-the server first, because Windows locks a running `.exe` and every platform
-would otherwise keep serving the old binary. Exit stops the gateway this
-process owns.
+Update installs the newest release **for the way this copy was installed**
+(npm via `npm i -g kinerouter@latest --prefer-online`, a script install by
+downloading and sha256-verifying the release asset, Docker by printing the
+`docker pull` command), then restarts the gateway. The same engine backs the
+dashboard's **Update now** button, `kinerouter update`, and the optional
+auto-update loop. Exit stops the gateway this process owns.
 
 Flags — the same ones KeyRouter's `cli.js` accepts:
 
@@ -229,6 +230,9 @@ kinerouter -p 20129          # port (default 20128, or $PORT)
 kinerouter -H 127.0.0.1      # bind address (default 0.0.0.0, or $HOST)
 kinerouter -t                # tray mode, no menu
 kinerouter --skip-update     # skip the release check
+
+kinerouter version           # show local and newest release
+kinerouter update            # install the newest release for this channel
 ```
 
 A flag beats the environment, and everything else stays an env var (`HOST`,
@@ -314,7 +318,7 @@ KineRouter writes each tool's own config file from the dashboard, or via
 
 ## 🌐 Providers
 
-**145 providers in the embedded registry**, grouped by transport:
+**165 providers in the embedded registry**, grouped by transport:
 
 | Lane | Examples | How it connects |
 | --- | --- | --- |
@@ -353,6 +357,7 @@ sidecar. Routes answer a clear 400 instead of failing silently. See
 | 🌐 **Deploy helpers** | Vercel, Cloudflare Workers, Deno, Netlify as proxy pools | Egress anywhere |
 | 🛰️ **Tunnels** | Cloudflare quick tunnel, Tailscale funnel | Remote access |
 | 🖥️ **Tray app** | Start/stop gateway from the desktop | No terminal needed |
+| 🔁 **Auto-update** | Opt-in background check (default 6h) installs stable releases | Stay current unattended |
 
 Bypass every token saver for one request:
 
@@ -398,6 +403,12 @@ read at startup.
 | `MACHINE_ID_SALT` | dev default | Machine-id derivation |
 | `AUTH_COOKIE_SECURE` | unset | Force `Secure` cookie |
 | `MODEL_CATALOG_SYNC` | on | Daily models.dev refresh |
+| `AUTO_UPDATE` | unset | Start with unattended updates enabled (also a dashboard toggle) |
+| `AUTO_UPDATE_INTERVAL_HOURS` | `6` | Background update-check interval |
+| `KINEROUTER_INSTALL` | detected | Force the update channel: `npm`, `script` or `docker` |
+| `UPDATE_REPO` | `keyzakyy-dev/kinerouter` | GitHub repo used for release checks |
+| `KINEROUTER_UPDATE_API` | GitHub API | Point release checks at a mirror |
+| `KINEROUTER_RELEASE_BASE` | GitHub releases | Override the asset download root |
 | `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | unset | Outbound proxy |
 
 Files created under `DATA_DIR`:
@@ -433,7 +444,7 @@ Layout:
 
 | Path | What |
 | --- | --- |
-| `kine/cmd/kinerouter` | entrypoint, CLI (`connect`, `show`, `version`) |
+| `kine/cmd/kinerouter` | entrypoint, CLI (`connect`, `show`, `version`, `update`) |
 | `kine/cmd/kinerouter-tray` | desktop tray binary |
 | `kine/internal/gateway` | HTTP routes, fallback loop, usage |
 | `kine/internal/translate` | wire-format conversion |
