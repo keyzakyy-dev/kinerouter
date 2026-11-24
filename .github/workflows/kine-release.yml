@@ -207,18 +207,24 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Version
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          version="${TAG#kine-v}"
+          echo "version=$version" >> "$GITHUB_ENV"
+          echo "version_minor=${version%.*}" >> "$GITHUB_ENV"
+      # Tag lines are built from the release version, not the ref: a
+      # workflow_dispatch re-run has ref_name "main" and the match patterns
+      # below would emit only :latest.
       - uses: docker/metadata-action@v5
         id: meta
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
           tags: |
-            type=match,pattern=kine-v(.*),group=1
-            type=match,pattern=kine-v(\d+\.\d+),group=1
+            type=raw,value=${{ env.version }}
+            type=raw,value=${{ env.version_minor }}
             type=raw,value=latest
-      - name: Version
-        env:
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
-        run: echo "version=${TAG#kine-v}" >> "$GITHUB_ENV"
       - uses: docker/build-push-action@v6
         with:
           context: ./kine
@@ -288,6 +294,14 @@ jobs:
 
       - name: Publish
         working-directory: npm
-        run: npm publish --access public
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          # A workflow_dispatch re-run must stay green: the tag's version may
+          # already be on the registry from the first attempt.
+          if npm view "kinerouter@$version" version >/dev/null 2>&1; then
+            echo "kinerouter@$version is already published; skipping"
+            exit 0
+          fi
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
