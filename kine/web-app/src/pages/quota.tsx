@@ -845,7 +845,7 @@ export default function QuotaPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
         {sortedConnections.map((conn) => (
           <QuotaCard
             key={conn.id}
@@ -1116,63 +1116,69 @@ function QuotaCard({
 
   return (
     <Card className={cn('min-w-0', isInactive && 'opacity-60')}>
-      <div className="border-b border-black/10 px-3 py-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md">
-              <ProviderIcon provider={conn.provider} size={32} className="object-contain" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="truncate text-sm font-semibold text-text-main">{providerLabel}</h3>
-              {getConnectionLabel(conn) && (
-                <p className="truncate text-xs text-text-muted">{getConnectionLabel(conn)}</p>
-              )}
-              {secondaryLabel(conn) && (
-                <p className="truncate text-[11px] text-text-muted/80">{secondaryLabel(conn)}</p>
-              )}
-              {conn.provider === 'kiro' && (
-                <div className="mt-1 flex flex-wrap items-center gap-1">
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                    {kiroMethodLabel(conn)}
-                  </span>
-                  {kiroRegion(conn) && (
-                    <span className="rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                      {kiroRegion(conn)}
-                    </span>
-                  )}
-                  <span
-                    className={cn(
-                      'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                      isInactive
-                        ? 'bg-surface-2 text-text-muted'
-                        : conn.testStatus === 'active' || conn.testStatus === 'success'
-                          ? 'bg-foreground/5 text-muted-foreground'
-                          : conn.testStatus === 'error' ||
-                              conn.testStatus === 'expired' ||
-                              conn.testStatus === 'unavailable'
-                            ? 'bg-red-500/10 text-red-600'
-                            : 'bg-surface-2 text-text-muted',
-                    )}
-                  >
-                    {isInactive ? 'disabled' : conn.testStatus || 'unknown'}
-                  </span>
-                  {Boolean(conn.providerSpecificData?.profileArn) && (
-                    <button
-                      type="button"
-                      onClick={() => onCopy(String(conn.providerSpecificData?.profileArn), conn.id)}
-                      title={String(conn.providerSpecificData?.profileArn)}
-                      className="inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-text-muted transition-colors hover:text-primary"
-                    >
-                      <Icon name={copied === conn.id ? 'check' : 'content_copy'} className="text-[12px]" />
-                      <code className="truncate font-mono">{String(conn.providerSpecificData?.profileArn)}</code>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+      <div className="flex items-center justify-between gap-2 px-3.5 pb-2.5 pt-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-foreground/5">
+            <ProviderIcon provider={conn.provider} size={30} className="object-contain" />
           </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h3 className="truncate text-sm font-semibold text-text-main">{providerLabel}</h3>
+              {!loading && visible.length > 0 && (
+                <span className="shrink-0 rounded-full bg-foreground/5 px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground">
+                  {visible.length}
+                </span>
+              )}
+            </div>
+            {getConnectionLabel(conn) && (
+              <p className="truncate text-[11px] leading-tight text-text-muted">{getConnectionLabel(conn)}</p>
+            )}
+            {secondaryLabel(conn) && (
+              <p className="truncate text-[10px] leading-tight text-text-muted/70">{secondaryLabel(conn)}</p>
+            )}
+            {conn.provider === 'kiro' && (
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  {kiroMethodLabel(conn)}
+                </span>
+                {kiroRegion(conn) && (
+                  <span className="rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    {kiroRegion(conn)}
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                    isInactive
+                      ? 'bg-surface-2 text-text-muted'
+                      : conn.testStatus === 'active' || conn.testStatus === 'success'
+                        ? 'bg-foreground/5 text-muted-foreground'
+                        : conn.testStatus === 'error' ||
+                            conn.testStatus === 'expired' ||
+                            conn.testStatus === 'unavailable'
+                          ? 'bg-red-500/10 text-red-600'
+                          : 'bg-surface-2 text-text-muted',
+                  )}
+                >
+                  {isInactive ? 'disabled' : conn.testStatus || 'unknown'}
+                </span>
+                {Boolean(conn.providerSpecificData?.profileArn) && (
+                  <button
+                    type="button"
+                    onClick={() => onCopy(String(conn.providerSpecificData?.profileArn), conn.id)}
+                    title={String(conn.providerSpecificData?.profileArn)}
+                    className="inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-text-muted transition-colors hover:text-primary"
+                  >
+                    <Icon name={copied === conn.id ? 'check' : 'content_copy'} className="text-[12px]" />
+                    <code className="truncate font-mono">{String(conn.providerSpecificData?.profileArn)}</code>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
-          <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
             {(isCodex || claudeReset) && (
               <>
                 <button
@@ -1278,10 +1284,9 @@ function QuotaCard({
               <Switch checked={conn.isActive ?? true} disabled={busy} onCheckedChange={onToggleActive} />
             </div>
           </div>
-        </div>
       </div>
 
-      <div className="px-2 py-1.5">
+      <div className="border-t border-black/[0.06] px-3.5 py-3">
         {loading ? (
           <div className="py-5 text-center text-text-muted">
             <Icon name="progress_activity" className="animate-spin text-[28px]" />
@@ -1298,7 +1303,6 @@ function QuotaCard({
         ) : (
           <QuotaTable
             quotas={visible}
-            compact
             sortMode="default"
             showSortLabel={conn.provider === 'codex' && quotaSortMode !== 'default'}
             onHideQuota={onHideQuota}
