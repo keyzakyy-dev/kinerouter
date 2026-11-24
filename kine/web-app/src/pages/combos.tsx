@@ -444,7 +444,7 @@ function ComboCard({
                 <button
                   onClick={() => setShowJudge(true)}
                   title="Pick the model that fuses panel answers"
-                  className="inline-flex max-w-full items-center gap-1 rounded border border-dashed border-primary/40 px-1.5 py-0.5 font-mono text-[11px] text-primary hover:border-primary hover:bg-primary/5"
+                  className="inline-flex max-w-full items-center gap-1 rounded border border-dashed border-primary/40 px-1.5 py-0.5 font-mono text-[11px] text-primary hover:bg-primary/5"
                 >
                   <Icon name="gavel" className="text-[13px]" />
                   <span className="truncate">{judge || `Auto: ${combo.models[0] || 'first model'}`}</span>
@@ -467,7 +467,7 @@ function ComboCard({
                 <button
                   onClick={() => setShowRouter(true)}
                   title="Pick the System One model that decides model routing"
-                  className="inline-flex max-w-full items-center gap-1 rounded border border-dashed border-primary/40 px-1.5 py-0.5 font-mono text-[11px] text-primary hover:border-primary hover:bg-primary/5"
+                  className="inline-flex max-w-full items-center gap-1 rounded border border-dashed border-primary/40 px-1.5 py-0.5 font-mono text-[11px] text-primary hover:bg-primary/5"
                 >
                   <Icon name="psychology" className="text-[13px]" />
                   <span className="truncate">{routerModel || `Auto: ${DEFAULT_ROUTER_MODEL}`}</span>
@@ -488,7 +488,7 @@ function ComboCard({
                 <button
                   onClick={() => setShowPolicy(true)}
                   title="Configure routing policy and prompt cache retention"
-                  className="inline-flex items-center gap-1 rounded border border-border/70 bg-surface-2/50 px-2 py-0.5 text-[11px] text-text-main hover:border-primary/50 hover:bg-primary/5"
+                  className="inline-flex items-center gap-1 rounded border border-border/70 bg-surface-2/50 px-2 py-0.5 text-[11px] text-text-main hover:bg-primary/5"
                 >
                   <Icon name="tune" className="text-[13px] text-text-muted" />
                   <span className="font-medium">{policyLabel(strategy)}</span>

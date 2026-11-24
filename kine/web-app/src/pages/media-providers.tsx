@@ -178,7 +178,7 @@ function ProviderCard({
   const { total, allOff } = connStats(p.id, connections)
   return (
     <Link to={`/dashboard/media-providers/${kind}/${encodeURIComponent(p.id)}`} className="group block">
-      <Card className={cn('h-full p-3 transition-colors hover:border-primary/40', allOff && 'opacity-50')}>
+      <Card className={cn('h-full p-3 transition-colors', allOff && 'opacity-50')}>
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: hexTint(p.display?.color) }}>

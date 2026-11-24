@@ -285,7 +285,7 @@ export function ModelSelectModal({
             ? 'border-dashed border-border bg-surface italic text-text-muted hover:text-primary'
             : isAdded || selectedModel === m.value
               ? 'border-primary bg-primary text-primary-foreground'
-              : 'border-border bg-surface text-text-main hover:border-primary/50 hover:bg-primary/5',
+              : 'border-border bg-surface text-text-main hover:bg-primary/5',
         )}
       >
         {isAdded && !m.isPlaceholder && <Icon name="check" className="text-[10px]" />}
@@ -385,7 +385,7 @@ export function ModelSelectModal({
                       'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium',
                       wildcardAdded
                         ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-transparent text-primary hover:border-primary/20 hover:bg-primary/10',
+                        : 'border-transparent text-primary hover:bg-primary/10',
                     )}
                   >
                     {wildcardAdded && <Icon name="check" className="text-[12px]" />}

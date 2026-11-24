@@ -163,7 +163,7 @@ export function McpMarketplaceModal({
               const keys = Object.keys(sel)
               const enabled = Object.values(sel).filter(Boolean).length
               return (
-                <div key={s.url} className="rounded border border-transparent hover:border-border">
+                <div key={s.url} className="rounded">
                   <div className="flex items-start gap-2 px-2 py-2 hover:bg-surface-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">

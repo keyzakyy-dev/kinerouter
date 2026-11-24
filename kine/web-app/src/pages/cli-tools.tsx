@@ -80,7 +80,7 @@ export default function CliToolsPage() {
           const label = loading ? 'Loading' : statusOf(tool, statuses[tool.id])
           return (
             <Link key={tool.id} to={`/dashboard/cli-tools/${tool.id}`} className="block">
-              <Card className="h-full p-3 transition-colors hover:border-primary/50">
+              <Card className="h-full p-3 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="flex size-8 shrink-0 items-center justify-center">
                     <ToolIcon tool={tool} />
@@ -115,7 +115,7 @@ export default function CliToolsPage() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {MITM_TOOLS.map((tool) => (
             <Link key={tool.id} to="/dashboard/mitm" className="block">
-              <Card className="p-3 transition-colors hover:border-primary/50">
+              <Card className="p-3 transition-colors">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex size-8 shrink-0 items-center justify-center">

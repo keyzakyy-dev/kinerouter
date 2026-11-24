@@ -324,7 +324,7 @@ function TestAllButton({ mode, testing, onClick }: { mode: ProviderTestMode; tes
         'flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors sm:w-auto sm:py-1.5',
         active
           ? 'animate-pulse border-primary/40 bg-primary/20 text-primary'
-          : 'border-border bg-bg text-text-muted hover:border-primary/40 hover:text-text-main',
+          : 'border-border bg-bg text-text-muted hover:text-text-main',
       )}
     >
       <Icon name="play_arrow" className={active ? 'animate-spin text-[14px]' : 'text-[14px]'} />
@@ -661,7 +661,7 @@ export function ProvidersPage() {
               {!searching && !showAllApikey && hiddenApikey > 0 && (
                 <button
                   onClick={() => setShowAllApikey(true)}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:border-primary hover:bg-primary/5"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
                 >
                   <Icon name="expand_more" className="text-[16px]" />
                   Show all {apikeyEntries.length} providers

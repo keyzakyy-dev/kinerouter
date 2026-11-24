@@ -86,7 +86,7 @@ export function SmartPolicyModal({
                 onClick={() => setPolicy(p.id)}
                 className={cn(
                   'flex cursor-pointer flex-col rounded-xl border p-3 transition-colors',
-                  selected ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-border hover:bg-surface-2/60',
+                  selected ? 'border-primary bg-primary/5' : 'border-border/60 hover:bg-surface-2/60',
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
