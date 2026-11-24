@@ -295,7 +295,7 @@ export default function JailbreakPage() {
     <div>
       <PageHeader
         title="Persona / Jailbreak"
-        description="Prompt documents injected into a model's outbound request. Off until a model or API key is bound to a preset."
+        description="Prompts injected into outbound requests. Off until a model or key is bound."
         actions={
           <Button
             size="sm"
@@ -433,7 +433,7 @@ export default function JailbreakPage() {
 
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label>Keyword rules: arm this preset when a model id matches</Label>
+                  <Label>Arm when model id matches</Label>
                   <RuleEditor
                     rules={draft.keywords ?? []}
                     onChange={(keywords) => setDraft({ ...draft, keywords })}
@@ -441,7 +441,7 @@ export default function JailbreakPage() {
                   />
                 </div>
                 <div>
-                  <Label>Preset excludes: never inject on these ids</Label>
+                  <Label>Never inject on these ids</Label>
                   <RuleEditor
                     rules={draft.excludes ?? []}
                     onChange={(next) => setDraft({ ...draft, excludes: next })}
@@ -457,7 +457,7 @@ export default function JailbreakPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card className="p-4">
               <p className="mb-1 text-sm font-medium text-text-main">Model bindings</p>
-              <p className="mb-3 text-xs text-text-muted">An exact binding outranks keyword rules. Injection is off for every model not listed here.</p>
+              <p className="mb-3 text-xs text-text-muted">Exact binding beats keyword rules. Unlisted models stay off.</p>
               <div className="mb-3 flex flex-wrap items-end gap-2">
                 <div className="min-w-0 flex-1">
                   <Label>Model id</Label>
@@ -512,7 +512,7 @@ export default function JailbreakPage() {
             <Card className="p-4">
               <p className="mb-1 text-sm font-medium text-text-main">Per-key bindings</p>
               <p className="mb-3 text-xs text-text-muted">
-                A key-scoped binding outranks the model's global binding, so a resold client gets its own persona.
+                Overrides the model binding, so a resold client gets its own persona.
               </p>
               <div className="mb-3 grid gap-2 sm:grid-cols-2">
                 <div>
@@ -587,7 +587,7 @@ export default function JailbreakPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card className="p-4">
               <p className="mb-1 text-sm font-medium text-text-main">Global excludes</p>
-              <p className="mb-3 text-xs text-text-muted">Absolute deny list: a matching model id is never injected, whatever a binding or keyword says.</p>
+              <p className="mb-3 text-xs text-text-muted">Never injected when the id matches, whatever a binding says.</p>
               <RuleEditor rules={excludes} onChange={setExcludes} placeholder="gpt-4o-mini" />
               <Button size="sm" className="mt-3" disabled={busy} onClick={saveExcludes}>
                 Save excludes
@@ -597,7 +597,7 @@ export default function JailbreakPage() {
             <Card className="p-4">
               <p className="mb-1 text-sm font-medium text-text-main">Import from GitHub</p>
               <p className="mb-3 text-xs text-text-muted">
-                Repository, folder or raw file URL. Every .md/.txt instruction file becomes a preset; existing ids are overwritten.
+                Repo, folder, or raw URL. Each .md/.txt becomes a preset; existing ids are overwritten.
               </p>
               <div className="flex gap-2">
                 <Input
@@ -614,7 +614,7 @@ export default function JailbreakPage() {
             <Card className="p-4">
               <p className="mb-1 text-sm font-medium text-text-main">GitHub credential</p>
               <p className="mb-3 text-xs text-text-muted">
-                A token raises the anonymous API limit from 60 to 5,000 requests an hour. An API base points import and sync at a mirror.
+                Token lifts the API limit from 60 to 5,000 an hour. API base targets a mirror.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <div>
@@ -638,7 +638,7 @@ export default function JailbreakPage() {
             <Card className="p-4">
               <p className="mb-1 text-sm font-medium text-text-main">Auto-sync sources</p>
               <p className="mb-3 text-xs text-text-muted">
-                A synced preset is rewritten on every run; presets you typed yourself are never touched.
+                Synced presets are rewritten each run; hand-written ones are left alone.
               </p>
               <div className="flex flex-col gap-2">
                 {sources.map((src, i) => (
