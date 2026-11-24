@@ -320,8 +320,12 @@ Install and update follow one rule: **one install path per machine**.
   `~/.kinerouter/runtime`, so updating the npm package never replaces a running
   file in place, and a skipped postinstall self-heals on first run.
 - `install.sh` / `install.ps1` are for machines without Node.js.
-- The launcher's "Update" entry prints the command matching how this copy was
-  installed, then stops the server before the file is replaced.
+- The launcher's "Update" entry, `kinerouter update` and the dashboard's
+  **Update now** button install the release for the way this copy was
+  installed (npm via npm, a script install by downloading and sha256-verifying
+  the asset, Docker by printing the pull command), then restart the gateway.
+  An opt-in background check (`AUTO_UPDATE`, default 6h) does the same for
+  stable releases only.
 
 `go install` is not a supported install path: release tags are `kine-vX.Y.Z`,
 which Go does not accept as module versions, and `web/dist` holds only a

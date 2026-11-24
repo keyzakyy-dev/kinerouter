@@ -19,3 +19,6 @@
 
 # Local agent scratch (screenshots, session state)
 /.openchamber/
+
+# Local-only project workflow notes
+WORKFLOW.md
