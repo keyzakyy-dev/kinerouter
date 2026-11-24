@@ -19,7 +19,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -106,12 +105,9 @@ func (g *Gateway) handleTerminalExec(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), terminalTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "/bin/sh", "-lc", command)
+	cmd := terminalShell(ctx, command)
 	cmd.Dir = cwd
 	cmd.Env = append(os.Environ(), "TERM=dumb", "CLICOLOR=0", "NO_COLOR=1")
-	// Own process group: a timeout kills the pipeline's children too, not just
-	// the shell that spawned them.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf
 	if err := cmd.Start(); err != nil {
@@ -121,9 +117,7 @@ func (g *Gateway) handleTerminalExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// A wedged pipeline must not outlive the request: kill the whole group.
-	kill := time.AfterFunc(terminalTimeout, func() {
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-	})
+	kill := time.AfterFunc(terminalTimeout, func() { killTerminal(cmd) })
 	defer kill.Stop()
 	err := cmd.Wait()
 	out := buf.Bytes()
