@@ -145,6 +145,7 @@ const ICONS: Record<string, TablerIcon> = {
   chevron_left: IconChevronLeft,
   chevron_right: IconChevronRight,
   close: IconX,
+  code: IconCode,
   cloud: IconCloud,
   cloud_off: IconCloudOff,
   cloud_upload: IconCloudUpload,

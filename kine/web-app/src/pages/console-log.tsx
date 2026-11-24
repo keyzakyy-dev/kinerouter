@@ -48,11 +48,12 @@ function parseLine(line: string, seq: number): Entry {
   return { seq, time, level, tag, message: body }
 }
 
-const LEVEL_META: Record<Level, { label: string; text: string; dot: string }> = {
-  error: { label: 'ERR', text: 'text-danger', dot: 'bg-danger' },
-  warn: { label: 'WRN', text: 'text-warning', dot: 'bg-warning' },
-  info: { label: 'INF', text: 'text-text-main', dot: 'bg-text-subtle' },
-  debug: { label: 'DBG', text: 'text-text-muted', dot: 'bg-text-subtle' },
+/** Chips are icon-only: the tinted box carries the level, the tooltip names it. */
+const LEVEL_META: Record<Level, { label: string; icon: string; text: string; on: string }> = {
+  error: { label: 'ERR', icon: 'error', text: 'text-danger', on: 'bg-danger/15 text-danger hover:bg-danger/25' },
+  warn: { label: 'WRN', icon: 'warning', text: 'text-warning', on: 'bg-warning/15 text-warning hover:bg-warning/25' },
+  info: { label: 'INF', icon: 'info', text: 'text-text-main', on: 'bg-info/15 text-info hover:bg-info/25' },
+  debug: { label: 'DBG', icon: 'code', text: 'text-text-muted', on: 'bg-surface-3 text-text-muted hover:bg-surface-3/80' },
 }
 
 const LEVEL_ORDER: Level[] = ['error', 'warn', 'info', 'debug']
@@ -183,16 +184,15 @@ export default function ConsoleLogPage() {
                   key={level}
                   type="button"
                   aria-pressed={!off}
-                  title={off ? `Show ${meta.label} lines` : `Hide ${meta.label} lines`}
+                  aria-label={`${off ? 'Show' : 'Hide'} ${meta.label} lines (${counts[level]})`}
+                  title={`${off ? 'Show' : 'Hide'} ${meta.label} lines (${counts[level]})`}
                   onClick={() => toggleLevel(level)}
                   className={cn(
-                    'inline-flex h-6 cursor-pointer items-center gap-1.5 rounded-full border border-border px-2 text-[11px] font-semibold transition-colors hover:bg-surface-2',
-                    off && 'opacity-40',
+                    'grid size-7 cursor-pointer place-items-center rounded-md transition-colors',
+                    off ? 'bg-surface-2 text-text-subtle hover:bg-surface-3' : meta.on,
                   )}
                 >
-                  <span className={cn('size-1.5 rounded-full', meta.dot)} aria-hidden />
-                  <span className={meta.text}>{meta.label}</span>
-                  <span className="font-normal tabular-nums text-text-muted">{counts[level]}</span>
+                  <Icon name={meta.icon} className="text-[15px]" />
                 </button>
               )
             })}
