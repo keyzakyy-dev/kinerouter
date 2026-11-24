@@ -5,6 +5,16 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-11-24
+
+### Fixed
+
+- **OpenCode Free chat requests failed with HTTP 405.** The registry transport
+  for `opencode` pointed at the bare host `https://opencode.ai`, which the
+  executor treats as the full endpoint, so every request POSTed the website
+  root. It now targets `/zen/v1/chat/completions`, with `/zen/v1/responses`
+  and `/zen/v1/messages` declared for the models that use those wire formats.
+
 ## [0.2.1] — 2026-11-24
 
 ### Added
