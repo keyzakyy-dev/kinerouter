@@ -11,6 +11,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -303,7 +304,11 @@ type dispatchResult struct {
 // dispatch runs one target through the account-fallback loop.
 func (g *Gateway) dispatch(w http.ResponseWriter, r *http.Request, targets []target, raw map[string]any, apiKey, clientFormat string, stream bool, sessionID string) dispatchResult {
 	var last dispatchResult
-	for _, t := range targets {
+	for i, t := range targets {
+		if i > 0 {
+			// The combo chain moved on: say which member answered last and why.
+			logWarn("chat", "⇄ MODEL %s → %s", targets[i-1].Model, t.Model)
+		}
 		conns, err := g.store.ListConnections(t.Provider, true)
 		if err == nil {
 			conns = filterByEnabledModels(t.Provider, conns, t.Model)
@@ -323,6 +328,11 @@ func (g *Gateway) dispatch(w http.ResponseWriter, r *http.Request, targets []tar
 				}
 				continue
 			}
+			if err != nil {
+				logWarn("chat", "⇄ SKIP %s/%s (%v)", t.Provider, t.Model, err)
+			} else {
+				logWarn("chat", "⇄ SKIP %s/%s (no accounts)", t.Provider, t.Model)
+			}
 			continue
 		}
 		tried := map[string]bool{}
@@ -332,32 +342,43 @@ func (g *Gateway) dispatch(w http.ResponseWriter, r *http.Request, targets []tar
 				conn = g.pickConnection(conns, t.Model, tried)
 			}
 			if conn == nil {
+				// Every account already answered in the rows above; only the
+				// all-locked case still needs a line of its own.
+				if len(tried) == 0 {
+					logWarn("chat", "⇄ NO ACCOUNT %s/%s (%d accounts locked)", t.Provider, t.Model, len(conns))
+				}
 				break
 			}
 			tried[conn.ID] = true
+			logDebug("chat", "   account %s · %s/%s · %d accounts · try %d",
+				accountLabel(conn), t.Provider, t.Model, len(conns), len(tried))
 			res, err := g.attempt(r.Context(), r.Header, conn, t, raw, apiKey, clientFormat, stream, w, sessionID)
 			if err == nil {
 				return res
 			}
 			var upErr *upstreamError
 			if !errors.As(err, &upErr) {
+				if errors.Is(err, context.Canceled) {
+					logInfo("chat", "⇄ CANCELED %s/%s · ACC:%s", t.Provider, t.Model, accountLabel(conn))
+					return dispatchResult{status: 499, body: []byte(`{"error":{"message":"client closed request","type":"api_error"}}`)}
+				}
 				// Transport failure: next account.
-				logWarn("fallback", "upstream failed provider=%s model=%s error=%v", t.Provider, t.Model, err)
+				logWarn("chat", "⇄ ACC:%s FAILED (%v) → NEXT ACCOUNT", accountLabel(conn), err)
 				continue
 			}
 			if upErr.status == http.StatusUnauthorized || upErr.status == http.StatusForbidden ||
 				upErr.status == http.StatusTooManyRequests || upErr.status == http.StatusPaymentRequired {
 				g.markUnavailable(conn, upErr.status, upErr.message, t.Model)
-				logWarn("fallback", "upstream failed provider=%s model=%s status=%d error=%s conn=%s",
-					t.Provider, t.Model, upErr.status, upErr.message, conn.ID)
+				logWarn("chat", "⇄ ACC:%s UNAVAILABLE (%d) → NEXT ACCOUNT", accountLabel(conn), upErr.status)
+				logDebug("chat", "   error=%s · %s/%s", upErr.message, t.Provider, t.Model)
 				last = dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
 				continue
 			}
 			if upErr.status >= 500 {
 				// A 5xx (including an unusable 200 body) is retryable: another
 				// account or combo member may answer.
-				logWarn("fallback", "upstream failed provider=%s model=%s status=%d conn=%s",
-					t.Provider, t.Model, upErr.status, conn.ID)
+				logWarn("chat", "⇄ ACC:%s UNAVAILABLE (%d) → NEXT ACCOUNT", accountLabel(conn), upErr.status)
+				logDebug("chat", "   error=%s · %s/%s", upErr.message, t.Provider, t.Model)
 				last = dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
 				continue
 			}
@@ -451,22 +472,12 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 	}
 	// Token savers run on the translated body (RTK compress → caveman →
 	// ponytail → custom prompt), as chatCore.js does.
-	var savedTokens int64
+	var savers []string
 	if settings, err := g.store.GetSettings(); err == nil {
 		cfg := saverCfgFrom(g, settings, hdr, t.Model, providerFormat)
-		if cfg.active() {
-			// The console reports what the savers bought: bytes removed from the
-			// outbound body, in the same 4-bytes-per-token unit the rest of the
-			// dashboard uses.
-			before := len(mustJSON(reqBody))
-			cfg.apply(reqBody, providerFormat)
-			if after := len(mustJSON(reqBody)); after < before {
-				savedTokens = int64(before-after) / 4
-			}
-		} else {
-			cfg.apply(reqBody, providerFormat)
-		}
+		savers = cfg.apply(reqBody, providerFormat)
 	}
+	g.logChatStart(conn, t, raw, clientFormat, providerFormat, stream, savers)
 	// Per-provider body quirks (kimchi artifact stripping, codebuddy neutral
 	// system prompt, azure/iflow/etc. transport handled after build).
 	executor.ApplyQuirksBody(t.Provider, t.Model, reqBody, streamUpstream)
@@ -672,7 +683,7 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			w.Write(outBody)
-			g.recordUsage(conn, t, apiKey, clientFormat, u, start, nil, savedTokens)
+			g.recordUsage(conn, t, apiKey, clientFormat, u, start, nil)
 			return dispatchResult{ok: true, status: http.StatusOK}, nil
 		}
 		// Kiro answers in AWS EventStream, never SSE: fold frames into one
@@ -690,7 +701,7 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			w.Write(outBody)
-			g.recordUsage(conn, t, apiKey, clientFormat, u, start, nil, savedTokens)
+			g.recordUsage(conn, t, apiKey, clientFormat, u, start, nil)
 			return dispatchResult{ok: true, status: http.StatusOK}, nil
 		}
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
@@ -710,7 +721,7 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(outBody)
-		g.recordUsage(conn, t, apiKey, clientFormat, u, start, nil, savedTokens)
+		g.recordUsage(conn, t, apiKey, clientFormat, u, start, nil)
 		return dispatchResult{ok: true, status: http.StatusOK}, nil
 	}
 
@@ -744,7 +755,7 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 			return dispatchResult{}, err
 		}
 		// Headers already sent; report what we have.
-		g.recordUsage(conn, t, apiKey, clientFormat, u, start, stats, savedTokens)
+		g.recordUsage(conn, t, apiKey, clientFormat, u, start, stats)
 		return dispatchResult{ok: true, status: http.StatusOK}, nil
 	}
 	if ferr := peek.Finish(); ferr != nil {
@@ -752,10 +763,10 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 			return dispatchResult{}, ferr
 		}
 		// In-band provider error was already committed for the client.
-		g.recordUsage(conn, t, apiKey, clientFormat, u, start, stats, savedTokens)
+		g.recordUsage(conn, t, apiKey, clientFormat, u, start, stats)
 		return dispatchResult{ok: true, status: http.StatusOK}, nil
 	}
-	g.recordUsage(conn, t, apiKey, clientFormat, u, start, stats, savedTokens)
+	g.recordUsage(conn, t, apiKey, clientFormat, u, start, stats)
 	return dispatchResult{ok: true, status: http.StatusOK}, nil
 }
 
@@ -1058,6 +1069,10 @@ func (g *Gateway) markUnavailable(c *store.Connection, status int, message, mode
 	if status == http.StatusTooManyRequests {
 		until = time.Now().Add(5 * time.Minute)
 	}
+	// The account is parked, not banned: the cooldown and the key it applies to
+	// are what an operator needs to tell the two apart.
+	logDebug("chat", "   parked %s · %s/%s · %d · cooldown %ds",
+		accountLabel(c), c.Provider, model, status, int(time.Until(until).Seconds()))
 	g.store.PatchConnection(c.ID, map[string]any{
 		"modelLock_" + model: until.UTC().Format(time.RFC3339),
 		"testStatus":         "unavailable",
@@ -1067,37 +1082,111 @@ func (g *Gateway) markUnavailable(c *store.Connection, status int, message, mode
 	})
 }
 
-// usageLogLine renders the same one-line usage record 9router-go emits:
-// provider, model, token split, stream timing, cost, what the savers bought,
-// and the account that paid for the turn. Token counts are cache-inclusive,
-// matching the stored usage row.
-func usageLogLine(conn *store.Connection, t target, u translate.Usage, cost float64, start time.Time, stats *streamStats, savedTokens int64) string {
-	prompt := u.PromptTokens + u.CacheRead + u.CacheCreation
-	line := fmt.Sprintf("logged provider=%s model=%s prompt=%d completion=%d cached=%d cache_creation=%d cache_creation_5m=0 cache_creation_1h=0 ttft_ms=%d latency_ms=%d cost=%v tok_per_sec=%v max_gap_ms=%d",
-		t.Provider, t.Model, prompt, u.CompletionTokens, u.CacheRead, u.CacheCreation,
-		stats.ttftMs(start), time.Since(start).Milliseconds(), cost,
-		stats.tokPerSec(u.CompletionTokens), stats.maxGapMs())
-	if savedTokens > 0 {
-		original := prompt + savedTokens
-		line += fmt.Sprintf(" compressed=%d->%d (%d%% saved)", original, prompt, savedTokens*100/original)
+// logChatStart prints the request header the KeyRouter console shows: the
+// model asked for, where it was routed, the wire formats, the shape of the
+// turn, and the account that took it.
+func (g *Gateway) logChatStart(conn *store.Connection, t target, raw map[string]any, clientFormat, providerFormat string, stream bool, savers []string) {
+	requested, _ := raw["model"].(string)
+	if requested == "" {
+		requested = t.Model
 	}
-	if conn.ID == "" || conn.ID == "noauth" {
-		return line + " account=Public / Direct"
+	parts := []string{
+		fmt.Sprintf("POST %s → %s/%s", requested, t.Provider, t.Model),
+		fmt.Sprintf("FMT: %s→%s", clientFormat, providerFormat),
 	}
-	line += " conn=" + conn.ID
-	if conn.Name != "" {
-		line += " connName=" + conn.Name
+	if stream {
+		parts = append(parts, "STREAM")
+	} else {
+		parts = append(parts, "JSON")
 	}
-	if conn.Email != "" {
-		line += " email=" + conn.Email
+	if n := messageCount(raw); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d MSG", n))
 	}
-	if egress := conn.Str("egress"); egress != "" {
-		line += " egress=" + egress
+	if n := toolCount(raw); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d TOOL", n))
 	}
-	return line
+	if level := thinkLevel(raw); level != "" {
+		parts = append(parts, "THINK:"+level)
+	}
+	parts = append(parts, "ACC:"+accountLabel(conn))
+	logInfo("chat", "▶ %s", strings.Join(parts, " · "))
+	if len(savers) > 0 {
+		logInfo("chat", "⚙ %s", strings.Join(savers, " · "))
+	}
 }
 
-func (g *Gateway) recordUsage(conn *store.Connection, t target, apiKey, endpoint string, u translate.Usage, start time.Time, stats *streamStats, savedTokens int64) {
+// messageCount reads the turn size from whichever request shape the client
+// used.
+func messageCount(raw map[string]any) int {
+	for _, key := range []string{"messages", "input", "contents"} {
+		if list, ok := raw[key].([]any); ok && len(list) > 0 {
+			return len(list)
+		}
+	}
+	return 0
+}
+
+func toolCount(raw map[string]any) int {
+	if list, ok := raw["tools"].([]any); ok {
+		return len(list)
+	}
+	return 0
+}
+
+// thinkLevel reports the reasoning mode the client asked for, or "" when the
+// turn carries none.
+func thinkLevel(raw map[string]any) string {
+	if v, ok := raw["reasoning_effort"].(string); ok && v != "" {
+		return v
+	}
+	if th, ok := raw["thinking"].(map[string]any); ok {
+		if typ, _ := th["type"].(string); typ == "enabled" {
+			return "on"
+		} else if typ != "" {
+			return typ
+		}
+	}
+	return ""
+}
+
+// accountLabel names the account behind a row: its name when it has one, else
+// the first eight characters of its id.
+func accountLabel(conn *store.Connection) string {
+	if conn.Name != "" {
+		return conn.Name
+	}
+	if conn.ID == "" || conn.ID == "noauth" {
+		return "-"
+	}
+	if len(conn.ID) > 8 {
+		return conn.ID[:8]
+	}
+	return conn.ID
+}
+
+// doneLogLine is the KeyRouter completion row: total time, time to first
+// token, the token split with the cache figures, and the output count.
+func doneLogLine(u translate.Usage, start time.Time, stats *streamStats) string {
+	prompt := u.PromptTokens + u.CacheRead + u.CacheCreation
+	line := fmt.Sprintf("DONE %dms", time.Since(start).Milliseconds())
+	if ttft := stats.ttftMs(start); ttft > 0 {
+		line += fmt.Sprintf(" · TTFT %dms", ttft)
+	}
+	line += fmt.Sprintf(" · IN %d", prompt)
+	if u.CacheRead > 0 || u.CacheCreation > 0 {
+		cache := make([]string, 0, 2)
+		if u.CacheRead > 0 {
+			cache = append(cache, "↻"+strconv.FormatInt(u.CacheRead, 10))
+		}
+		if u.CacheCreation > 0 {
+			cache = append(cache, "+"+strconv.FormatInt(u.CacheCreation, 10))
+		}
+		line += " (CACHE " + strings.Join(cache, " ") + ")"
+	}
+	return line + fmt.Sprintf(" · OUT %d", u.CompletionTokens)
+}
+
+func (g *Gateway) recordUsage(conn *store.Connection, t target, apiKey, endpoint string, u translate.Usage, start time.Time, stats *streamStats) {
 	// A successful call proves the connection works; drop any stale
 	// "unavailable" marker left by an earlier failure.
 	if conn.Str("testStatus") != "active" || conn.Str("lastError") != "" {
@@ -1119,7 +1208,7 @@ func (g *Gateway) recordUsage(conn *store.Connection, t target, apiKey, endpoint
 		"cached_tokens":     u.CacheRead,
 	}
 	g.saveDetail(conn, t, u, start, "success", "")
-	logInfo("usage", "%s", usageLogLine(conn, t, u, cost, start, stats, savedTokens))
+	logInfo("chat", "%s", doneLogLine(u, start, stats))
 	g.store.SaveUsage(store.UsageRecord{
 		Timestamp:        time.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00"),
 		Provider:         t.Provider,

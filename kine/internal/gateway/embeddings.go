@@ -118,7 +118,7 @@ func (g *Gateway) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		status, respBody, used, err := g.embedOnce(r, conn, t, cfg, body)
 		if used.PromptTokens > 0 {
-			g.recordUsage(conn, t, apiKey, "embeddings", used, start, nil, 0)
+			g.recordUsage(conn, t, apiKey, "embeddings", used, start, nil)
 		}
 		if err == nil && status >= 200 && status < 300 {
 			w.Header().Set("Content-Type", "application/json")

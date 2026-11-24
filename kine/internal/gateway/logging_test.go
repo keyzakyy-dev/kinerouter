@@ -18,8 +18,7 @@ func TestQuietPathAndRouteTrim(t *testing.T) {
 			t.Fatalf("%s should log at debug", p)
 		}
 	}
-	// Dashboard pollers outside the reference list keep their info rows.
-	if quietPath("/api/settings") || quietPath("/v1/chat/completions") || quietPath("/api/connections/abc") {
+	if quietPath("/v1/chat/completions") || quietPath("/api/connections/abc") {
 		t.Fatal("unexpected quiet path")
 	}
 
@@ -32,42 +31,55 @@ func TestQuietPathAndRouteTrim(t *testing.T) {
 	}
 }
 
-// The usage line carries the same keys as the reference, in the same order,
-// with the account that paid for the turn.
-func TestUsageLogLine(t *testing.T) {
+// The completion row is the KeyRouter shape: total, TTFT, token split with the
+// cache figures, output count.
+func TestDoneLogLine(t *testing.T) {
 	u := translate.Usage{PromptTokens: 100, CompletionTokens: 20, CacheRead: 30, CacheCreation: 5}
 	stats := &streamStats{}
 	stats.note()
 	time.Sleep(2 * time.Millisecond)
 	stats.note()
 
-	line := usageLogLine(
-		&store.Connection{ID: "abc123", Name: "Work", Email: "me@x.com"},
-		target{Provider: "anthropic", Model: "claude-sonnet-4.5"},
-		u, 0.0123, time.Now().Add(-time.Second), stats, 7,
-	)
-	keys := []string{
-		"logged provider=anthropic model=claude-sonnet-4.5",
-		"prompt=135", "completion=20", "cached=30", "cache_creation=5",
-		"cache_creation_5m=0", "cache_creation_1h=0",
-		"ttft_ms=", "latency_ms=", "cost=0.0123", "tok_per_sec=", "max_gap_ms=",
-		"compressed=142->135 (4% saved)",
-		"conn=abc123", "connName=Work", "email=me@x.com",
-	}
-	pos := 0
-	for _, want := range keys {
-		at := strings.Index(line[pos:], want)
-		if at < 0 {
-			t.Fatalf("usage line missing or out of order %q: %s", want, line)
+	line := doneLogLine(u, time.Now().Add(-time.Second), stats)
+	for _, want := range []string{"DONE ", "ms · TTFT ", " · IN 135 (CACHE ↻30 +5) · OUT 20"} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("done line missing %q: %s", want, line)
 		}
-		pos += at + len(want)
 	}
 
-	direct := usageLogLine(&store.Connection{ID: "noauth"}, target{Provider: "free", Model: "m"}, u, 0, time.Now(), nil, 0)
-	if !strings.HasSuffix(direct, "account=Public / Direct") {
-		t.Fatalf("no-auth line = %s", direct)
+	plain := doneLogLine(translate.Usage{PromptTokens: 7, CompletionTokens: 3}, time.Now(), nil)
+	if strings.Contains(plain, "TTFT") || strings.Contains(plain, "CACHE") {
+		t.Fatalf("zero-value line should omit TTFT/CACHE: %s", plain)
 	}
-	if strings.Contains(direct, "compressed=") {
-		t.Fatalf("no savings reported, yet compressed key present: %s", direct)
+	if !strings.HasSuffix(plain, " · IN 7 · OUT 3") {
+		t.Fatalf("plain line = %s", plain)
+	}
+}
+
+// The start row names the account, counts the turn, and reports the thinking
+// mode only when the client asked for one.
+func TestChatStartParts(t *testing.T) {
+	raw := map[string]any{
+		"messages":         []any{map[string]any{}, map[string]any{}, map[string]any{}},
+		"tools":            []any{map[string]any{}, map[string]any{}},
+		"reasoning_effort": "high",
+	}
+	if n := messageCount(raw); n != 3 {
+		t.Fatalf("messageCount = %d", n)
+	}
+	if n := toolCount(raw); n != 2 {
+		t.Fatalf("toolCount = %d", n)
+	}
+	if level := thinkLevel(raw); level != "high" {
+		t.Fatalf("thinkLevel = %q", level)
+	}
+	if level := thinkLevel(map[string]any{}); level != "" {
+		t.Fatalf("thinkLevel(empty) = %q", level)
+	}
+	if got := accountLabel(&store.Connection{Name: "Work"}); got != "Work" {
+		t.Fatalf("accountLabel name = %q", got)
+	}
+	if got := accountLabel(&store.Connection{ID: "063cd40e-aaaa"}); got != "063cd40e" {
+		t.Fatalf("accountLabel id = %q", got)
 	}
 }

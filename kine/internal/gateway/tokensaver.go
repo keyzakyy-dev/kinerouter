@@ -9,6 +9,7 @@ package gateway
 // not the user's own custom prompt — matching the JS.
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -19,12 +20,14 @@ import (
 const tokenSaverHeader = "x-kinerouter-token-saver"
 
 type saverCfg struct {
-	compress bool
-	headroom rtk.HeadroomOptions
-	headOn   bool
-	caveman  string // prompt text, "" when off
-	ponytail string
-	custom   string
+	compress      bool
+	headroom      rtk.HeadroomOptions
+	headOn        bool
+	caveman       string // prompt text, "" when off
+	cavemanLevel  string
+	ponytail      string
+	ponytailLevel string
+	custom        string
 	// pxpipe runs last and only on Claude-shaped bodies (JS parity).
 	pxpipe func(map[string]any) (map[string]any, PxpipeSummary)
 }
@@ -45,10 +48,12 @@ func saverCfgFrom(g *Gateway, settings map[string]any, h http.Header, model, for
 		c.pxpipe = g.pxpipeTransformForChat(settings)
 	}
 	if on && boolSetting(settings, "cavemanEnabled") {
-		c.caveman = rtk.CavemanPrompts[strSetting(settings, "cavemanLevel", "full")]
+		c.cavemanLevel = strSetting(settings, "cavemanLevel", "full")
+		c.caveman = rtk.CavemanPrompts[c.cavemanLevel]
 	}
 	if on && boolSetting(settings, "ponytailEnabled") {
-		c.ponytail = rtk.PonytailPrompts[strSetting(settings, "ponytailLevel", "full")]
+		c.ponytailLevel = strSetting(settings, "ponytailLevel", "full")
+		c.ponytail = rtk.PonytailPrompts[c.ponytailLevel]
 	}
 	if boolSetting(settings, "customPromptEnabled") {
 		c.custom = strings.TrimSpace(strSetting(settings, "customPrompt", ""))
@@ -68,31 +73,42 @@ func strSetting(m map[string]any, key, def string) string {
 	return def
 }
 
-// apply rewrites body in place.
-func (c *saverCfg) apply(body map[string]any, providerFormat string) {
+// apply rewrites body in place and returns the savers that changed something,
+// in the shape the console log prints ("RTK:9 · CAVEMAN:full").
+func (c *saverCfg) apply(body map[string]any, providerFormat string) []string {
+	var parts []string
 	if !c.active() || body == nil {
-		return
+		return parts
 	}
 	if c.compress {
-		rtk.CompressMessages(body, true)
+		if st := rtk.CompressMessages(body, true); st != nil && len(st.Hits) > 0 {
+			parts = append(parts, fmt.Sprintf("RTK:%d", len(st.Hits)))
+		}
 	}
 	if c.headOn {
-		rtk.CompressWithHeadroom(body, c.headroom)
+		if st, _ := rtk.CompressWithHeadroom(body, c.headroom); st != nil && st.TokensSaved > 0 {
+			parts = append(parts, fmt.Sprintf("HEADROOM:%d", st.TokensSaved))
+		}
 	}
 	if c.caveman != "" {
 		rtk.InjectSystemPrompt(body, providerFormat, c.caveman)
+		parts = append(parts, "CAVEMAN:"+c.cavemanLevel)
 	}
 	if c.ponytail != "" {
 		rtk.InjectSystemPrompt(body, providerFormat, c.ponytail)
+		parts = append(parts, "PONYTAIL:"+c.ponytailLevel)
 	}
 	if c.custom != "" {
 		rtk.InjectSystemPrompt(body, providerFormat, c.custom)
+		parts = append(parts, fmt.Sprintf("CUSTOMPROMPT:%dc", len(c.custom)))
 	}
 	if c.pxpipe != nil && providerFormat == translate.FormatClaude {
 		if next, _ := c.pxpipe(body); next != nil {
 			replaceMap(body, next)
+			parts = append(parts, "PXPIPE")
 		}
 	}
+	return parts
 }
 
 // replaceMap makes dst hold src's keys, so the in-place consumers keep working.
