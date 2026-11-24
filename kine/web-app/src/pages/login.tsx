@@ -49,7 +49,7 @@ export default function LoginPage() {
       <aside className="relative hidden overflow-hidden p-10 lg:flex lg:flex-col">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute inset-0 dark:hidden"
           style={{
             backgroundImage:
               'radial-gradient(115% 85% at 0% 0%, color-mix(in oklab, var(--color-brand-500) 22%, transparent), transparent 62%), radial-gradient(90% 70% at 100% 100%, color-mix(in oklab, var(--color-brand-500) 8%, transparent), transparent 70%)',
