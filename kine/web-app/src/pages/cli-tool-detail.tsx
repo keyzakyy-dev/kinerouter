@@ -640,26 +640,28 @@ function ToolDetail({ tool }: { tool: CliTool }) {
                 />
               ) : (
                 <Field label={`Models (${selected.length} selected)`}>
-                  <div className="custom-scrollbar flex max-h-56 flex-col gap-0.5 overflow-y-auto rounded-lg bg-surface-2 p-1">
-                    {models.length === 0 && (
-                      <p className="p-3 text-[11px] text-text-muted">No models yet. Add a provider connection first.</p>
-                    )}
-                    {models.map((m) => (
-                      <label
-                        key={m}
-                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[11px] transition-colors hover:bg-surface-3"
-                      >
-                        <input
-                          type="checkbox"
-                          className="size-3.5 accent-[var(--text-main)]"
-                          checked={selected.includes(m)}
-                          onChange={() =>
-                            setSelected((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]))
-                          }
-                        />
-                        <code className="font-mono">{m}</code>
-                      </label>
-                    ))}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap gap-1.5 rounded-lg bg-surface-2 px-3 py-2">
+                      {selected.length === 0 && (
+                        <span className="text-[11px] text-text-muted">
+                          {models.length === 0 ? 'No models yet. Add a provider connection first.' : 'No models selected'}
+                        </span>
+                      )}
+                      {selected.map((m) => (
+                        <span key={m} className="inline-flex items-center gap-1 rounded bg-card px-1.5 py-0.5 font-mono text-[10px] text-text-main">
+                          {m}
+                          <button
+                            className="text-text-muted hover:text-danger"
+                            onClick={() => setSelected((prev) => prev.filter((x) => x !== m))}
+                          >
+                            <Icon name="close" className="text-[12px]" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <Button variant="ghost" size="sm" className="w-fit" onClick={() => setPickerFor('__multi__')}>
+                      <Icon name="add" className="text-[15px]" /> Add model
+                    </Button>
                   </div>
                 </Field>
               )
@@ -793,7 +795,16 @@ function ToolDetail({ tool }: { tool: CliTool }) {
       <ModelSelectModal
         isOpen={pickerFor !== null}
         onClose={() => setPickerFor(null)}
-        onSelect={(m) => pickModel(m.value)}
+        onSelect={(m) =>
+          pickerFor === '__multi__'
+            ? setSelected((prev) => (prev.includes(m.value) ? prev : [...prev, m.value]))
+            : pickModel(m.value)
+        }
+        onDeselect={pickerFor === '__multi__' ? (m) => setSelected((prev) => prev.filter((x) => x !== m.value)) : undefined}
+        onSelectBatch={pickerFor === '__multi__' ? (ms) => setSelected((prev) => [...new Set([...prev, ...ms.map((m) => m.value)])]) : undefined}
+        onDeselectBatch={pickerFor === '__multi__' ? (ms) => setSelected((prev) => prev.filter((x) => !ms.some((m) => m.value === x))) : undefined}
+        addedModelValues={pickerFor === '__multi__' ? selected : undefined}
+        closeOnSelect={pickerFor !== '__multi__'}
         selectedModel={
           pickerFor?.startsWith('grok:') ? grokSubagents[pickerFor.slice(5)]
             : pickerFor === '__subagent__' ? subagentModel
@@ -803,7 +814,7 @@ function ToolDetail({ tool }: { tool: CliTool }) {
                 : pickerFor ? claudeModels[pickerFor] : undefined
         }
         modelAliases={aliases}
-        title="Select Model"
+        title={pickerFor === '__multi__' ? 'Add Models' : 'Select Model'}
       />
 
       {tool.id === 'cowork' && (

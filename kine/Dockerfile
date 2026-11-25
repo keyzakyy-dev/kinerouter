@@ -29,8 +29,8 @@ COPY --from=build /src/LICENSE /licenses/LICENSE
 COPY --from=build /src/NOTICE /licenses/NOTICE
 # Pre-create the data dir owned by nonroot so a fresh named volume inherits it.
 COPY --from=build --chown=nonroot:nonroot --chmod=700 /src/go.mod /data/.keep
-ENV DATA_DIR=/data PORT=20128 HOST=0.0.0.0
+ENV DATA_DIR=/data PORT=20150 HOST=0.0.0.0
 VOLUME /data
-EXPOSE 20128
+EXPOSE 20150
 USER nonroot:nonroot
 ENTRYPOINT ["/kinerouter"]

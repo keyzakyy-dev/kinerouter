@@ -63,6 +63,35 @@ func ToGemini(raw map[string]any, model string, stream bool) (map[string]any, er
 	}
 
 	var system strings.Builder
+	// A tool result must carry the name of the function it answers, not the
+	// tool_call_id: Gemini rejects `functionResponse.name:"call_abc"` because no
+	// declaration is called that. An OpenAI tool_call_id is only unique within
+	// its own assistant turn, so names are queued per id and consumed in
+	// document order — a replayed id otherwise renames an earlier result.
+	toolNames := map[string][]string{}
+	toolCursor := map[string]int{}
+	nextToolName := func(id string) string {
+		queue := toolNames[id]
+		if len(queue) > toolCursor[id] {
+			name := queue[toolCursor[id]]
+			toolCursor[id]++
+			return name
+		}
+		if len(queue) > 0 {
+			return queue[len(queue)-1]
+		}
+		return ""
+	}
+	for _, m := range in.Messages {
+		if m.Role != "assistant" {
+			continue
+		}
+		for _, tc := range m.ToolCalls {
+			if tc.ID != "" && tc.Function.Name != "" {
+				toolNames[tc.ID] = append(toolNames[tc.ID], tc.Function.Name)
+			}
+		}
+	}
 	for _, m := range in.Messages {
 		switch m.Role {
 		case "system":
@@ -72,6 +101,9 @@ func ToGemini(raw map[string]any, model string, stream bool) (map[string]any, er
 			system.WriteString(contentToText(m.Content))
 		case "tool":
 			name := m.Name
+			if name == "" {
+				name = nextToolName(m.ToolCallID)
+			}
 			if name == "" {
 				name = m.ToolCallID
 			}

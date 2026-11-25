@@ -309,7 +309,9 @@ func convertToolChoiceToClaude(raw json.RawMessage) json.RawMessage {
 		case "required":
 			return mustJSON(map[string]string{"type": "any"})
 		case "none":
-			return nil
+			// Claude has a native "none"; dropping the key would hand the model
+			// the tool permission the client withheld.
+			return mustJSON(map[string]string{"type": "none"})
 		}
 	}
 	var obj struct {

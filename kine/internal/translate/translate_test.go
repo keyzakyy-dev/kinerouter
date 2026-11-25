@@ -109,6 +109,13 @@ func TestOpenAIToClaudeStreamRoundTrip(t *testing.T) {
 			}
 		}
 	}
+	// The terminal is deferred until the trailing usage chunk; a stream that
+	// ends without one closes through Finish().
+	for _, ev := range o.Finish() {
+		if ev["type"] == "message_delta" {
+			sawStop = true
+		}
+	}
 	if !sawStart || !sawText || !sawStop {
 		t.Fatalf("stream shape lost: start=%v text=%v stop=%v", sawStart, sawText, sawStop)
 	}
@@ -297,5 +304,36 @@ func TestOpenAIToGeminiResponse(t *testing.T) {
 	}
 	if cand["finishReason"] != "STOP" {
 		t.Fatalf("finish: %v", cand["finishReason"])
+	}
+}
+
+// A Gemini functionResponse must carry the function name the assistant turn
+// declared, never the OpenAI tool_call_id, or Gemini rejects the tool loop.
+func TestGeminiToolResultName(t *testing.T) {
+	raw := map[string]any{
+		"model": "gemini-x",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "read a"},
+			map[string]any{"role": "assistant", "content": "", "tool_calls": []any{
+				map[string]any{"id": "call_abc", "type": "function",
+					"function": map[string]any{"name": "read_file", "arguments": `{"path":"/a"}`}},
+			}},
+			map[string]any{"role": "tool", "tool_call_id": "call_abc", "content": "ok"},
+		},
+	}
+	out, err := ToGemini(raw, "gemini-x", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	for _, c := range out["contents"].([]GeminiContent) {
+		for _, p := range c.Parts {
+			if p.FunctionResponse != nil {
+				got = p.FunctionResponse.Name
+			}
+		}
+	}
+	if got != "read_file" {
+		t.Fatalf("functionResponse.name = %q, want read_file", got)
 	}
 }

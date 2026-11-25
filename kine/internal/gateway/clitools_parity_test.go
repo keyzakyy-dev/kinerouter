@@ -24,8 +24,8 @@ const (
 	resolvedWindow   = int64(272000)
 	resolvedCompact  = resolvedWindow - resolvedWindow/10
 	unresolvedModel  = "no-such-provider/model-x"
-	piDefaultWindow  = int64(128000)
-	piDefaultMaxTok  = int64(16384)
+	piDefaultWindow  = int64(200000)
+	piDefaultMaxTok  = int64(64000)
 	crushDefaultWind = int64(128000)
 )
 
@@ -265,7 +265,7 @@ func TestCliParityCrush(t *testing.T) {
 	}
 }
 
-// pi: 9router-go's 128000/16384 defaults when nothing resolves, the resolved
+// pi: 9router's 200000/64000 defaults when nothing resolves, the resolved
 // window when it does.
 func TestCliParityPi(t *testing.T) {
 	home := tempHome(t)

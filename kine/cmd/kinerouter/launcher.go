@@ -361,7 +361,11 @@ func startTray() (int, bool) {
 	// The tray quits the gateway it belongs to, like 9Router's tray Quit. Only
 	// the process that started it may be stopped, so the PID travels explicitly
 	// rather than trusting PPID (which changes if the gateway detaches again).
-	cmd.Env = append(os.Environ(), "KINEROUTER_OWNER_PID="+strconv.Itoa(os.Getpid()))
+	// PORT travels with the tray so it probes the port this gateway actually
+	// serves on, not the built-in default: `-p 4000` never sets the env var.
+	cmd.Env = append(os.Environ(),
+		"KINEROUTER_OWNER_PID="+strconv.Itoa(os.Getpid()),
+		"PORT="+strconv.Itoa(instancePort))
 	if err := cmd.Start(); err != nil {
 		fmt.Printf("tray: %v\n", err)
 		return 0, false

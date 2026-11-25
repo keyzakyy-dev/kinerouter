@@ -46,7 +46,7 @@ Usage:
   kinerouter update             Install the newest release for this channel
 
 options (the login entry runs --tray --skip-update):
-  -p, --port <port>  Port to serve on (default: 20128, or $PORT)
+  -p, --port <port>  Port to serve on (default: 20150, or $PORT)
   -H, --host <host>  Address to bind (default: 0.0.0.0, or $HOST)
   -t, --tray         Serve headless and show the tray icon, no menu
   --skip-update      Skip the release check; used at login so startup never
@@ -55,7 +55,7 @@ options (the login entry runs --tray --skip-update):
 connect points THIS machine's CLI tools at a remote KineRouter server.
 show prints the router settings each local tool currently holds (read-only).
 
-  kinerouter connect http://10.0.0.5:20128 --tools claude,codex
+  kinerouter connect http://10.0.0.5:20150 --tools claude,codex
   kinerouter show claude
 
 connect options:
@@ -118,7 +118,7 @@ func runCLI(args []string) (handled bool, code int) {
 	if strings.HasPrefix(args[0], "-") {
 		// Everything else is still an env var, so an unknown flag is a typo and
 		// not a silently ignored option: starting the server anyway would swallow
-		// `kinerouter --porrt 3000` and serve on 20128 regardless.
+		// `kinerouter --porrt 3000` and serve on the default port regardless.
 		fmt.Fprintf(os.Stderr, "unknown flag %q\n\n%s", args[0], cliHelp)
 		return true, 2
 	}

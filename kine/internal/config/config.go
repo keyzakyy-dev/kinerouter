@@ -15,6 +15,10 @@ import (
 // Name is this product's data directory name.
 const Name = "kinerouter"
 
+// DefaultPort is the port used when neither -p nor $PORT says otherwise. It is
+// exported so the tray and the MITM child follow the same number.
+const DefaultPort = 20150
+
 type Config struct {
 	DataDir          string
 	Port             int
@@ -31,7 +35,7 @@ type Config struct {
 func Load() (*Config, error) {
 	c := &Config{
 		DataDir:         DataDir(),
-		Port:            envInt("PORT", 20128),
+		Port:            envInt("PORT", DefaultPort),
 		Host:            envStr("HOST", "0.0.0.0"),
 		APIKeySecret:    envStr("API_KEY_SECRET", "endpoint-proxy-api-key-secret"),
 		MachineIDSalt:   envStr("MACHINE_ID_SALT", "endpoint-proxy-salt"),

@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/keyzakyy-dev/kinerouter/internal/config"
 	"github.com/keyzakyy-dev/kinerouter/internal/providerdata"
 )
 
@@ -312,7 +313,16 @@ func crushPath() string {
 	return filepath.Join(dir, "crush", "crush.json")
 }
 
-func crushHasKineRouter(cfg map[string]any) bool {
+// gatewayPort is the port this gateway serves on, so a detector or emitter
+// never assumes the reference product's 20128.
+func (g *Gateway) gatewayPort() int {
+	if g.cfg != nil && g.cfg.Port > 0 {
+		return g.cfg.Port
+	}
+	return config.DefaultPort
+}
+
+func (g *Gateway) crushHasKineRouter(cfg map[string]any) bool {
 	providers := objMap(cfg["providers"])
 	if providers == nil {
 		return false
@@ -321,7 +331,7 @@ func crushHasKineRouter(cfg map[string]any) bool {
 		return true
 	}
 	for _, v := range providers {
-		if p := objMap(v); p != nil && strings.Contains(str(p, "base_url"), "20128") {
+		if p := objMap(v); p != nil && strings.Contains(str(p, "base_url"), itoa(int64(g.gatewayPort()))) {
 			return true
 		}
 	}
@@ -334,7 +344,7 @@ func (g *Gateway) cliCrushStatus() map[string]any {
 		return map[string]any{"installed": false, "config": nil, "message": "Crush CLI is not installed"}
 	}
 	cfg := readJSONMap(path)
-	return map[string]any{"installed": true, "config": cfg, "hasKineRouter": crushHasKineRouter(cfg), "configPath": path}
+	return map[string]any{"installed": true, "config": cfg, "hasKineRouter": g.crushHasKineRouter(cfg), "configPath": path}
 }
 
 func (g *Gateway) handleCliCrushGet(w http.ResponseWriter, r *http.Request) {
@@ -405,7 +415,7 @@ func (g *Gateway) cliSmeltStatus() map[string]any {
 		return map[string]any{"installed": false, "config": nil, "message": "Smelt CLI is not installed"}
 	}
 	cfg := readJSONMap(path)
-	has := cfg != nil && (str(cfg, "_managedBy") == "kinerouter" || strings.Contains(str(cfg, "baseUrl"), "20128"))
+	has := cfg != nil && (str(cfg, "_managedBy") == "kinerouter" || strings.Contains(str(cfg, "baseUrl"), itoa(int64(g.gatewayPort()))))
 	return map[string]any{"installed": true, "config": cfg, "hasKineRouter": has, "configPath": path}
 }
 
@@ -827,7 +837,7 @@ func (g *Gateway) cliPiStatus() map[string]any {
 			has = true
 		}
 		for _, v := range providers {
-			if p := objMap(v); p != nil && strings.Contains(str(p, "baseUrl"), "20128") {
+			if p := objMap(v); p != nil && strings.Contains(str(p, "baseUrl"), itoa(int64(g.gatewayPort()))) {
 				has = true
 			}
 		}
@@ -837,6 +847,44 @@ func (g *Gateway) cliPiStatus() map[string]any {
 
 func (g *Gateway) handleCliPiGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, g.cliPiStatus())
+}
+
+// piInputs keeps only the modalities pi knows, de-duplicated. Empty means the
+// field is dropped rather than written as a list pi would reject.
+func piInputs(v any) []any {
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	seen := map[string]bool{}
+	out := []any{}
+	for _, x := range arr {
+		s, _ := x.(string)
+		if (s != "text" && s != "image") || seen[s] {
+			continue
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	return out
+}
+
+// piThinkingLevels keeps the recognised levels; a null is kept (it means
+// "this level is unavailable"), anything else is dropped.
+func piThinkingLevels(v any) map[string]any {
+	m := objMap(v)
+	if m == nil {
+		return nil
+	}
+	out := map[string]any{}
+	for _, k := range []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"} {
+		if s, ok := m[k].(string); ok {
+			out[k] = s
+		} else if val, ok := m[k]; ok && val == nil {
+			out[k] = nil
+		}
+	}
+	return out
 }
 
 func (g *Gateway) handleCliPiPost(w http.ResponseWriter, r *http.Request) {
@@ -899,10 +947,10 @@ func (g *Gateway) handleCliPiPost(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			mt = prevModels[id]["maxTokens"]
 		}
-		// 9router-go's pi defaults (128000/16384); a resolved capacity replaces
+		// 9router's pi defaults are 200000/64000; a resolved capacity replaces
 		// them field by field, because a model may publish a window without an
 		// output cap.
-		ctxFallback, tokFallback := int64(128000), int64(16384)
+		ctxFallback, tokFallback := int64(200000), int64(64000)
 		if lim := g.cliModelLimit(id); lim.Known {
 			ctxFallback = lim.Context
 			if lim.MaxOutput > 0 {
@@ -911,6 +959,21 @@ func (g *Gateway) handleCliPiPost(w http.ResponseWriter, r *http.Request) {
 		}
 		out["contextWindow"] = capNum(cw, ctxFallback, 2000000)
 		out["maxTokens"] = capNum(mt, tokFallback, 200000)
+		// Pi carries three optional capability fields; 9router re-adds only the
+		// values it recognises and drops the rest.
+		inputs, reasoning, levels := out["input"], out["reasoning"], out["thinkingLevelMap"]
+		delete(out, "input")
+		delete(out, "reasoning")
+		delete(out, "thinkingLevelMap")
+		if arr := piInputs(inputs); len(arr) > 0 {
+			out["input"] = arr
+		}
+		if b, ok := reasoning.(bool); ok {
+			out["reasoning"] = b
+		}
+		if m := piThinkingLevels(levels); len(m) > 0 {
+			out["thinkingLevelMap"] = m
+		}
 		return out
 	}
 	var modelList []any
@@ -1409,9 +1472,12 @@ func (g *Gateway) handleCliClaudePost(w http.ResponseWriter, r *http.Request) {
 	if base != "" {
 		mergedEnv["ANTHROPIC_BASE_URL"] = normalizeV1(base)
 	}
-	// A supplied token replaces whatever the file held; an empty one keeps the
-	// saved token so "Apply" on an unchanged form never breaks a working setup.
-	if token != "" {
+	// 9router never overwrites a token the file already holds: an existing
+	// ANTHROPIC_AUTH_TOKEN is the user's own credential, not ours to replace.
+	// Only an empty file takes the supplied one.
+	if prev := str(objMap(current["env"]), "ANTHROPIC_AUTH_TOKEN"); prev != "" {
+		mergedEnv["ANTHROPIC_AUTH_TOKEN"] = prev
+	} else if token != "" {
 		mergedEnv["ANTHROPIC_AUTH_TOKEN"] = token
 	}
 	for _, t := range claudeTiers {
@@ -1449,7 +1515,7 @@ func (g *Gateway) handleCliClaudePost(w http.ResponseWriter, r *http.Request) {
 	// "model" the user set for the official API is not ours to delete.
 	if model != "" {
 		merged["model"] = model
-	} else if claudePointsAtGateway(merged, base) {
+	} else if g.claudePointsAtGateway(merged, base) {
 		delete(merged, "model")
 	}
 
@@ -1458,9 +1524,9 @@ func (g *Gateway) handleCliClaudePost(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to update claude settings"})
 		return
 	}
-	if v, ok := body["exaMcpEnabled"]; ok {
-		writeClaudeJSONMcp(v == true)
-	}
+	// 9router syncs the exa entry on every apply, so a form that omits the
+	// field still removes a server it no longer wants.
+	writeClaudeJSONMcp(body["exaMcpEnabled"] == true)
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Settings updated successfully"})
 }
 
@@ -1475,7 +1541,7 @@ func (g *Gateway) handleCliClaudeDelete(w http.ResponseWriter, r *http.Request) 
 		current = map[string]any{}
 	}
 	env := objMap(current["env"])
-	owned := claudePointsAtGateway(current, "")
+	owned := g.claudePointsAtGateway(current, "")
 	if env != nil {
 		for _, k := range claudeResetEnvKeys {
 			delete(env, k)
@@ -1495,7 +1561,7 @@ func (g *Gateway) handleCliClaudeDelete(w http.ResponseWriter, r *http.Request) 
 
 // claudePointsAtGateway reports whether a settings map already exposes the
 // gateway. Without an explicit base URL the managed port is the only signal.
-func claudePointsAtGateway(settings map[string]any, base string) bool {
+func (g *Gateway) claudePointsAtGateway(settings map[string]any, base string) bool {
 	raw := strings.TrimRight(strings.TrimSpace(str(objMap(settings["env"]), "ANTHROPIC_BASE_URL")), "/")
 	if raw == "" || strings.Contains(raw, "api.anthropic.com") {
 		return false
@@ -1507,7 +1573,7 @@ func claudePointsAtGateway(settings map[string]any, base string) bool {
 		wantV1 := norm(normalizeV1(target))
 		return norm(raw) == want || norm(raw) == wantV1
 	}
-	return strings.Contains(raw, "20128") || strings.Contains(raw, "kinerouter")
+	return strings.Contains(raw, itoa(int64(g.gatewayPort()))) || strings.Contains(raw, "kinerouter")
 }
 
 // cliModelLimit is the resolved capacity of a model id, for the client configs

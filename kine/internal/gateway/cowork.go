@@ -278,9 +278,9 @@ func coworkWriteSkipApprovals(servers []map[string]any) any {
 	return map[string]any{"written": len(skip)}
 }
 
-func coworkLocalBridgeEntries(names []string) []map[string]any {
+func (g *Gateway) coworkLocalBridgeEntries(names []string) []map[string]any {
 	out := []map[string]any{}
-	port := itoa(int64(20128))
+	port := itoa(int64(g.gatewayPort()))
 	for _, n := range names {
 		var def *coworkPlugin
 		for i := range coworkLocalStdioPlugins {
@@ -489,7 +489,7 @@ func (g *Gateway) handleCliCoworkPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	managed := coworkManagedServers(plugins)
-	managed = append(managed, coworkLocalBridgeEntries(localNames)...)
+	managed = append(managed, g.coworkLocalBridgeEntries(localNames)...)
 	for _, p := range customIn {
 		transport := firstNonEmpty(str(p, "transport"), "sse")
 		managed = append(managed, map[string]any{

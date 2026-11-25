@@ -76,7 +76,7 @@ command execs it. Pin a version with `KINEROUTER_VERSION=0.1.0`; offline, use
 
 ```bash
 docker build -t kinerouter ./kine          # or use the published image below
-docker run -d --name kinerouter -p 20128:20128 \
+docker run -d --name kinerouter -p 20150:20150 \
   -e INITIAL_PASSWORD='choose-something' \
   -v kinerouter-data:/data \
   ghcr.io/keyzakyy-dev/kinerouter:0.1.1
@@ -103,7 +103,7 @@ in the binary) but required for the dashboard.
 ./kinerouter
 ```
 
-Defaults: listen `0.0.0.0:20128`, data dir `~/.kinerouter`. In a terminal, a
+Defaults: listen `0.0.0.0:20150`, data dir `~/.kinerouter`. In a terminal, a
 launcher menu offers the web dashboard, the Terminal UI (Providers, API Keys,
 Combos, CLI Tools, Settings — same tree and labels as 9Router), tray mode or a
 plain start;
@@ -114,7 +114,7 @@ UI, Terminal UI, Hide to Tray, Exit — Exit stops the gateway this process owns
 closing the terminal does not take the gateway with it. `<data dir>/launcher.pid`
 records both PIDs, so the next launch stops that exact instance.
 
-Open http://localhost:20128/ and log in with `INITIAL_PASSWORD` (default
+Open http://localhost:20150/ and log in with `INITIAL_PASSWORD` (default
 `123456`, local sign-in only — set `INITIAL_PASSWORD` or change it in Settings before remote access works).
 
 ## Configuration
@@ -124,7 +124,7 @@ is read at startup.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PORT` | `20128` | HTTP listen port |
+| `PORT` | `20150` | HTTP listen port |
 | `HOST` | `0.0.0.0` | Listen address |
 | `DATA_DIR` | `~/.kinerouter` (`%APPDATA%\kinerouter` on Windows) | Database, JWT secret, machine id |
 | `JWT_SECRET` | generated into `DATA_DIR/jwt-secret` | Dashboard session signing key |
@@ -164,8 +164,8 @@ whenever a schema version bump is applied.
 Verify after switching:
 
 ```bash
-curl -s localhost:20128/api/health                      # {"ok":true}
-curl -s -X POST localhost:20128/v1/chat/completions \
+curl -s localhost:20150/api/health                      # {"ok":true}
+curl -s -X POST localhost:20150/v1/chat/completions \
   -H "Authorization: Bearer $KEY" \
   -d '{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"hi"}]}'
 ```

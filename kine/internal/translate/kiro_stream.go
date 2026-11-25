@@ -119,6 +119,18 @@ func parseEventFrame(data []byte) (eventFrame, error) {
 	return eventFrame{Headers: headers, Payload: m}, nil
 }
 
+// kiroToolCall buffers one Kiro tool call. Kiro fragments a single call across
+// frames: the first carries name+toolUseId, the middle frames carry slices of
+// the JSON arguments under `input`, and a `stop: true` frame closes it. Passing
+// each frame through as its own tool call produced `arguments: "\"{\"pa"`.
+type kiroToolCall struct {
+	id     string
+	name   string
+	index  int
+	inputs strings.Builder
+	closed bool
+}
+
 // KiroToOpenAI converts Kiro EventStream frames into OpenAI chat chunks.
 // Mirrors kiroToOpenAIResponse: one chunk per payload-bearing event, plus the
 // final finish chunk once messageStopEvent arrives.
@@ -130,6 +142,7 @@ type KiroToOpenAI struct {
 	hadToolUse bool
 	Usage      Usage
 	restore    map[string]string // sanitized tool name → client name
+	tools      []*kiroToolCall
 }
 
 // NewKiroToOpenAI builds a response translator seeded with the request's tool
@@ -190,18 +203,30 @@ func (k *KiroToOpenAI) Transform(frame eventFrame) []map[string]any {
 			name := k.restoreName(str(call, "name"))
 			id := str(call, "toolUseId")
 			if id == "" {
-				id = "call_" + strconv.Itoa(k.toolIndex+1)
+				id = "call_" + strconv.Itoa(len(k.tools)+1)
 			}
-			idx := k.toolIndex
-			k.toolIndex++
-			args := "{}"
-			if b, err := json.Marshal(call["input"]); err == nil {
-				args = string(b)
+			buf := k.toolBuffer(id)
+			if name != "" {
+				buf.name = name
 			}
-			out = append(out, k.chunk(map[string]any{"tool_calls": []any{map[string]any{
-				"index": idx, "id": id, "type": "function",
-				"function": map[string]any{"name": name, "arguments": args},
-			}}}, nil))
+			switch input := call["input"].(type) {
+			case string:
+				buf.inputs.WriteString(input)
+			case map[string]any:
+				if b, err := json.Marshal(input); err == nil {
+					buf.inputs.Write(b)
+				}
+			case nil:
+			default:
+				if b, err := json.Marshal(input); err == nil {
+					buf.inputs.Write(b)
+				}
+			}
+			if stop, _ := call["stop"].(bool); !stop {
+				continue
+			}
+			buf.closed = true
+			out = append(out, k.toolChunk(buf))
 		}
 		return out
 	case "messageStopEvent":
@@ -209,7 +234,18 @@ func (k *KiroToOpenAI) Transform(frame eventFrame) []map[string]any {
 		if k.hadToolUse {
 			reason = "tool_calls"
 		}
-		return []map[string]any{k.chunk(map[string]any{}, &reason)}
+		// A call that never saw its `stop: true` frame (or a stream cut short)
+		// still has to reach the client, or the turn ends with the model having
+		// called a tool nobody sees.
+		var out []map[string]any
+		for _, buf := range k.tools {
+			if buf.closed || buf.name == "" {
+				continue
+			}
+			buf.closed = true
+			out = append(out, k.toolChunk(buf))
+		}
+		return append(out, k.chunk(map[string]any{}, &reason))
 	case "metadataEvent", "MetadataEvent":
 		return nil
 	}
@@ -221,6 +257,32 @@ func (k *KiroToOpenAI) restoreName(name string) string {
 		return orig
 	}
 	return name
+}
+
+// toolBuffer returns the accumulator for a toolUseId, creating one on first
+// sight so its index stays stable across the call's fragments.
+func (k *KiroToOpenAI) toolBuffer(id string) *kiroToolCall {
+	for _, buf := range k.tools {
+		if buf.id == id {
+			return buf
+		}
+	}
+	buf := &kiroToolCall{id: id, index: k.toolIndex}
+	k.toolIndex++
+	k.tools = append(k.tools, buf)
+	return buf
+}
+
+// toolChunk emits a completed tool call with its reassembled arguments.
+func (k *KiroToOpenAI) toolChunk(buf *kiroToolCall) map[string]any {
+	args := strings.TrimSpace(buf.inputs.String())
+	if args == "" {
+		args = "{}"
+	}
+	return k.chunk(map[string]any{"tool_calls": []any{map[string]any{
+		"index": buf.index, "id": buf.id, "type": "function",
+		"function": map[string]any{"name": buf.name, "arguments": args},
+	}}}, nil)
 }
 
 func (k *KiroToOpenAI) chunk(delta map[string]any, finish *string) map[string]any {

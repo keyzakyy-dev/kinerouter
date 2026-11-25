@@ -259,6 +259,38 @@ type OpenAIToClaude struct {
 	nextBlock   int
 	blockByKind map[string]int
 	blockOpen   map[int]string
+	// pendingStop holds the finish reason whose terminal is deferred: OpenAI
+	// sends `usage` in a separate chunk after the finish chunk, so closing the
+	// message immediately would report input/cache tokens as 0.
+	pendingStop *string
+}
+
+// flushTerminal emits message_delta + message_stop once, or nothing while no
+// finish reason is pending.
+func (o *OpenAIToClaude) flushTerminal() []map[string]any {
+	if o.State.Closed || o.pendingStop == nil {
+		return nil
+	}
+	o.State.Closed = true
+	// OpenAI's prompt_tokens already includes the cached ones; Claude expects
+	// input_tokens to exclude them, or a client that sums both double counts.
+	input := o.Usage.PromptTokens - o.Usage.CacheRead - o.Usage.CacheCreation
+	if input < 0 {
+		input = 0
+	}
+	usage := map[string]any{"input_tokens": input, "output_tokens": o.Usage.CompletionTokens}
+	if o.Usage.CacheRead > 0 {
+		usage["cache_read_input_tokens"] = o.Usage.CacheRead
+	}
+	if o.Usage.CacheCreation > 0 {
+		usage["cache_creation_input_tokens"] = o.Usage.CacheCreation
+	}
+	return []map[string]any{
+		{"type": "message_delta",
+			"delta": map[string]any{"stop_reason": openAIFinishToClaude(*o.pendingStop), "stop_sequence": nil},
+			"usage": usage},
+		{"type": "message_stop"},
+	}
 }
 
 type OpenAIStreamState struct {
@@ -338,7 +370,9 @@ func (o *OpenAIToClaude) Transform(chunk map[string]any) []map[string]any {
 	}
 	choices, _ := chunk["choices"].([]any)
 	if len(choices) == 0 {
-		return out
+		// A usage-only chunk arrives after the finish chunk, so this is the
+		// first point where the terminal can carry real token counts.
+		return append(out, o.flushTerminal()...)
 	}
 	choice, _ := choices[0].(map[string]any)
 	delta, _ := choice["delta"].(map[string]any)
@@ -399,22 +433,23 @@ func (o *OpenAIToClaude) Transform(chunk map[string]any) []map[string]any {
 				delete(o.blockOpen, idx)
 			}
 		}
-		stopReason := openAIFinishToClaude(fr)
-		out = append(out, map[string]any{
-			"type":  "message_delta",
-			"delta": map[string]any{"stop_reason": stopReason, "stop_sequence": nil},
-			"usage": map[string]any{"output_tokens": o.Usage.CompletionTokens},
-		})
+		// Hold the terminal: the trailing usage chunk still has to arrive, and
+		// message_delta is the only place Claude clients read input tokens.
+		o.pendingStop = &fr
 	}
 	return out
 }
 
-// Finish emits message_stop if the upstream ended without a finish_reason.
+// Finish closes the message when the upstream ended without a usable finish
+// chunk, and flushes a terminal that is still deferred.
 func (o *OpenAIToClaude) Finish() []map[string]any {
 	if o.State.Closed {
 		return nil
 	}
-	o.State.Closed = true
+	if o.pendingStop == nil {
+		stop := "stop"
+		o.pendingStop = &stop
+	}
 	var out []map[string]any
 	out = append(out, o.closeBlock("text")...)
 	out = append(out, o.closeBlock("thinking")...)
@@ -424,7 +459,7 @@ func (o *OpenAIToClaude) Finish() []map[string]any {
 			delete(o.blockOpen, idx)
 		}
 	}
-	out = append(out, map[string]any{"type": "message_stop"})
+	out = append(out, o.flushTerminal()...)
 	return out
 }
 

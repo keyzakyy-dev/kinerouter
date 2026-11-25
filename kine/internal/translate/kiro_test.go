@@ -160,3 +160,49 @@ func TestKiroProfileARN(t *testing.T) {
 		t.Fatalf("connection ARN must win: %q", got)
 	}
 }
+
+// Kiro streams a tool call as fragments: the first frame carries name+id, the
+// next ones carry slices of the JSON arguments, and a stop:true frame closes
+// it. Each frame must not become its own tool call.
+func TestKiroToolCallFragments(t *testing.T) {
+	k := NewKiroToOpenAI("m", nil)
+	frames := []eventFrame{
+		{Headers: map[string]any{":event-type": "toolUseEvent"}, Payload: map[string]any{
+			"toolUseEvent": map[string]any{"toolUseId": "t1", "name": "read_file", "input": `{"pa`},
+		}},
+		{Headers: map[string]any{":event-type": "toolUseEvent"}, Payload: map[string]any{
+			"toolUseEvent": map[string]any{"toolUseId": "t1", "name": "read_file", "input": `th":"/a"}`},
+		}},
+		{Headers: map[string]any{":event-type": "toolUseEvent"}, Payload: map[string]any{
+			"toolUseEvent": map[string]any{"toolUseId": "t1", "name": "read_file", "input": ``, "stop": true},
+		}},
+		{Headers: map[string]any{":event-type": "messageStopEvent"}, Payload: map[string]any{}},
+	}
+	var calls []map[string]any
+	var finish any
+	for _, f := range frames {
+		for _, ch := range k.Transform(f) {
+			choice := ch["choices"].([]any)[0].(map[string]any)
+			if fr := choice["finish_reason"]; fr != nil {
+				finish = fr
+			}
+			delta, _ := choice["delta"].(map[string]any)
+			if tcs, ok := delta["tool_calls"].([]any); ok {
+				calls = append(calls, tcs[0].(map[string]any))
+			}
+		}
+	}
+	if len(calls) != 1 {
+		t.Fatalf("want 1 tool call, got %d: %+v", len(calls), calls)
+	}
+	fn := calls[0]["function"].(map[string]any)
+	if fn["arguments"] != `{"path":"/a"}` {
+		t.Fatalf("arguments not reassembled: %v", fn["arguments"])
+	}
+	if calls[0]["index"].(int) != 0 {
+		t.Fatalf("index: %v", calls[0]["index"])
+	}
+	if finish != "tool_calls" {
+		t.Fatalf("finish: %v", finish)
+	}
+}

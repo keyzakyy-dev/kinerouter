@@ -102,10 +102,11 @@ func TestClaudePostKeepsSavedToken(t *testing.T) {
 		t.Fatalf("token overwritten: %q", got)
 	}
 
-	// A supplied token replaces the old one.
+	// 9router drops an incoming token whenever the file already holds one, so
+	// a supplied key never replaces a working credential.
 	postClaude(t, g, map[string]any{"apiKey": "sk-new"})
-	if got := str(objMap(read()["env"]), "ANTHROPIC_AUTH_TOKEN"); got != "sk-new" {
-		t.Fatalf("token not replaced: %q", got)
+	if got := str(objMap(read()["env"]), "ANTHROPIC_AUTH_TOKEN"); got != "sk-keep" {
+		t.Fatalf("token replaced: %q", got)
 	}
 }
 

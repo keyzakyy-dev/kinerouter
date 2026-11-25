@@ -1,7 +1,7 @@
 #!/bin/sh
 # Dev build + run: never touches the installed release.
 #
-#   ./dev.sh              build web + binary, run on :20129 with ~/.kinerouter-dev
+#   ./dev.sh              build web + binary, run on :20140 with ~/.kinerouter-dev
 #   ./dev.sh --no-web     skip the web build (backend-only iteration)
 #
 # The version carries a -dev suffix (git short sha), so /api/version reports
@@ -11,7 +11,7 @@ set -eu
 
 cd "$(dirname "$0")"
 
-PORT=${PORT:-20129}
+PORT=${PORT:-20140}
 DATA_DIR=${DATA_DIR:-$HOME/.kinerouter-dev}
 REV=$(git rev-parse --short HEAD 2>/dev/null || echo local)
 

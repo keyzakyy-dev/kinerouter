@@ -1584,6 +1584,11 @@ func streamTranslate(upstream io.Reader, provider, client string, w io.Writer, f
 	handle := func(event string, data []byte) {
 		if bytes.Equal(data, []byte("[DONE]")) {
 			switch {
+			case claudeToOpenAI != nil:
+				// Anthropic reports usage on message_start/message_delta; an
+				// OpenAI client only reads the trailing usage-only chunk.
+				fmt.Fprintf(w, "data: %s\n\n", mustJSON(claudeToOpenAI.FinalUsage()))
+				writeDone(w)
 			case openAIToClaude != nil:
 				for _, ev := range openAIToClaude.Finish() {
 					writeClaudeEvent(w, ev)
@@ -1694,6 +1699,9 @@ func streamTranslate(upstream io.Reader, provider, client string, w io.Writer, f
 	}
 	// Upstream closed without [DONE]: finalize whatever the translator holds.
 	switch {
+	case claudeToOpenAI != nil:
+		fmt.Fprintf(w, "data: %s\n\n", mustJSON(claudeToOpenAI.FinalUsage()))
+		writeDone(w)
 	case openAIToClaude != nil:
 		for _, ev := range openAIToClaude.Finish() {
 			writeClaudeEvent(w, ev)

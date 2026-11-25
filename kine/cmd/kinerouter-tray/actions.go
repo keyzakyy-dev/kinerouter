@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/keyzakyy-dev/kinerouter/internal/config"
 )
 
 // state is what the menu shows. Unknown exists so a failed probe is never
@@ -40,7 +42,7 @@ func envPort() int {
 	if n, err := strconv.Atoi(os.Getenv("PORT")); err == nil && n > 0 && n < 65536 {
 		return n
 	}
-	return 20128
+	return config.DefaultPort
 }
 
 // urlFor returns the dashboard URL. Loopback only: the tray is a local

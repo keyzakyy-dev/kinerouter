@@ -122,7 +122,7 @@ func (g *Gateway) publicOrigin(r *http.Request, settings map[string]any, saml bo
 		}
 		return proto + "://" + r.Host
 	}
-	return "http://localhost:20128"
+	return "http://localhost:" + itoa(int64(g.gatewayPort()))
 }
 
 func randomToken(n int) string {

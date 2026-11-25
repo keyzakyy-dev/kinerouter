@@ -5,7 +5,7 @@ services:
     container_name: kinerouter
     restart: unless-stopped
     ports:
-      - "20128:20128"
+      - "20150:20150"
     environment:
       # Required: there is no usable default. Set it before the first start.
       # A container's TCP peer is never loopback, so an unset value locks the

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/keyzakyy-dev/kinerouter/internal/config"
+	"github.com/keyzakyy-dev/kinerouter/internal/providerdata"
 	"github.com/keyzakyy-dev/kinerouter/internal/store"
 )
 
@@ -15,7 +17,9 @@ func testGateway(t *testing.T) *Gateway {
 		t.Fatalf("store: %v", err)
 	}
 	t.Cleanup(func() { s.Close() })
-	return &Gateway{store: s}
+	// The fixtures speak to port 20128; the detectors follow cfg.Port, so pin it.
+	cfg := &config.Config{DataDir: t.TempDir(), Port: 20128}
+	return &Gateway{store: s, cfg: cfg, reg: providerdata.Get()}
 }
 
 // Caller key wins, then the first active dashboard key, then "".

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+
+	"github.com/keyzakyy-dev/kinerouter/internal/config"
 )
 
 // A probe that cannot answer must read as Unknown, not Stopped: "Stopped"
@@ -44,8 +46,8 @@ func TestEnvPort(t *testing.T) {
 	}
 	for _, bad := range []string{"", "0", "abc", "70000"} {
 		t.Setenv("PORT", bad)
-		if got := envPort(); got != 20128 {
-			t.Fatalf("envPort(%q) = %d, want default 20128", bad, got)
+		if got := envPort(); got != config.DefaultPort {
+			t.Fatalf("envPort(%q) = %d, want default %d", bad, got, config.DefaultPort)
 		}
 	}
 }

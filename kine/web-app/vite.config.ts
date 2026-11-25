@@ -9,8 +9,9 @@ export default defineConfig({
   build: { outDir: '../web/dist', emptyOutDir: true },
   server: {
     proxy: {
-      '/api': 'http://localhost:20128',
-      '/v1': 'http://localhost:20128',
+      // The dev UI talks to dev.sh's :20140. KINE_BACKEND points it elsewhere.
+      '/api': process.env.KINE_BACKEND || 'http://localhost:20140',
+      '/v1': process.env.KINE_BACKEND || 'http://localhost:20140',
     },
   },
   test: {

@@ -27,7 +27,11 @@ import (
 )
 
 func (g *Gateway) registerMitmRoutes(mux *http.ServeMux) {
-	mitm.InitHooks(g.store.GetSettings, g.store.UpdateSettings)
+	port := 0
+	if g.cfg != nil {
+		port = g.cfg.Port
+	}
+	mitm.InitHooks(g.store.GetSettings, g.store.UpdateSettings, port)
 	mitm.SetMachineID(g.machineID)
 	if g.cfg != nil && g.cfg.DataDir != "" { // routes may be built before config in tests
 		g.syncMitmAliases()

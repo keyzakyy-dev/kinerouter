@@ -3,6 +3,54 @@
 All notable changes to KineRouter. Format based on Keep a Changelog;
 versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
+## [0.2.5] — 2026-11-25
+
+### Changed
+
+- **The gateway's port is no longer the reference product's.** `20128` was
+  hardcoded in the tray probe, the MITM child's router base, the OIDC public
+  origin, the Cowork bridge entries and every CLI-tool writer/detector, so a
+  gateway on any other port wrote configs pointing at 9Router's default.
+  `config.DefaultPort` is now `20150` and the rest derives from the port the
+  gateway actually serves on.
+
+- **Claude Code apply leaves an existing `ANTHROPIC_AUTH_TOKEN` alone.** An
+  empty form no longer overwrites the user's own credential, matching 9router;
+  the exa MCP entry is synced on every apply instead of only when the field is
+  present, so dropping it removes the server.
+
+- **Pi's context/output fallback is 200000/64000**, and the writer re-adds only
+  the `input`, `reasoning` and `thinkingLevelMap` values pi recognises.
+
+- **The model picker lists compatible provider nodes.** A node is not a
+  registry entry, so `/api/providers` has no row for it and requiring one hid
+  every custom provider; a node with registered models or aliases now appears,
+  and its chip carries the node's prefix.
+
+- **CLI tool model selection is a chip list with a picker modal** instead of a
+  checkbox list, matching the dashboard's other model fields.
+
+### Fixed
+
+- **Kiro tool calls were split across frames and passed through one fragment
+  at a time**, so the arguments arrived malformed (`arguments: "\"{\"pa"`). A
+  call is now buffered by `toolUseId` until its `stop` frame, and emitted once
+  with the reassembled JSON.
+
+- **A Claude client lost its token counts** because the message was closed on
+  the finish chunk while OpenAI sends `usage` in a later chunk. The terminal
+  (`message_delta` + `message_stop`) is deferred until that usage arrives, with
+  `input_tokens` net of the cached counts, and `Finish` flushes it if the
+  upstream ends early. The reverse direction now emits a trailing usage chunk
+  for OpenAI clients.
+
+- **`tool_choice: "none"` was dropped on the way to Anthropic**, handing the
+  model tool permission the client withheld; it now becomes `{"type":"none"}`.
+
+- **Gemini received the `tool_call_id` as `functionResponse.name`** and refused
+  it. The name is now taken from the assistant call that produced the id,
+  queued per id so a replayed id cannot rename an earlier result.
+
 ## [0.2.4] — 2026-11-25
 
 ### Changed

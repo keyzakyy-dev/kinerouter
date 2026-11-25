@@ -130,26 +130,35 @@ export function ModelSelectModal({
 
   const grouped = useMemo(() => {
     const groups: Record<string, Group> = {}
+    const nodeById = Object.fromEntries(nodes.map((n) => [n.id, n]))
     const enabledIds = [
-      ...activeProviderIds,
-      ...providers.filter((p) => p.noAuth).map((p) => p.id),
+      ...new Set([
+        ...activeProviderIds,
+        ...providers.filter((p) => p.noAuth).map((p) => p.id),
+        // A compatible node with user-added models is selectable even without a
+        // connection: a local endpoint often needs no stored key.
+        ...(kindFilter ? [] : customModels.map((m) => m.providerAlias).filter((a) => nodeById[a])),
+      ]),
     ]
     for (const id of enabledIds) {
+      // A compatible node is not a registry entry, so /api/providers has no row
+      // for it; requiring one kept every custom provider out of the picker.
       const p = byId[id]
-      if (!p) continue
-      const kinds = p.serviceKinds ?? ['llm']
+      const node = nodeById[id]
+      if (!p && !node) continue
+      const kinds = p?.serviceKinds ?? ['llm']
       if (kindFilter && !kinds.includes(kindFilter)) continue
-      const alias = p.alias || id
-      const isNode = nodes.some((n) => n.id === id)
+      const alias = p?.alias || id
+      const isNode = !!node
+      const providerName = p?.display.name ?? id
 
       if (kindFilter && PROVIDER_AS_MODEL_KINDS.has(kindFilter)) {
-        groups[id] = { name: p.display.name, alias, color: p.display.color, models: [{ id, name: p.display.name, value: id }] }
+        groups[id] = { name: providerName, alias, color: p?.display.color, models: [{ id, name: providerName, value: id }] }
         continue
       }
 
-      const node = nodes.find((n) => n.id === id)
       const prefix = (node?.prefix as string) || alias
-      const displayName = node?.name || p.display.name
+      const displayName = node?.name || providerName
 
       const aliasModels = Object.entries(modelAliases)
         .filter(([, full]) => full.startsWith(`${alias}/`))
@@ -177,7 +186,7 @@ export function ModelSelectModal({
           : [{ id: `__placeholder__${id}`, name: `${prefix}/model-id`, value: `${prefix}/model-id`, isPlaceholder: true }]
       } else {
         const live: PickerModel[] = Object.values(liveModels).filter((m) => m.value.startsWith(`${alias}/`))
-        const table: PickerModel[] = (p.models ?? [])
+        const table: PickerModel[] = (p?.models ?? [])
           .filter((m) => !kindFilter || m.kind === kindFilter || (!m.kind && !kindFilter))
           .map((m) => ({ id: m.id, name: m.name || m.id, value: `${alias}/${m.id}`, kind: m.kind }))
         const base = live.length > 0 ? live : table
@@ -194,7 +203,7 @@ export function ModelSelectModal({
         models = models.filter((m) => m.isPlaceholder || m.kind === kindFilter)
       }
       if (models.length === 0 && kindFilter && ALLOW_PROVIDER_FALLBACK_KINDS.has(kindFilter) && kinds.includes(kindFilter)) {
-        models = [{ id, name: p.display.name, value: alias }]
+        models = [{ id, name: providerName, value: alias }]
       }
 
       // Disabled ids are stored under the alias or the provider id.
@@ -213,7 +222,7 @@ export function ModelSelectModal({
       }
 
       if (models.length > 0 || isNode) {
-        groups[id] = { name: displayName, alias: prefix, color: p.display.color, models }
+        groups[id] = { name: displayName, alias: prefix, color: p?.display.color, models }
       }
     }
     return groups

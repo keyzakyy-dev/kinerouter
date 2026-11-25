@@ -47,7 +47,7 @@ KineRouter solves that:
 ```
 ┌──────────────────┐
 │  Claude Code     │
-│  Codex · Cursor  │   one endpoint: http://localhost:20128/v1
+│  Codex · Cursor  │   one endpoint: http://localhost:20150/v1
 │  Cline · OpenCode│
 └────────┬─────────┘
          ↓
@@ -169,7 +169,7 @@ The tray needs GTK3 + AppIndicator on Linux and nothing extra on macOS/Windows.
 ### Docker
 
 ```bash
-docker run -d --name kinerouter -p 20128:20128 \
+docker run -d --name kinerouter -p 20150:20150 \
   -e INITIAL_PASSWORD='choose-something' \
   -v kinerouter-data:/data \
   ghcr.io/keyzakyy-dev/kinerouter:0.1.10
@@ -226,7 +226,7 @@ auto-update loop. Exit stops the gateway this process owns.
 Flags — the same ones KeyRouter's `cli.js` accepts:
 
 ```bash
-kinerouter -p 20129          # port (default 20128, or $PORT)
+kinerouter -p 20140          # port (default 20150, or $PORT)
 kinerouter -H 127.0.0.1      # bind address (default 0.0.0.0, or $HOST)
 kinerouter -t                # tray mode, no menu
 kinerouter --skip-update     # skip the release check
@@ -274,10 +274,10 @@ release copy all provide the same command name. Whichever comes first on
 when they see a second copy; remove it (`npm rm -g kinerouter`, or delete the
 stray binary) before updating.
 
-Dashboard: `http://localhost:20128/dashboard` · API: `http://localhost:20128/v1`
+Dashboard: `http://localhost:20150/dashboard` · API: `http://localhost:20150/v1`
 
 **Next:** log in with `INITIAL_PASSWORD` (default `123456`), connect a provider,
-create an API key, point your CLI at `http://localhost:20128/v1`, and use a model
+create an API key, point your CLI at `http://localhost:20150/v1`, and use a model
 id like `kr/claude-sonnet-4.5`, `cc/claude-opus-4-7` or `my-combo`.
 
 ### Uninstall
@@ -394,7 +394,7 @@ read at startup.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PORT` | `20128` | HTTP port |
+| `PORT` | `20150` | HTTP port |
 | `HOST` | `0.0.0.0` | Listen address |
 | `DATA_DIR` | `~/.kinerouter` | DB, JWT secret, machine id |
 | `INITIAL_PASSWORD` | unset | First dashboard password |
@@ -430,7 +430,7 @@ cd kine
 go test ./...                       # translation, routing, storage
 go vet ./...
 
-cd web-app && npm run dev           # Vite on :5173, proxies to :20128
+cd web-app && npm run dev           # Vite on :3000, proxies to :20140
 ```
 
 Production rebuild after a UI change:

@@ -22,15 +22,20 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/keyzakyy-dev/kinerouter/internal/config"
 )
 
 const (
 	mitmPort           = 443
-	defaultRouterBase  = "http://localhost:20128"
 	maxRestarts        = 5
 	restartWindowReset = 60 * time.Second
 	healthPollTimeout  = 8 * time.Second
 )
+
+// defaultRouterBase is the loopback origin used when no mitmRouterBaseUrl is
+// set; InitHooks replaces it with the port the gateway actually serves on.
+var defaultRouterBase = "http://localhost:" + strconv.Itoa(config.DefaultPort)
 
 var restartDelays = []time.Duration{5 * time.Second, 10 * time.Second, 20 * time.Second, 30 * time.Second, 60 * time.Second}
 
@@ -43,8 +48,12 @@ var (
 func InitHooks(
 	get func() (map[string]any, error),
 	update func(map[string]any) (map[string]any, error),
+	port int,
 ) {
 	getSettings, updateSettings = get, update
+	if port > 0 {
+		defaultRouterBase = "http://localhost:" + strconv.Itoa(port)
+	}
 }
 
 // RouterBaseURL resolves the configured router base (settings.mitmRouterBaseUrl),
