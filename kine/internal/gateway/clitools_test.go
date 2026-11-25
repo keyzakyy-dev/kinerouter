@@ -75,3 +75,21 @@ func TestCoworkManagedServers(t *testing.T) {
 		}
 	}
 }
+
+// Cowork stores the bare origin: Claude Desktop appends /v1/messages itself.
+func TestCoworkGatewayBaseURL(t *testing.T) {
+	cases := map[string]string{
+		"http://127.0.0.1:20128/v1":      "http://127.0.0.1:20128",
+		"http://127.0.0.1:20128/v1/":     "http://127.0.0.1:20128",
+		"http://127.0.0.1:20128/":        "http://127.0.0.1:20128",
+		"http://127.0.0.1:20128":         "http://127.0.0.1:20128",
+		"  https://kine.example.com/v1 ": "https://kine.example.com",
+		"https://gw.example.com/ki/v1":   "https://gw.example.com/ki",
+		"https://gw.example.com/v1/alt":  "https://gw.example.com/v1/alt",
+	}
+	for in, want := range cases {
+		if got := coworkGatewayBaseURL(in); got != want {
+			t.Fatalf("%q: got %q want %q", in, got, want)
+		}
+	}
+}

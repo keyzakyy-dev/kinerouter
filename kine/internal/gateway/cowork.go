@@ -431,12 +431,23 @@ func (g *Gateway) handleCliCoworkGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, g.cliCoworkStatus())
 }
 
+// coworkGatewayBaseURL keeps the gateway origin bare. Claude Desktop builds
+// its requests as <base>/v1/messages, so a stored "/v1" suffix turns every
+// call into /v1/v1/messages and the app drops to config_model_rejected.
+func coworkGatewayBaseURL(u string) string {
+	u = strings.TrimRight(strings.TrimSpace(u), "/")
+	if strings.HasSuffix(strings.ToLower(u), "/v1") {
+		u = strings.TrimRight(u[:len(u)-3], "/")
+	}
+	return u
+}
+
 func (g *Gateway) handleCliCoworkPost(w http.ResponseWriter, r *http.Request) {
 	body, ok := cliBody(w, r)
 	if !ok {
 		return
 	}
-	baseURL, apiKey := str(body, "baseUrl"), str(body, "apiKey")
+	baseURL, apiKey := coworkGatewayBaseURL(str(body, "baseUrl")), str(body, "apiKey")
 	if baseURL == "" || apiKey == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "baseUrl and apiKey are required"})
 		return

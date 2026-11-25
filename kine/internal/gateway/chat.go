@@ -382,6 +382,15 @@ func (g *Gateway) dispatch(w http.ResponseWriter, r *http.Request, targets []tar
 				last = dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
 				continue
 			}
+			if requestErrorAdvancesChain(upErr.status, upErr.message) {
+				// The target cannot serve this request (window too small, safety
+				// policy, model gone). Another combo member still can, so move on
+				// without marking the account unavailable.
+				logWarn("chat", "⇄ %s/%s CANNOT SERVE THIS REQUEST (%d) → NEXT MODEL", t.Provider, t.Model, upErr.status)
+				logDebug("chat", "   error=%s", upErr.message)
+				last = dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
+				break
+			}
 			return dispatchResult{status: upErr.status, body: []byte(upErr.raw)}
 		}
 	}
@@ -466,6 +475,12 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 			}
 		}
 	}
+	// A model the catalogue does not declare tool-capable answers a tool round
+	// with a 400; flatten the history so the retrieved context survives.
+	if modelWithoutToolSupport(t.Provider, t.Model) {
+		reqRaw = cloneMap(reqRaw)
+		stripToolsAndFlatten(reqRaw)
+	}
 	reqBody, err := translateRequestWithSession(clientFormat, providerFormat, reqRaw, t.Model, streamUpstream, sessionID)
 	if err != nil {
 		return dispatchResult{}, err
@@ -481,6 +496,11 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 	// Per-provider body quirks (kimchi artifact stripping, codebuddy neutral
 	// system prompt, azure/iflow/etc. transport handled after build).
 	executor.ApplyQuirksBody(t.Provider, t.Model, reqBody, streamUpstream)
+	// A quirk can prepend cacheable system blocks (zcode adds two), and a rolling
+	// history can already carry four; Anthropic refuses a fifth marker outright.
+	if providerFormat == "claude" {
+		translate.CapClaudeCacheControl(reqBody)
+	}
 	// Kiro reads the CodeWhisperer payload shape from an OpenAI- or
 	// Claude-shaped body directly (no pivot), so the savers above rewrote the
 	// source body and Kiro must be built last.
@@ -1315,6 +1335,9 @@ func translateRequestWithSession(client, provider string, raw map[string]any, mo
 			if _, ok := out["max_tokens"]; !ok {
 				out["max_tokens"] = 64000
 			}
+			// Anthropic refuses blank text blocks, unsigned thinking and an
+			// empty or assistant tail; repair them before forwarding.
+			translate.SanitizeClaudePassthrough(out)
 		}
 		if provider == translate.FormatResponses {
 			out["stream"] = true
@@ -1356,6 +1379,8 @@ func translateRequestWithSession(client, provider string, raw map[string]any, mo
 	case client == translate.FormatOpenAI && provider == translate.FormatOpenAI:
 		out := cloneMap(raw)
 		out["model"] = model
+		// gpt-5/gpt-6/o-series reject max_tokens; send the field they know.
+		translate.RenameMaxTokens(out, model)
 		if stream {
 			out["stream"] = true
 			out["stream_options"] = map[string]any{"include_usage": true}
@@ -1418,6 +1443,11 @@ func translateRequestWithSession(client, provider string, raw map[string]any, mo
 func translateNonStream(provider, client string, body []byte) ([]byte, translate.Usage) {
 	var u translate.Usage
 	if provider == client {
+		if provider == translate.FormatOpenAI {
+			// A stop beside tool_calls ends an agent loop with the call never
+			// executed; some OpenAI-compatible servers report exactly that.
+			body = translate.NormalizeToolCallFinish(body)
+		}
 		return body, extractUsage(body, provider)
 	}
 	var m map[string]any

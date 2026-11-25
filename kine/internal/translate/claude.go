@@ -11,8 +11,8 @@ import (
 // any other content in the same turn.
 func OpenAIRequestToClaude(in *OpenAIRequest, model string) *ClaudeRequest {
 	out := &ClaudeRequest{Model: model, Stream: in.Stream}
-	if in.MaxTokens != nil {
-		out.MaxTokens = *in.MaxTokens
+	if mt := RequestedMaxTokens(in); mt != nil {
+		out.MaxTokens = *mt
 	} else {
 		out.MaxTokens = 64000
 	}
@@ -183,7 +183,11 @@ func ClaudeRequestToOpenAI(in *ClaudeRequest, model string) *OpenAIRequest {
 	out := &OpenAIRequest{Model: model, Stream: in.Stream, Temperature: in.Temperature, TopP: in.TopP}
 	if in.MaxTokens > 0 {
 		mt := in.MaxTokens
-		out.MaxTokens = &mt
+		if RequiresMaxCompletionTokens(model) {
+			out.MaxCompletionTokens = &mt
+		} else {
+			out.MaxTokens = &mt
+		}
 	}
 	if len(in.System) > 0 {
 		var s string

@@ -49,8 +49,8 @@ func ToGemini(raw map[string]any, model string, stream bool) (map[string]any, er
 	}
 	out := GeminiContents{}
 	gen := map[string]any{}
-	if in.MaxTokens != nil {
-		gen["maxOutputTokens"] = *in.MaxTokens
+	if mt := RequestedMaxTokens(&in); mt != nil {
+		gen["maxOutputTokens"] = *mt
 	}
 	if in.Temperature != nil {
 		gen["temperature"] = *in.Temperature

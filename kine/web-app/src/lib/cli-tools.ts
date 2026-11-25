@@ -352,8 +352,8 @@ export const cliTool = (id: string) => CLI_TOOLS.find((t) => t.id === id)
 
 /** Claude's env block: one model per alias, token comes from the picked key. */
 export const CLAUDE_MODEL_KEYS = [
-  { alias: 'opus', env: 'ANTHROPIC_DEFAULT_OPUS_MODEL' },
-  { alias: 'sonnet', env: 'ANTHROPIC_DEFAULT_SONNET_MODEL' },
-  { alias: 'fable', env: 'ANTHROPIC_DEFAULT_FABLE_MODEL' },
-  { alias: 'haiku', env: 'ANTHROPIC_DEFAULT_HAIKU_MODEL' },
+  { alias: 'opus', tier: 'opus', env: 'ANTHROPIC_DEFAULT_OPUS_MODEL' },
+  { alias: 'sonnet', tier: 'sonnet', env: 'ANTHROPIC_DEFAULT_SONNET_MODEL' },
+  { alias: 'fable', tier: 'fable', env: 'ANTHROPIC_DEFAULT_FABLE_MODEL' },
+  { alias: 'haiku', tier: 'haiku', env: 'ANTHROPIC_DEFAULT_HAIKU_MODEL' },
 ]

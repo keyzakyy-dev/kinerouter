@@ -5,6 +5,118 @@ versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
 ## [Unreleased]
 
+### Changed
+
+- **Claude Code CLI-tool config follows 9router-go.** The form now has a
+  primary/default model (`model` in `~/.claude/settings.json`), the four tier
+  overrides (`ANTHROPIC_DEFAULT_{FABLE,OPUS,SONNET,HAIKU}_MODEL`), and
+  auto-compact presets of 100k/180k/200k/330k/custom. Apply writes the
+  top-level `autoCompactWindow` the reference writes and derives
+  `CLAUDE_CODE_AUTO_COMPACT_WINDOW` from the narrowest context window the named
+  models resolve to (clamped 100K–1M). A supplied API key now replaces the
+  saved token instead of being discarded; an empty one still keeps it.
+
+- **The other CLI-tool writers match their 9router-go adapters.** Codex states
+  `model_context_window`, `model_auto_compact_token_limit` (90% of the window)
+  and `model_max_output_tokens`, and its reset removes those three instead of
+  editing `~/.codex/auth.json` (a custom provider never reads it). OpenCode
+  writes a per-model `limit` (`context`, `output`) and strips a provider prefix
+  the caller already passed. Crush, Pi and Oh My Pi take the resolved context
+  window with each adapter's documented fallback (128000, and 16384 output
+  tokens for Pi/OMP), and OMP now writes the `models` entry omp needs to show a
+  context percentage and auto-compact at all. Droid renumbers every
+  `customModels` entry from zero, so no row keeps another model's index.
+
+### Fixed
+
+- **The Codex lane forwarded parameters the ChatGPT backend rejects.** A request
+  carrying `temperature`, `top_p`, `max_output_tokens` or `metadata` was
+  answered with 400 "Unsupported parameter", so the turn never ran. The body is
+  now cut to the Responses allowlist, `service_tier` is normalised
+  (`fast` → `priority`, anything else dropped) and a reasoning request asks for
+  `reasoning.encrypted_content` so multi-turn reasoning survives `store=false`.
+
+- **The token saver's truncation threw away the one line that explained the
+  failure.** A body over the head/tail threshold lost everything between them,
+  which is where a single `ERROR:` usually sits after two hundred healthy lines.
+  Up to 20 diagnostic lines from the dropped middle are now kept, and the
+  "+N lines truncated" marker counts only what was really dropped.
+
+- **A tool id from another client dialect reached Anthropic unchanged.**
+  `tool_use.id` must match `^[a-zA-Z0-9_-]+$`; an id minted by an OpenAI-shaped
+  client (`call.a:b`, a Responses id) was refused with 400. Foreign ids are now
+  rewritten deterministically to `toolu_<hash>`, and a `tool_result` is renamed
+  with the call it answers, so the pairing survives.
+
+- **A fifth `cache_control` marker was forwarded.** Anthropic refuses more than
+  four, and a rolling history plus the zcode quirk's two cacheable system blocks
+  could exceed the budget without the client asking for it. The head anchors (the
+  last system block and the last cacheable tool) stay, the tail-most remaining
+  markers are kept and the oldest dropped.
+
+- **An upstream `finish_reason: "stop"` beside tool calls ended the agent
+  loop.** vLLM and a few OpenAI-compatible servers report a plain stop after a
+  named `tool_choice`, and the loop reads that as the final answer. The turn is
+  now reported as `tool_calls`; `length` and `content_filter` are left alone.
+
+- **A combo stopped at the first member that could not fit the request.** Any
+  4xx except the account failures (401/402/403/429) was surfaced straight to
+  the client, so a 128K member rejected a 200K prompt instead of letting the
+  next member — or a provider with a bigger window — answer. Context-window
+  overflow, a safety/content-filter rejection, a capacity error and a model the
+  provider dropped now advance the chain without locking the account; a plain
+  bad request is still surfaced, because no other target can fix it.
+
+- **Tool rounds were sent to models that cannot call tools.** Cloudflare
+  Workers AI answers a tool request for e.g. `@cf/meta/llama-3.1-8b-instruct-fp8-fast`
+  with a 400. The history is now flattened to prose (tool calls and results
+  become text, definitions dropped) for models the catalogue does not declare
+  tool-capable, so the retrieved context survives the fallback.
+
+- **Fusion panel stragglers kept their connections open.** Once the grace
+  window or the hard timeout ended the wait, the losing panel calls ran until
+  their own timeout (up to 90s) while the answer had already been written. The
+  panel now shares one cancellable context, which also matches the upstream
+  fix for the same leak.
+
+- **A tool result was attributed to the assistant in the flattened history.**
+  It is environment output, so it is labelled as a user turn; the judge and
+  panel prompts no longer claim the model produced the file contents itself.
+
+- **The token saver rewrote `Read`, `Grep` and `Glob` output.** Truncating the
+  file text or match list the model asked for destroys the answer it is working
+  from, so those tools (read, grep, edit, write, patch, anchor, glob, view,
+  list_dir) are now skipped, matched case-insensitively. A tool result that
+  opens with `Error:`, `Exception:` or a Python traceback is preserved too: the
+  OpenAI Chat tool shape has no error flag, so the text was the only signal and
+  it was being compressed away.
+
+- **Claude passthrough forwarded the shapes Anthropic rejects.** Blank text
+  blocks, unsigned thinking blocks, empty turns, a mid-array `system` turn and
+  an assistant prefill ending in whitespace each produce a 400, and Claude
+  clients had their body forwarded verbatim. The passthrough lane now cleans
+  them up (and appends the `Continue.` user turn when cleanup would leave an
+  assistant tail), leaving an already-valid body untouched.
+
+- **`max_tokens` was sent to models that reject it.** gpt-5.x/gpt-6.x and the
+  o1/o3/o4 families only accept `max_completion_tokens`, so a Claude or OpenAI
+  client asking for a budget got `400 Unsupported parameter`. The field is now
+  renamed for those models on every lane, and a client that already sends
+  `max_completion_tokens` keeps its budget when the request is translated to a
+  Claude or Gemini provider.
+
+- **Cowork was handed a base URL ending in `/v1`, and Claude Desktop appends
+  `/v1/messages` to it.** Every Cowork inference call became
+  `/v1/v1/messages`, which the gateway answers with 404, so the app reported
+  `config_model_rejected`. The dashboard now sends the bare origin and the
+  handler strips a trailing `/v1` from any request, so an older client cannot
+  reintroduce the doubled path.
+
+- **Claude Code reset left `ANTHROPIC_DEFAULT_FABLE_MODEL` and the top-level
+  `model`/`autoCompactWindow` keys behind.** Reset now removes every managed
+  env key plus both top-level keys, and keeps a `model` the user set for the
+  official Anthropic API.
+
 ## [0.2.3] — 2026-11-25
 
 ### Changed

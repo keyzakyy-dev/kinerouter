@@ -687,15 +687,72 @@ func dedupLog(input string) string {
 
 // ----------------------------------------------------------- smart-truncate
 
+// severityWordsList is the vocabulary a line uses when it reports a failure.
+// A head/tail truncation keeps the beginning and the end of a body, which is
+// exactly where a single failure line usually is not: the run looked fine for
+// two hundred lines and then broke once. Those lines are recovered from the
+// middle instead of being dropped (upstream tokensaver/preserve.go).
+var severityWordsList = []string{
+	"error", "failed", "failure", "exception", "traceback", "fail",
+	`ts\d{4}`, "✖", "fatal", "panic", "critical",
+}
+
+var reSeverity = regexp.MustCompile(`(?i)` + strings.Join(severityWordsList, "|"))
+
+// maxPreservedDiagnosticLines caps how many diagnostic lines a truncation may
+// re-add: a body where every line mentions "error" would otherwise grow instead
+// of shrink. The first matches in document order win.
+const maxPreservedDiagnosticLines = 20
+
+// preservedDiagnosticLines returns the diagnostic lines of the middle of a
+// body, in their original order and without duplicates. kept holds the lines
+// the head and tail already keep, so none is added a second time.
+func preservedDiagnosticLines(middle, kept []string) []string {
+	seen := make(map[string]bool, len(kept))
+	for _, l := range kept {
+		seen[strings.TrimSpace(l)] = true
+	}
+	out := make([]string, 0, maxPreservedDiagnosticLines)
+	for _, l := range middle {
+		if len(out) >= maxPreservedDiagnosticLines {
+			break
+		}
+		key := strings.TrimSpace(l)
+		if key == "" || seen[key] || !reSeverity.MatchString(l) {
+			continue
+		}
+		seen[key] = true
+		out = append(out, l)
+	}
+	return out
+}
+
+// truncateKeepDiagnostics keeps the head and the tail of a body, plus the
+// diagnostic lines the dropped middle carried, and reports how many lines were
+// really dropped so the marker never claims to have dropped a line that is
+// still in the result.
+func truncateKeepDiagnostics(lines []string, headCount, tailCount int) (head, kept, tail []string, cut int) {
+	head = lines[:headCount]
+	tail = lines[len(lines)-tailCount:]
+	middle := lines[headCount : len(lines)-tailCount]
+	already := make([]string, 0, len(head)+len(tail))
+	already = append(already, head...)
+	already = append(already, tail...)
+	kept = preservedDiagnosticLines(middle, already)
+	return head, kept, tail, len(middle) - len(kept)
+}
+
 func smartTruncate(input string) string {
 	lines := strings.Split(input, "\n")
 	if len(lines) < smartTruncateMinLine {
 		return input
 	}
-	head := lines[:smartTruncateHead]
-	tail := lines[len(lines)-smartTruncateTail:]
-	cut := len(lines) - len(head) - len(tail)
-	return strings.Join(head, "\n") + fmt.Sprintf("\n... +%d lines truncated\n", cut) + strings.Join(tail, "\n")
+	head, kept, tail, cut := truncateKeepDiagnostics(lines, smartTruncateHead, smartTruncateTail)
+	out := strings.Join(head, "\n")
+	if len(kept) > 0 {
+		out += "\n... (diagnostics from the dropped middle)\n" + strings.Join(kept, "\n")
+	}
+	return out + fmt.Sprintf("\n... +%d lines truncated\n", cut) + strings.Join(tail, "\n")
 }
 
 // ------------------------------------------------------------ read-numbered
@@ -707,10 +764,12 @@ func readNumbered(input string) string {
 	if len(lines) < smartTruncateMinLine {
 		return input
 	}
-	head := lines[:smartTruncateHead]
-	tail := lines[len(lines)-smartTruncateTail:]
-	cut := len(lines) - len(head) - len(tail)
-	return strings.Join(head, "\n") + fmt.Sprintf("\n... +%d lines truncated (file continues)\n", cut) + strings.Join(tail, "\n")
+	head, kept, tail, cut := truncateKeepDiagnostics(lines, smartTruncateHead, smartTruncateTail)
+	out := strings.Join(head, "\n")
+	if len(kept) > 0 {
+		out += "\n... (diagnostics from the dropped middle)\n" + strings.Join(kept, "\n")
+	}
+	return out + fmt.Sprintf("\n... +%d lines truncated (file continues)\n", cut) + strings.Join(tail, "\n")
 }
 
 // ------------------------------------------------------------- search-list

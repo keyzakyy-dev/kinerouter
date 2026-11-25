@@ -101,6 +101,17 @@ func (g *Gateway) handleCliCodexPost(w http.ResponseWriter, r *http.Request) {
 	agents := tomlSection(parsed, "agents")
 	delete(agents, "subagent")
 	agents["default_subagent_model"] = firstNonEmpty(str(body, "subagentModel"), model)
+	// Codex sizes its context meter and its auto-compact trigger from its own
+	// model registry; a custom provider's model is not in it, so the numbers
+	// have to be stated. Compaction fires from the limit, and 90% keeps the
+	// triggering turn under a boundary the upstream actually enforces.
+	if lim := g.cliModelLimit(model); lim.Known {
+		parsed["model_context_window"] = lim.Context
+		parsed["model_auto_compact_token_limit"] = lim.Context - lim.Context/10
+		if lim.MaxOutput > 0 {
+			parsed["model_max_output_tokens"] = lim.MaxOutput
+		}
+	}
 	content, err := stringifyToml(parsed)
 	if err != nil || writeAtomic(codexConfigPath(), []byte(content)) != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to update codex settings"})
@@ -127,23 +138,20 @@ func (g *Gateway) handleCliCodexDelete(w http.ResponseWriter, r *http.Request) {
 		delete(a, "default_subagent_model")
 		delete(a, "subagent")
 	}
+	// The limit keys are global in codex's config, so one left behind would
+	// describe this gateway's window to whatever provider the user picks next.
+	delete(parsed, "model_context_window")
+	delete(parsed, "model_auto_compact_token_limit")
+	delete(parsed, "model_max_output_tokens")
 	content, err := stringifyToml(parsed)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to reset codex settings"})
 		return
 	}
 	writeAtomic(path, []byte(content))
-
-	authPath := codexAuthPath()
-	if auth := readJSONMap(authPath); auth != nil {
-		delete(auth, "OPENAI_API_KEY")
-		delete(auth, "auth_mode")
-		if len(auth) == 0 {
-			os.Remove(authPath)
-		} else {
-			writeJSONFile(authPath, auth)
-		}
-	}
+	// auth.json is deliberately not a target: a custom provider ignores it and
+	// authenticates with the header written above, so the user's own login for
+	// the official API survives a reset.
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": "KineRouter settings removed successfully"})
 }
 
@@ -886,8 +894,19 @@ func ompRemoveProviderBlock(content string) string {
 	return strings.Join(append(append([]string{}, lines[:start]...), lines[end:]...), "\n")
 }
 
-func ompBuildProviderYAML(baseURL, apiKey string) string {
-	return "  " + grokMainSlot + ":\n" +
+// yamlScalar renders a YAML double-quoted scalar. oh-my-pi's loader accepts it
+// for every model id, including the ones with slashes and brackets.
+func yamlScalar(s string) string {
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
+}
+
+// ompBuildProviderYAML writes the provider block oh-my-pi reads. The models list
+// matters: omp decides compaction from the per-model context window, and a
+// discovered model without one has no context percentage and never
+// auto-compacts, so the entry is written for every apply (9router-go
+// crush_pi_omp.go).
+func ompBuildProviderYAML(baseURL, apiKey, model string, ctx, maxOut int64) string {
+	block := "  " + grokMainSlot + ":\n" +
 		"    baseUrl: " + normalizeV1(baseURL) + "\n" +
 		"    apiKey: " + apiKey + "\n" +
 		"    api: openai-completions\n" +
@@ -895,6 +914,15 @@ func ompBuildProviderYAML(baseURL, apiKey string) string {
 		"    disableStrictTools: true\n" +
 		"    discovery:\n" +
 		"      type: proxy"
+	if model == "" {
+		return block
+	}
+	return block + "\n" +
+		"    models:\n" +
+		"      - id: " + yamlScalar(model) + "\n" +
+		"        name: " + yamlScalar(model) + "\n" +
+		"        contextWindow: " + itoa(ctx) + "\n" +
+		"        maxTokens: " + itoa(maxOut)
 }
 
 func ompHasKineRouter(content string) bool {
@@ -934,8 +962,17 @@ func (g *Gateway) handleCliOmpPost(w http.ResponseWriter, r *http.Request) {
 	resolvedKey := g.resolveCliAPIKey(str(body, "apiKey"))
 	os.MkdirAll(ompDir(), 0o700)
 
+	// Same defaults as pi's adapter; a resolved capacity wins.
+	model := firstNonEmpty(str(body, "model"), "provider/model-id")
+	ctx, maxOut := int64(128000), int64(16384)
+	if lim := g.cliModelLimit(model); lim.Known {
+		ctx = lim.Context
+		if lim.MaxOutput > 0 {
+			maxOut = lim.MaxOutput
+		}
+	}
 	content := ompRemoveProviderBlock(readTextOrEmpty(ompModelsPath()))
-	block := ompBuildProviderYAML(baseURL, resolvedKey)
+	block := ompBuildProviderYAML(baseURL, resolvedKey, model, ctx, maxOut)
 	switch {
 	case strings.TrimSpace(content) == "":
 		content = "providers:\n" + block + "\n"

@@ -44,22 +44,23 @@ type OpenAIMessage struct {
 }
 
 type OpenAIRequest struct {
-	Model             string          `json:"model"`
-	Messages          []OpenAIMessage `json:"messages"`
-	Stream            bool            `json:"stream,omitempty"`
-	MaxTokens         *int            `json:"max_tokens,omitempty"`
-	Temperature       *float64        `json:"temperature,omitempty"`
-	TopP              *float64        `json:"top_p,omitempty"`
-	Stop              json.RawMessage `json:"stop,omitempty"`
-	Tools             []OpenAITool    `json:"tools,omitempty"`
-	ToolChoice        json.RawMessage `json:"tool_choice,omitempty"`
-	ParallelToolCalls *bool           `json:"parallel_tool_calls,omitempty"`
-	StreamOptions     json.RawMessage `json:"stream_options,omitempty"`
-	ReasoningEffort   string          `json:"reasoning_effort,omitempty"`
-	User              string          `json:"user,omitempty"`
-	Seed              *int64          `json:"seed,omitempty"`
-	ResponseFormat    json.RawMessage `json:"response_format,omitempty"`
-	Metadata          json.RawMessage `json:"metadata,omitempty"`
+	Model               string          `json:"model"`
+	Messages            []OpenAIMessage `json:"messages"`
+	Stream              bool            `json:"stream,omitempty"`
+	MaxTokens           *int            `json:"max_tokens,omitempty"`
+	MaxCompletionTokens *int            `json:"max_completion_tokens,omitempty"`
+	Temperature         *float64        `json:"temperature,omitempty"`
+	TopP                *float64        `json:"top_p,omitempty"`
+	Stop                json.RawMessage `json:"stop,omitempty"`
+	Tools               []OpenAITool    `json:"tools,omitempty"`
+	ToolChoice          json.RawMessage `json:"tool_choice,omitempty"`
+	ParallelToolCalls   *bool           `json:"parallel_tool_calls,omitempty"`
+	StreamOptions       json.RawMessage `json:"stream_options,omitempty"`
+	ReasoningEffort     string          `json:"reasoning_effort,omitempty"`
+	User                string          `json:"user,omitempty"`
+	Seed                *int64          `json:"seed,omitempty"`
+	ResponseFormat      json.RawMessage `json:"response_format,omitempty"`
+	Metadata            json.RawMessage `json:"metadata,omitempty"`
 }
 
 type OpenAIUsage struct {

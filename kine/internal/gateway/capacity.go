@@ -88,15 +88,20 @@ func (g *Gateway) capsFor(modelStr string) catalogCaps {
 }
 
 func (g *Gateway) contextWindowFor(modelStr string) int64 {
+	if g == nil || g.cfg == nil {
+		return 0
+	}
 	provider, model := splitModelRef(modelStr)
 	_, ctx := g.loadCatalog()
 	if n, ok := ctx[provider+":"+baseModelID(model)]; ok && n > 0 {
 		return n
 	}
-	if t, ok := g.reg.ByID[provider]; ok {
-		for i := range t.Models {
-			if t.Models[i].ID == model || t.Models[i].UpstreamModelID == model {
-				return t.Models[i].ContextLength
+	if g.reg != nil {
+		if t, ok := g.reg.ByID[provider]; ok {
+			for i := range t.Models {
+				if t.Models[i].ID == model || t.Models[i].UpstreamModelID == model {
+					return t.Models[i].ContextLength
+				}
 			}
 		}
 	}

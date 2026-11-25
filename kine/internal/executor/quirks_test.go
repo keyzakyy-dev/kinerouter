@@ -197,3 +197,78 @@ func TestCodexQuirks(t *testing.T) {
 		t.Fatalf("codex headers %v", h)
 	}
 }
+
+// The ChatGPT Codex backend rejects any parameter outside its allowlist with
+// 400 "Unsupported parameter", so a client that sends temperature or an output
+// budget would never get an answer.
+func TestCodexUnsupportedParamsDropped(t *testing.T) {
+	body := map[string]any{
+		"model":                 "gpt-5.3-codex",
+		"input":                 []any{map[string]any{"type": "message", "role": "user", "content": "hi"}},
+		"temperature":           0.7,
+		"top_p":                 0.9,
+		"max_output_tokens":     4096,
+		"max_tokens":            4096,
+		"max_completion_tokens": 4096,
+		"metadata":              map[string]any{"k": "v"},
+		"stream_options":        map[string]any{"include_usage": true},
+		"previous_response_id":  "resp_1",
+		"user":                  "someone",
+		"seed":                  7.0,
+		"n":                     2.0,
+		"prompt_cache_key":      "cache-1",
+		"parallel_tool_calls":   true,
+		"text":                  map[string]any{"format": map[string]any{"type": "text"}},
+	}
+	ApplyQuirksBody("codex", "gpt-5.3-codex", body, true)
+	for _, k := range []string{"temperature", "top_p", "max_output_tokens", "max_tokens",
+		"max_completion_tokens", "metadata", "stream_options", "previous_response_id",
+		"user", "seed", "n"} {
+		if _, ok := body[k]; ok {
+			t.Fatalf("%s must be dropped for codex: %#v", k, body)
+		}
+	}
+	for _, k := range []string{"model", "input", "stream", "instructions", "prompt_cache_key",
+		"parallel_tool_calls", "text"} {
+		if _, ok := body[k]; !ok {
+			t.Fatalf("%s must survive: %#v", k, body)
+		}
+	}
+}
+
+func TestCodexServiceTierAndReasoningInclude(t *testing.T) {
+	fast := map[string]any{"input": "hi", "service_tier": "fast", "speed": true}
+	ApplyQuirksBody("codex", "m", fast, true)
+	if fast["service_tier"] != "priority" {
+		t.Fatalf("fast tier: %v", fast["service_tier"])
+	}
+	if _, ok := fast["speed"]; ok {
+		t.Fatal("the client-only speed hint must be dropped")
+	}
+	flex := map[string]any{"input": "hi", "service_tier": "flex"}
+	ApplyQuirksBody("codex", "m", flex, true)
+	if _, ok := flex["service_tier"]; ok {
+		t.Fatalf("a tier the backend does not accept must be dropped: %v", flex["service_tier"])
+	}
+	// Reasoning effort asks for encrypted content so a store=false session can
+	// carry the reasoning forward.
+	r := map[string]any{"input": "hi", "reasoning": map[string]any{"effort": "high"}}
+	ApplyQuirksBody("codex", "m", r, true)
+	inc, _ := r["include"].([]any)
+	if len(inc) != 1 || inc[0] != "reasoning.encrypted_content" {
+		t.Fatalf("include: %v", r["include"])
+	}
+	// A client-supplied include list is preserved.
+	own := map[string]any{"input": "hi", "reasoning": map[string]any{"effort": "high"},
+		"include": []any{"message.output_text.logprobs"}}
+	ApplyQuirksBody("codex", "m", own, true)
+	if got := own["include"].([]any); len(got) != 1 || got[0] != "message.output_text.logprobs" {
+		t.Fatalf("client include overwritten: %v", got)
+	}
+	// effort "none" does not ask for reasoning content.
+	none := map[string]any{"input": "hi", "reasoning": map[string]any{"effort": "none"}}
+	ApplyQuirksBody("codex", "m", none, true)
+	if none["include"] != nil {
+		t.Fatalf("effort none must not request reasoning: %v", none["include"])
+	}
+}

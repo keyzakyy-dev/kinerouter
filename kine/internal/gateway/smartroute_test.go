@@ -90,7 +90,10 @@ func TestFlattenToolHistory(t *testing.T) {
 	if out[1].(map[string]any)["content"] != "ok\n"+toolCallPrefix+"read]" {
 		t.Fatalf("assistant: %v", out[1])
 	}
-	if out[2].(map[string]any)["role"] != "assistant" || out[2].(map[string]any)["content"] != toolResultPrefix+"file body]" {
+	if out[2].(map[string]any)["role"] != "user" || out[2].(map[string]any)["content"] != toolResultPrefix+"file body]" {
+		// A tool result is environment output, so it reads as a user turn:
+		// attributing it to the model made the panel/judge prompts claim the
+		// assistant had produced the file contents itself.
 		t.Fatalf("tool turn: %v", out[2])
 	}
 }

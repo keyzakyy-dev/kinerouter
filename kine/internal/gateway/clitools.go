@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/keyzakyy-dev/kinerouter/internal/providerdata"
@@ -357,10 +358,16 @@ func (g *Gateway) handleCliCrushPost(w http.ResponseWriter, r *http.Request) {
 	}
 	providers := section(existing, "providers")
 	modelID := firstNonEmpty(str(body, "model"), "provider/model-id")
+	// A resolved window beats the 128000 guess: a wrong guess is exactly how a
+	// client misses its compaction boundary (9router-go crushContextWindowFor).
+	window := int64(128000)
+	if lim := g.cliModelLimit(modelID); lim.Known {
+		window = lim.Context
+	}
 	providers["kinerouter"] = map[string]any{
 		"type": "openai-compat", "base_url": normalizeV1(baseURL),
 		"api_key": g.resolveCliAPIKey(str(body, "apiKey")),
-		"models":  []any{map[string]any{"id": modelID, "name": modelID, "context_window": 128000}},
+		"models":  []any{map[string]any{"id": modelID, "name": modelID, "context_window": window}},
 	}
 	if err := writeJSONFile(path, existing); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": map[string]any{"message": err.Error()}})
@@ -519,6 +526,7 @@ func (g *Gateway) handleCliDroidPost(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	ourStart := len(kept)
 	for i, m := range models {
 		kept = append(kept, map[string]any{
 			"model": m, "id": "custom:KineRouter-" + itoa(int64(i)), "index": i,
@@ -526,12 +534,20 @@ func (g *Gateway) handleCliDroidPost(w http.ResponseWriter, r *http.Request) {
 			"maxOutputTokens": 131072, "noImageSupport": false, "provider": "openai",
 		})
 	}
-	if defaultIndex >= 0 && defaultIndex < len(kept) {
-		first := kept[defaultIndex]
-		kept = append(kept[:defaultIndex], kept[defaultIndex+1:]...)
+	// defaultIndex counts our own entries, not the whole array: moving kept[0]
+	// would promote the user's unrelated model instead of the active one.
+	if defaultIndex >= 0 && defaultIndex < len(models) {
+		first := kept[ourStart+defaultIndex]
+		pick := ourStart + defaultIndex
+		kept = append(kept[:pick], kept[pick+1:]...)
 		kept = append([]any{first}, kept...)
-		for i, m := range kept {
-			objMap(m)["index"] = i
+	}
+	// Droid addresses a custom model by its `index` field, not by its position,
+	// so every entry is renumbered from zero on every write (9router-go's
+	// droidRenumber): one stale index points that row at another model.
+	for i, m := range kept {
+		if obj := objMap(m); obj != nil {
+			obj["index"] = i
 		}
 	}
 	settings["customModels"] = kept
@@ -634,10 +650,22 @@ func (g *Gateway) handleCliOpencodePost(w http.ResponseWriter, r *http.Request) 
 	opts["baseURL"] = normalizeV1(baseURL)
 	opts["apiKey"] = g.resolveCliAPIKey(str(body, "apiKey"))
 	modelsMap := section(existing, "models")
-	for _, m := range models {
+	for _, rawModel := range models {
+		// The prefix is stripped and re-added at every write, so a caller passing
+		// an id already copied out of opencode does not end up with a double one.
+		m := strings.TrimPrefix(rawModel, "kinerouter/")
 		entry := map[string]any{
 			"name":       m,
 			"modalities": map[string]any{"input": []any{"text", "image"}, "output": []any{"text"}},
+		}
+		// An explicit limit is what gives opencode a context percentage and an
+		// auto-compact boundary; a model unknown to its own snapshot has neither.
+		if lim := g.cliModelLimit(m); lim.Known {
+			limit := map[string]any{"context": lim.Context}
+			if lim.MaxOutput > 0 {
+				limit["output"] = lim.MaxOutput
+			}
+			entry["limit"] = limit
 		}
 		// Effort variants come from the same thinking-level table the dashboard
 		// picker uses; levels are per provider+model. Existing user-tuned
@@ -657,12 +685,12 @@ func (g *Gateway) handleCliOpencodePost(w http.ResponseWriter, r *http.Request) 
 		if s, _ := v.(string); s == "" && v != nil {
 			cfg["model"] = ""
 		} else if s != "" {
-			cfg["model"] = "kinerouter/" + s
+			cfg["model"] = "kinerouter/" + strings.TrimPrefix(s, "kinerouter/")
 		}
 	} else if len(models) > 0 {
-		cfg["model"] = "kinerouter/" + models[0]
+		cfg["model"] = "kinerouter/" + strings.TrimPrefix(models[0], "kinerouter/")
 	}
-	subagent := firstNonEmpty(str(body, "subagentModel"), models[0])
+	subagent := strings.TrimPrefix(firstNonEmpty(str(body, "subagentModel"), models[0]), "kinerouter/")
 	if len(models) > 0 {
 		agent := section(cfg, "agent")
 		agent["explorer"] = map[string]any{
@@ -871,8 +899,18 @@ func (g *Gateway) handleCliPiPost(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			mt = prevModels[id]["maxTokens"]
 		}
-		out["contextWindow"] = capNum(cw, 200000, 2000000)
-		out["maxTokens"] = capNum(mt, 64000, 200000)
+		// 9router-go's pi defaults (128000/16384); a resolved capacity replaces
+		// them field by field, because a model may publish a window without an
+		// output cap.
+		ctxFallback, tokFallback := int64(128000), int64(16384)
+		if lim := g.cliModelLimit(id); lim.Known {
+			ctxFallback = lim.Context
+			if lim.MaxOutput > 0 {
+				tokFallback = lim.MaxOutput
+			}
+		}
+		out["contextWindow"] = capNum(cw, ctxFallback, 2000000)
+		out["maxTokens"] = capNum(mt, tokFallback, 200000)
 		return out
 	}
 	var modelList []any
@@ -1214,8 +1252,21 @@ func claudeJSONPath() string     { return homePath(".claude.json") }
 
 var claudeExaEntry = map[string]any{"type": "http", "url": "https://mcp.exa.ai/mcp"}
 
+// claudeTiers are the four model slots Claude Code resolves by name, in the
+// order 9router-go writes them (clientconfig/claude.go).
+var claudeTiers = []struct{ tier, env string }{
+	{"fable", "ANTHROPIC_DEFAULT_FABLE_MODEL"},
+	{"opus", "ANTHROPIC_DEFAULT_OPUS_MODEL"},
+	{"sonnet", "ANTHROPIC_DEFAULT_SONNET_MODEL"},
+	{"haiku", "ANTHROPIC_DEFAULT_HAIKU_MODEL"},
+}
+
+// claudeResetEnvKeys is every env key Apply manages; Reset removes exactly
+// these. API_TIMEOUT_MS is ours (the TUI quick setup writes it), so a reset has
+// to clear it too — 9router-go never writes it, hence it is absent upstream.
 var claudeResetEnvKeys = []string{
 	"ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN",
+	"ANTHROPIC_DEFAULT_FABLE_MODEL",
 	"ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL",
 	"API_TIMEOUT_MS", "CLAUDE_CODE_AUTO_COMPACT_WINDOW",
 }
@@ -1232,11 +1283,32 @@ func (g *Gateway) cliClaudeStatus() map[string]any {
 	if servers := objMap(claudeJSON["mcpServers"]); servers != nil {
 		_, exaOn = servers["exa"]
 	}
-	return map[string]any{
+	// The dashboard form is driven by these fields, mirroring 9router-go's
+	// adapter Current(): a tier or model the file does not carry stays absent,
+	// so the UI can tell "unset" from "empty" and leave the key alone on Apply.
+	tiers := map[string]any{}
+	for _, t := range claudeTiers {
+		if v := str(env, t.env); v != "" {
+			tiers[t.tier] = v
+		}
+	}
+	out := map[string]any{
 		"installed": true, "settings": settings,
 		"hasKineRouter": env != nil && str(env, "ANTHROPIC_BASE_URL") != "",
-		"exaMcpEnabled": exaOn, "settingsPath": path,
+		"exaMcpEnabled": exaOn, "settingsPath": path, "tiers": tiers,
 	}
+	if base := str(env, "ANTHROPIC_BASE_URL"); base != "" {
+		out["baseUrl"] = base
+	}
+	if m := str(settings, "model"); m != "" {
+		out["model"] = m
+	}
+	if v, ok := settings["autoCompactWindow"]; ok {
+		out["autoCompactWindow"] = numString(v)
+	} else if v := str(env, "CLAUDE_CODE_AUTO_COMPACT_WINDOW"); v != "" {
+		out["autoCompactWindow"] = v
+	}
+	return out
 }
 
 func (g *Gateway) handleCliClaudeGet(w http.ResponseWriter, r *http.Request) {
@@ -1267,27 +1339,54 @@ func writeClaudeJSONMcp(enable bool) {
 	writeJSONFile(path, data)
 }
 
+// handleCliClaudePost writes ~/.claude/settings.json the way 9router-go's
+// clientconfig adapter does. Two request shapes are accepted:
+//
+//	{baseUrl, apiKey, model, tiers{fable,opus,sonnet,haiku}, autoCompactWindow}
+//	{env: {ANTHROPIC_*}}   (older dashboard and the TUI's quick setup)
+//
+// The env map wins for any key it carries, so a caller that already knows the
+// exact variable names is never surprised. An empty value never deletes:
+// 9router-go leaves a tier the caller did not name exactly as the user had it,
+// because "no value" and "the dashboard could not resolve one" look alike.
 func (g *Gateway) handleCliClaudePost(w http.ResponseWriter, r *http.Request) {
 	var body map[string]any
 	if err := decodeBody(r, &body); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to update claude settings"})
 		return
 	}
-	env, ok := body["env"].(map[string]any)
-	if !ok {
+	env := objMap(body["env"])
+	if env == nil {
+		env = map[string]any{}
+	}
+	if body["env"] != nil && objMap(body["env"]) == nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Invalid env object"})
 		return
 	}
+
+	base := strings.TrimSpace(firstNonEmpty(str(body, "baseUrl"), str(env, "ANTHROPIC_BASE_URL")))
+	token := strings.TrimSpace(firstNonEmpty(str(body, "apiKey"), str(env, "ANTHROPIC_AUTH_TOKEN")))
+	model := strings.TrimSpace(str(body, "model"))
+	compact := numString(body["autoCompactWindow"])
+	compactFromEnv := false
+	if compact == "" {
+		compact = numString(env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"])
+		compactFromEnv = compact != ""
+	}
+	bodyTiers := objMap(body["tiers"])
+	tierValues := map[string]string{}
+	for _, t := range claudeTiers {
+		v := strings.TrimSpace(str(bodyTiers, t.tier))
+		if v == "" {
+			v = strings.TrimSpace(str(env, t.env))
+		}
+		tierValues[t.env] = v
+	}
+
 	path := claudeSettingsPath()
 	current := readJSONMap(path)
 	if current == nil {
 		current = map[string]any{}
-	}
-	if base, ok := env["ANTHROPIC_BASE_URL"].(string); ok && base != "" {
-		env["ANTHROPIC_BASE_URL"] = normalizeV1(base)
-	}
-	if curEnv := objMap(current["env"]); curEnv != nil && str(curEnv, "ANTHROPIC_AUTH_TOKEN") != "" {
-		delete(env, "ANTHROPIC_AUTH_TOKEN")
 	}
 	merged := map[string]any{}
 	for k, v := range current {
@@ -1298,20 +1397,70 @@ func (g *Gateway) handleCliClaudePost(w http.ResponseWriter, r *http.Request) {
 	for k, v := range objMap(current["env"]) {
 		mergedEnv[k] = v
 	}
+	// The env-map shape writes exactly the keys it carries (the TUI relies on
+	// API_TIMEOUT_MS landing verbatim). An empty value never clears: callers
+	// send "" for "no change", not for "delete this".
 	for k, v := range env {
+		if sv, ok := v.(string); ok && sv == "" {
+			continue
+		}
 		mergedEnv[k] = v
 	}
-	if v, ok := body["autoCompactWindow"]; ok && v != nil && v != "" && v != 0 {
-		mergedEnv["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = numString(v)
-	} else {
-		delete(mergedEnv, "CLAUDE_CODE_AUTO_COMPACT_WINDOW")
+	if base != "" {
+		mergedEnv["ANTHROPIC_BASE_URL"] = normalizeV1(base)
 	}
+	// A supplied token replaces whatever the file held; an empty one keeps the
+	// saved token so "Apply" on an unchanged form never breaks a working setup.
+	if token != "" {
+		mergedEnv["ANTHROPIC_AUTH_TOKEN"] = token
+	}
+	for _, t := range claudeTiers {
+		if v := tierValues[t.env]; v != "" {
+			mergedEnv[t.env] = v
+		}
+	}
+
+	// autoCompactWindow is the top-level key Claude Code reads; the env var only
+	// exists for the window the resolver knows, so the CLI compacts at the real
+	// boundary of a proxied model instead of its built-in name-based guess.
+	derived := g.claudeCompactWindow(model, tierValues)
+	if compact != "" && compact != "default" && compact != "0" {
+		if n, err := strconv.Atoi(compact); err == nil {
+			merged["autoCompactWindow"] = n
+		} else {
+			merged["autoCompactWindow"] = compact
+		}
+		if derived > 0 {
+			mergedEnv["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = strconv.Itoa(derived)
+		} else if !compactFromEnv {
+			// Nothing to resolve against: honour the picked window rather than
+			// leaving the CLI on its built-in assumption.
+			mergedEnv["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = compact
+		}
+	} else {
+		delete(merged, "autoCompactWindow")
+		delete(mergedEnv, "CLAUDE_CODE_AUTO_COMPACT_WINDOW")
+		if derived > 0 {
+			mergedEnv["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = strconv.Itoa(derived)
+		}
+	}
+
+	// The primary model is a top-level key. Clearing it only removes ours: a
+	// "model" the user set for the official API is not ours to delete.
+	if model != "" {
+		merged["model"] = model
+	} else if claudePointsAtGateway(merged, base) {
+		delete(merged, "model")
+	}
+
 	merged["env"] = mergedEnv
 	if err := writeJSONFile(path, merged); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to update claude settings"})
 		return
 	}
-	writeClaudeJSONMcp(body["exaMcpEnabled"] == true)
+	if v, ok := body["exaMcpEnabled"]; ok {
+		writeClaudeJSONMcp(v == true)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Settings updated successfully"})
 }
 
@@ -1325,7 +1474,9 @@ func (g *Gateway) handleCliClaudeDelete(w http.ResponseWriter, r *http.Request) 
 	if current == nil {
 		current = map[string]any{}
 	}
-	if env := objMap(current["env"]); env != nil {
+	env := objMap(current["env"])
+	owned := claudePointsAtGateway(current, "")
+	if env != nil {
 		for _, k := range claudeResetEnvKeys {
 			delete(env, k)
 		}
@@ -1333,9 +1484,92 @@ func (g *Gateway) handleCliClaudeDelete(w http.ResponseWriter, r *http.Request) 
 			delete(current, "env")
 		}
 	}
+	delete(current, "autoCompactWindow")
+	if owned {
+		delete(current, "model")
+	}
 	writeClaudeJSONMcp(false)
 	writeJSONFile(path, current)
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Settings reset successfully"})
+}
+
+// claudePointsAtGateway reports whether a settings map already exposes the
+// gateway. Without an explicit base URL the managed port is the only signal.
+func claudePointsAtGateway(settings map[string]any, base string) bool {
+	raw := strings.TrimRight(strings.TrimSpace(str(objMap(settings["env"]), "ANTHROPIC_BASE_URL")), "/")
+	if raw == "" || strings.Contains(raw, "api.anthropic.com") {
+		return false
+	}
+	norm := func(s string) string { return strings.Replace(s, "127.0.0.1", "localhost", 1) }
+	if base != "" {
+		target := strings.TrimRight(strings.TrimSpace(base), "/")
+		want := norm(target)
+		wantV1 := norm(normalizeV1(target))
+		return norm(raw) == want || norm(raw) == wantV1
+	}
+	return strings.Contains(raw, "20128") || strings.Contains(raw, "kinerouter")
+}
+
+// cliModelLimit is the resolved capacity of a model id, for the client configs
+// that have to state a context window themselves (codex, opencode, crush, pi,
+// omp). Known is false when nothing resolved, which is what keeps a writer from
+// inventing a number 9router-go would not write.
+type cliModelLimit struct {
+	Context   int64
+	MaxOutput int64
+	Known     bool
+}
+
+func (g *Gateway) cliModelLimit(model string) cliModelLimit {
+	m := strings.TrimSuffix(strings.TrimSpace(model), "[1m]")
+	if m == "" || g == nil {
+		return cliModelLimit{}
+	}
+	ctx := g.contextWindowFor(m)
+	if ctx <= 0 {
+		return cliModelLimit{}
+	}
+	provider, name := splitModelRef(m)
+	return cliModelLimit{
+		Context:   ctx,
+		MaxOutput: providerdata.CapabilitiesFor(provider, name).MaxOutput,
+		Known:     true,
+	}
+}
+
+// claudeCompactWindow is the narrowest context window among the models the form
+// names, clamped to Claude Code's 100K–1M range. Claude Code applies one env
+// value to every tier, so the narrowest is the only choice that never
+// overshoots a real limit. Zero means "nothing resolved, write nothing".
+func (g *Gateway) claudeCompactWindow(model string, tiers map[string]string) int {
+	best := 0
+	consider := func(m string) {
+		m = strings.TrimSuffix(strings.TrimSpace(m), "[1m]")
+		if m == "" || g == nil {
+			return
+		}
+		w := int(g.contextWindowFor(m))
+		if w <= 0 {
+			return
+		}
+		if best == 0 || w < best {
+			best = w
+		}
+	}
+	consider(model)
+	for _, t := range claudeTiers {
+		consider(tiers[t.env])
+	}
+	if best == 0 {
+		return 0
+	}
+	if best > 1000000 {
+		return 1000000
+	}
+	if best < 100000 {
+		return 100000
+	}
+	return best
 }
 
 // ---------------------------------------------------------------- devin

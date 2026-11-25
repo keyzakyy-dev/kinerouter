@@ -116,83 +116,11 @@ const (
 )
 
 // flattenToolHistory turns tool turns into prose so panel models keep context
-// but cannot emit tool calls.
+// but cannot emit tool calls. Shared with the non-tool-model lane so both send
+// the same shape.
 func flattenToolHistory(items []any) []any {
-	out := make([]any, 0, len(items))
-	for _, it := range items {
-		m := objMap(it)
-		if m == nil {
-			out = append(out, it)
-			continue
-		}
-		role := str(m, "role")
-		if role == "tool" || role == "function" {
-			cp := cloneMap(m)
-			cp["role"] = "assistant"
-			cp["content"] = toolResultPrefix + contentText(m["content"]) + "]"
-			out = append(out, cp)
-			continue
-		}
-		if role == "assistant" {
-			if calls, ok := m["tool_calls"].([]any); ok {
-				cp := cloneMap(m)
-				delete(cp, "tool_calls")
-				names := make([]string, 0, len(calls))
-				for _, c := range calls {
-					cm := objMap(c)
-					n := firstNonEmpty(strAny(objMap(cm["function"])["name"]), strAny(cm["name"]), "tool")
-					names = append(names, n)
-				}
-				base := contentText(m["content"])
-				if base != "" {
-					base += "\n"
-				}
-				cp["content"] = base + toolCallPrefix + strings.Join(names, ", ") + "]"
-				out = append(out, cp)
-				continue
-			}
-		}
-		if blocks, ok := m["content"].([]any); ok {
-			var texts, toolNames, toolResults []string
-			touched := false
-			for _, b := range blocks {
-				bm := objMap(b)
-				switch str(bm, "type") {
-				case "text":
-					if s, _ := bm["text"].(string); s != "" {
-						texts = append(texts, s)
-					}
-				case "tool_use":
-					toolNames = append(toolNames, firstNonEmpty(str(bm, "name"), "tool"))
-					touched = true
-				case "tool_result":
-					toolResults = append(toolResults, contentText(bm["content"]))
-					touched = true
-				}
-			}
-			if touched {
-				cp := cloneMap(m)
-				content := strings.Join(texts, "\n")
-				if len(toolNames) > 0 {
-					if content != "" {
-						content += "\n"
-					}
-					content += toolCallPrefix + strings.Join(toolNames, ", ") + "]"
-				}
-				if len(toolResults) > 0 {
-					if content != "" {
-						content += "\n"
-					}
-					content += toolResultPrefix + strings.Join(toolResults, "\n") + "]"
-				}
-				cp["content"] = content
-				out = append(out, cp)
-				continue
-			}
-		}
-		out = append(out, it)
-	}
-	return out
+	flat, _ := flattenToolTurns(items)
+	return flat
 }
 
 // appendUserTurn adds a synthesized user turn in whichever array the body uses.
@@ -329,6 +257,11 @@ func resolveOrNil(g *Gateway, model string) []target {
 func (g *Gateway) runPanel(r *http.Request, panel []string, body map[string]any, apiKey, clientFormat string, minPanel int, tuning fusionTuning) []*panelResult {
 	out := make([]*panelResult, len(panel))
 	done := make(chan int, len(panel))
+	// One context for the whole panel: when the grace window or the hard
+	// timeout ends the wait, the stragglers' upstream calls are cancelled
+	// instead of holding their sockets until their own timeout expires.
+	panelCtx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 	var mu sync.Mutex
 	go func() {
 		var wg sync.WaitGroup
@@ -337,13 +270,16 @@ func (g *Gateway) runPanel(r *http.Request, panel []string, body map[string]any,
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				ctx, cancel := context.WithTimeout(r.Context(), tuning.hardTimeout)
-				defer cancel()
+				ctx, memberCancel := context.WithTimeout(panelCtx, tuning.hardTimeout)
+				defer memberCancel()
 				status, respBody := g.collectMember(ctx, r, member, body, apiKey, clientFormat)
 				mu.Lock()
 				out[i] = &panelResult{status: status, body: respBody, count: i}
 				mu.Unlock()
-				done <- i
+				select {
+				case done <- i:
+				case <-panelCtx.Done():
+				}
 			}()
 		}
 		wg.Wait()

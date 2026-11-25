@@ -26,14 +26,16 @@ const GROK_SUBAGENTS = [
   { id: 'plan', label: 'Plan' },
 ]
 
-/** Auto-compact window presets (CLAUDE_CODE_AUTO_COMPACT_WINDOW, valid 100K–1M). */
+/** Auto-compact presets, the same set 9router-go's Claude form offers
+ *  (settings.json `autoCompactWindow`, valid 100K–1M). */
 const CONTEXT_OPTIONS = [
   { label: 'Default', value: '' },
-  { label: '200K', value: '198000' },
-  { label: '300K', value: '298000' },
-  { label: '500K', value: '498000' },
-  { label: '700K', value: '698000' },
+  { label: '100k', value: '100000' },
+  { label: '180k', value: '180000' },
+  { label: '200k', value: '200000' },
+  { label: '330k', value: '330000' },
 ]
+const COMPACT_CUSTOM = '__custom__'
 
 const INSTALL_COMMANDS: Record<string, string> = {
   claude: 'npm install -g @anthropic-ai/claude-code',
@@ -108,6 +110,7 @@ function ToolDetail({ tool }: { tool: CliTool }) {
   const [keyPresets, setKeyPresets] = useState<KeyPreset[]>(readKeyPresets)
 
   // Claude extras
+  const [claudePrimaryModel, setClaudePrimaryModel] = useState('')
   const [autoCompact, setAutoCompact] = useState('')
   const [oneM, setOneM] = useState(false)
   const [exaMcp, setExaMcp] = useState(false)
@@ -169,8 +172,10 @@ function ToolDetail({ tool }: { tool: CliTool }) {
         setBaseUrl((prev) => prev || statusBaseUrl(st) || origin)
 
         const env = ((st?.settings as Record<string, unknown> | undefined)?.env ?? {}) as Record<string, string>
+        const stModel = ((st?.settings as Record<string, unknown> | undefined)?.model ?? st?.model) as string | undefined
         setClaudeModels(statusClaudeModels(st))
-        setAutoCompact(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW || '')
+        setClaudePrimaryModel(stModel ?? '')
+        setAutoCompact(String(st?.autoCompactWindow ?? env.CLAUDE_CODE_AUTO_COMPACT_WINDOW ?? ''))
         setOneM(CLAUDE_MODEL_KEYS.some((c) => env[c.env]?.endsWith('[1m]')))
         setExaMcp(Boolean(st?.exaMcpEnabled))
         setCcFilterNaming(Boolean(settings.ccFilterNaming))
@@ -221,22 +226,24 @@ function ToolDetail({ tool }: { tool: CliTool }) {
       let body: Record<string, unknown>
       switch (tool.form) {
         case 'env':
+          // Same body 9router-go's adapter takes (clientconfig.Options): the
+          // server owns the env key names, so the form cannot drift from them.
           body = {
-            env: {
-              ANTHROPIC_BASE_URL: withV1(baseUrl),
-              ANTHROPIC_AUTH_TOKEN: apiKey,
-              ...Object.fromEntries(
-                CLAUDE_MODEL_KEYS.filter((k) => claudeModels[k.env]).map((k) => [k.env, claudeModels[k.env]]),
-              ),
-            },
-            exaMcpEnabled: exaMcp,
+            baseUrl: withV1(baseUrl),
+            apiKey,
+            model: claudePrimaryModel.trim(),
+            tiers: Object.fromEntries(
+              CLAUDE_MODEL_KEYS.filter((k) => claudeModels[k.env]?.trim()).map((k) => [k.tier, claudeModels[k.env].trim()]),
+            ),
             autoCompactWindow: autoCompact,
+            exaMcpEnabled: exaMcp,
           }
           break
         case 'multi':
           body = tool.id === 'cowork'
             ? {
-              baseUrl: withV1(baseUrl), apiKey, models: selected,
+              // Cowork calls <base>/v1/messages, so it needs the bare origin.
+              baseUrl: withoutV1(baseUrl), apiKey, models: selected,
               plugins: plugins.map((p) => ({
                 name: p.name, url: p.url, transport: p.transport, oauth: p.oauth, toolNames: p.toolNames,
               })),
@@ -313,6 +320,7 @@ function ToolDetail({ tool }: { tool: CliTool }) {
     if (pickerFor?.startsWith('grok:')) setGrokSubagents((prev) => ({ ...prev, [pickerFor.slice(5)]: value }))
     else if (pickerFor === '__subagent__') setSubagentModel(value)
     else if (pickerFor === '__profile__') setProfileModel(value)
+    else if (pickerFor === '__primary__') setClaudePrimaryModel(value)
     else if (pickerFor) setClaudeModels((prev) => ({ ...prev, [pickerFor]: value }))
     setPickerFor(null)
   }
@@ -500,8 +508,34 @@ function ToolDetail({ tool }: { tool: CliTool }) {
 
             {tool.form === 'env' ? (
               <>
+                <Field
+                  label="Primary / default model"
+                  action={<span className="font-mono text-[10px] text-text-muted">settings.json · "model"</span>}
+                >
+                  <div className="flex items-center gap-1.5 rounded-lg bg-surface-2 pl-3 pr-1 py-1">
+                    <Input
+                      className="h-8 flex-1 truncate border-0 bg-transparent px-1 font-mono text-[11px] shadow-none focus-visible:ring-0"
+                      value={claudePrimaryModel}
+                      onChange={(e) => setClaudePrimaryModel(e.target.value)}
+                      placeholder="provider/model-id or combo"
+                    />
+                    {claudePrimaryModel && (
+                      <button
+                        className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded text-text-muted hover:text-danger"
+                        onClick={() => setClaudePrimaryModel('')}
+                        title="Clear"
+                      >
+                        <Icon name="close" className="text-[13px]" />
+                      </button>
+                    )}
+                    <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setPickerFor('__primary__')}>
+                      Select
+                    </Button>
+                  </div>
+                </Field>
+
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Model mapping</span>
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Model tiers</span>
                   {CLAUDE_MODEL_KEYS.map((k) => (
                     <div key={k.env} className="flex items-center gap-1.5 rounded-lg bg-surface-2 pl-3 pr-1 py-1">
                       <span className="w-14 shrink-0 text-[10px] font-medium uppercase tracking-wide text-text-muted">
@@ -529,12 +563,31 @@ function ToolDetail({ tool }: { tool: CliTool }) {
                   ))}
                 </div>
 
-                <Field label="Auto-compact">
+                <Field label="Auto-compact window">
                   <Dropdown
-                    value={autoCompact || NONE}
-                    onChange={(v) => setAutoCompact(v === NONE ? '' : v)}
-                    options={CONTEXT_OPTIONS.map((o) => ({ value: o.value || NONE, label: o.label }))}
+                    value={
+                      autoCompact === '' ? NONE
+                        : CONTEXT_OPTIONS.some((o) => o.value === autoCompact) ? autoCompact
+                          : COMPACT_CUSTOM
+                    }
+                    onChange={(v) => {
+                      if (v === NONE) setAutoCompact('')
+                      else if (v === COMPACT_CUSTOM) setAutoCompact(CONTEXT_OPTIONS.some((o) => o.value === autoCompact) ? '' : autoCompact)
+                      else setAutoCompact(v)
+                    }}
+                    options={[
+                      ...CONTEXT_OPTIONS.map((o) => ({ value: o.value || NONE, label: o.label })),
+                      { value: COMPACT_CUSTOM, label: 'Custom…' },
+                    ]}
                   />
+                  {!CONTEXT_OPTIONS.some((o) => o.value === autoCompact) && (
+                    <Input
+                      className={INPUT_CLS + ' font-mono'}
+                      value={autoCompact}
+                      onChange={(e) => setAutoCompact(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="330000"
+                    />
+                  )}
                 </Field>
 
                 <div className="flex flex-col gap-1.5">
@@ -734,7 +787,7 @@ function ToolDetail({ tool }: { tool: CliTool }) {
         isOpen={manualOpen}
         onClose={() => setManualOpen(false)}
         title={`${tool.name}: Manual Configuration`}
-        configs={manualConfigs(tool, withV1(baseUrl), apiKey, selected, claudeModels, autoCompact, subagentModel)}
+        configs={manualConfigs(tool, withV1(baseUrl), apiKey, selected, claudeModels, autoCompact, subagentModel, claudePrimaryModel)}
       />
 
       <ModelSelectModal
@@ -745,7 +798,8 @@ function ToolDetail({ tool }: { tool: CliTool }) {
           pickerFor?.startsWith('grok:') ? grokSubagents[pickerFor.slice(5)]
             : pickerFor === '__subagent__' ? subagentModel
             : pickerFor === '__profile__' ? profileModel
-              : pickerFor === '__main__' ? selected[0]
+              : pickerFor === '__primary__' ? claudePrimaryModel
+                : pickerFor === '__main__' ? selected[0]
                 : pickerFor ? claudeModels[pickerFor] : undefined
         }
         modelAliases={aliases}
@@ -1239,13 +1293,17 @@ function manualConfigs(
   claudeModels: Record<string, string>,
   autoCompact: string,
   subagentModel: string,
+  claudePrimaryModel = '',
 ): { filename: string; content: string }[] {
   const k = key || 'sk_kinerouter'
   if (tool.form === 'env') {
     const env: Record<string, string> = { ANTHROPIC_BASE_URL: baseV1, ANTHROPIC_AUTH_TOKEN: k }
     for (const c of CLAUDE_MODEL_KEYS) if (claudeModels[c.env]) env[c.env] = claudeModels[c.env]
     if (autoCompact) env.CLAUDE_CODE_AUTO_COMPACT_WINDOW = autoCompact
-    return [{ filename: '~/.claude/settings.json', content: JSON.stringify({ hasCompletedOnboarding: true, env }, null, 2) }]
+    const settings: Record<string, unknown> = { hasCompletedOnboarding: true, env }
+    if (claudePrimaryModel) settings.model = claudePrimaryModel
+    if (autoCompact) settings.autoCompactWindow = Number(autoCompact)
+    return [{ filename: '~/.claude/settings.json', content: JSON.stringify(settings, null, 2) }]
   }
   if (tool.id === 'codex') {
     const model = models[0] || 'provider/model-id'
@@ -1594,6 +1652,13 @@ function BadgeState({
 function withV1(url: string) {
   const trimmed = url.trim().replace(/\/+$/, '')
   return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`
+}
+
+// Claude Desktop builds Cowork requests as <base>/v1/messages, so the stored
+// base must stay an origin; a /v1 suffix would produce /v1/v1/messages.
+function withoutV1(url: string) {
+  const trimmed = url.trim().replace(/\/+$/, '')
+  return trimmed.replace(/\/v1$/i, '')
 }
 
 function configPath(tool: CliTool, status: CliToolStatus | null) {

@@ -25,6 +25,121 @@ const (
 	minCompressSize = 500
 )
 
+// protectedTools are the tools whose output must never be rewritten. Read,
+// Grep and friends return the file text or the match list the model asked for;
+// truncating it destroys the answer the agent is working from. Matched
+// case-insensitively because the same tool arrives as "Read" from one client
+// and "read" from another.
+var protectedTools = map[string]bool{
+	"read": true, "grep": true, "edit": true, "write": true, "patch": true,
+	"anchor": true, "glob": true, "view": true, "list_dir": true,
+}
+
+func isProtectedTool(name string) bool {
+	return protectedTools[strings.ToLower(strings.TrimSpace(name))]
+}
+
+// toolNameFor resolves the tool behind a result: the inline name when the
+// provider put one there, otherwise the call it references.
+func toolNameFor(m map[string]any, tools map[string]string, idKey string) string {
+	if name := str(m, "name"); name != "" {
+		return name
+	}
+	return tools[str(m, idKey)]
+}
+
+// errorToolContentMarkers open an error output. The OpenAI Chat tool message
+// has no error flag, so the text is the only signal it carries; a result that
+// merely mentions the word is not an error, hence the anchored match.
+var errorToolContentMarkers = []string{
+	"Error:",
+	"Exception:",
+	"Traceback (most recent call last):",
+}
+
+func hasErrorToolContent(content any) bool {
+	text, ok := content.(string)
+	if !ok {
+		return false
+	}
+	trimmed := strings.TrimSpace(text)
+	for _, marker := range errorToolContentMarkers {
+		if strings.HasPrefix(trimmed, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// isErrorResult reports whether a tool result carries a failure. Error traces
+// are preserved: the agent needs them verbatim to recover.
+func isErrorResult(m map[string]any) bool {
+	if m == nil {
+		return false
+	}
+	for _, key := range []string{"is_error", "isError"} {
+		if b, ok := m[key].(bool); ok && b {
+			return true
+		}
+	}
+	if s, ok := m["status"].(string); ok && strings.EqualFold(s, "error") {
+		return true
+	}
+	for _, key := range []string{"content", "output", "text"} {
+		if hasErrorToolContent(m[key]) {
+			return true
+		}
+	}
+	return false
+}
+
+// buildToolCallMap indexes every tool call in the conversation by the id its
+// result references, so a result can be matched to the tool that produced it
+// and to the protected-tool skip list.
+func buildToolCallMap(items []any) map[string]string {
+	out := map[string]string{}
+	note := func(id, name string) {
+		if id != "" && name != "" {
+			out[id] = name
+		}
+	}
+	for _, it := range items {
+		msg, ok := it.(map[string]any)
+		if !ok || msg == nil {
+			continue
+		}
+		if list, ok := msg["tool_calls"].([]any); ok {
+			for _, tc := range list {
+				tcMap, _ := tc.(map[string]any)
+				fn, _ := tcMap["function"].(map[string]any)
+				id, _ := tcMap["id"].(string)
+				name, _ := fn["name"].(string)
+				note(id, name)
+			}
+		}
+		if t, _ := msg["type"].(string); t == "function_call" {
+			note(str(msg, "call_id"), str(msg, "name"))
+		}
+		if blocks, ok := msg["content"].([]any); ok {
+			for _, b := range blocks {
+				block, _ := b.(map[string]any)
+				if t, _ := block["type"].(string); t == "tool_use" {
+					note(str(block, "id"), str(block, "name"))
+				}
+			}
+		}
+	}
+	return out
+}
+
+func str(m map[string]any, key string) string {
+	if m == nil {
+		return ""
+	}
+	s, _ := m[key].(string)
+	return s
+}
+
 // Stats reports what compressMessages did; zero Hits means it changed nothing.
 type Stats struct {
 	BytesBefore int
@@ -78,18 +193,22 @@ func CompressMessages(body map[string]any, enabled bool) *Stats {
 		}
 	}
 	stats := &Stats{}
+	tools := buildToolCallMap(items)
 	for _, it := range items {
 		msg, ok := it.(map[string]any)
 		if !ok || msg == nil {
 			continue
 		}
 		if msg["type"] == "function_call_output" {
+			if isErrorResult(msg) || isProtectedTool(toolNameFor(msg, tools, "call_id")) {
+				continue
+			}
 			switch out := msg["output"].(type) {
 			case string:
 				msg["output"] = compressText(out, stats, "openai-responses-string")
 			case []any:
 				for _, p := range out {
-					if part, ok := p.(map[string]any); ok && part["type"] == "input_text" {
+					if part, ok := p.(map[string]any); ok && (part["type"] == "input_text" || part["type"] == "text") {
 						if t, ok := part["text"].(string); ok {
 							part["text"] = compressText(t, stats, "openai-responses-array")
 						}
@@ -100,6 +219,9 @@ func CompressMessages(body map[string]any, enabled bool) *Stats {
 		}
 		role, _ := msg["role"].(string)
 		if role == "tool" {
+			if isErrorResult(msg) || isProtectedTool(toolNameFor(msg, tools, "tool_call_id")) {
+				continue
+			}
 			switch c := msg["content"].(type) {
 			case string:
 				msg["content"] = compressText(c, stats, "openai-tool")
@@ -124,8 +246,12 @@ func CompressMessages(body map[string]any, enabled bool) *Stats {
 			if !ok || block["type"] != "tool_result" {
 				continue
 			}
-			if isErr, _ := block["is_error"].(bool); isErr {
-				continue // preserve error traces
+			if isErrorResult(block) || isProtectedTool(toolNameFor(block, tools, "tool_use_id")) {
+				continue
+			}
+			// The Claude flat shape keeps the text in "text" instead of "content".
+			if t, ok := block["text"].(string); ok {
+				block["text"] = compressText(t, stats, "claude-text")
 			}
 			switch c := block["content"].(type) {
 			case string:

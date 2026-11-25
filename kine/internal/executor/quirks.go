@@ -290,6 +290,74 @@ func githubBody(model string, body map[string]any) {
 	}
 }
 
+// codexResponsesAllowlist is the parameter set the ChatGPT Codex Responses
+// backend accepts. Everything else is dropped: the backend answers an unknown
+// field with 400 "Unsupported parameter", so a client that sends temperature or
+// max_output_tokens would otherwise never get an answer. Port of
+// RESPONSES_API_ALLOWLIST from open-sse/executors/codex.js (upstream
+// codex_token_params.go).
+var codexResponsesAllowlist = map[string]bool{
+	"model": true, "input": true, "instructions": true, "tools": true,
+	"tool_choice": true, "stream": true, "store": true, "reasoning": true,
+	"service_tier": true, "include": true, "prompt_cache_key": true,
+	"client_metadata": true, "text": true, "parallel_tool_calls": true,
+}
+
+// normalizeCodexServiceTier keeps the one value the backend accepts. Upstream:
+//
+//	if (body.service_tier === "fast") body.service_tier = "priority";
+//	if (body.service_tier && body.service_tier !== "priority") delete body.service_tier;
+//
+// Absence stays absence: nothing here promotes a request the caller did not ask
+// to prioritise.
+func normalizeCodexServiceTier(body map[string]any) {
+	if raw, ok := body["service_tier"]; ok {
+		s, isString := raw.(string)
+		switch {
+		case isString && s == "fast":
+			body["service_tier"] = "priority"
+		case isString && s == "priority":
+			// already the accepted value
+		case !codexTruthy(raw):
+			// null/false/0/"" is what upstream leaves in place
+		default:
+			delete(body, "service_tier")
+		}
+	}
+	delete(body, "speed")
+}
+
+// codexTruthy mirrors JavaScript truthiness for the values JSON can hold.
+func codexTruthy(v any) bool {
+	switch t := v.(type) {
+	case nil:
+		return false
+	case bool:
+		return t
+	case string:
+		return t != ""
+	case float64:
+		return t != 0
+	}
+	return true
+}
+
+// codexInjectReasoningInclude asks for encrypted reasoning so a stored-disabled
+// session can still carry reasoning across turns. A client-supplied include list
+// is preserved rather than overwritten.
+func codexInjectReasoningInclude(body map[string]any) {
+	if body["include"] != nil {
+		return
+	}
+	r, ok := body["reasoning"].(map[string]any)
+	if !ok {
+		return
+	}
+	if eff, _ := r["effort"].(string); eff != "" && eff != "none" {
+		body["include"] = []any{"reasoning.encrypted_content"}
+	}
+}
+
 // codexBody mirrors the parts of CodexExecutor.transformRequest that do not
 // need model-catalog knowledge: the Responses body must be an array, streamed,
 // carry no server-generated item ids (store=false cannot resolve them) and
@@ -320,6 +388,24 @@ func codexBody(model string, body map[string]any) {
 	}
 	if s, _ := body["instructions"].(string); strings.TrimSpace(s) == "" {
 		body["instructions"] = codexDefaultInstructions
+	}
+	normalizeCodexServiceTier(body)
+	codexInjectReasoningInclude(body)
+	// Drop what the backend rejects, then enforce the allowlist. Internal "_"
+	// flags are gone by this point ("_compact" above), so nothing to keep.
+	for _, k := range []string{
+		"temperature", "top_p", "frequency_penalty", "presence_penalty",
+		"logprobs", "top_logprobs", "n", "seed", "max_tokens",
+		"max_completion_tokens", "max_output_tokens", "user",
+		"prompt_cache_retention", "metadata", "stream_options",
+		"safety_identifier", "previous_response_id",
+	} {
+		delete(body, k)
+	}
+	for k := range body {
+		if !codexResponsesAllowlist[k] && !strings.HasPrefix(k, "_") {
+			delete(body, k)
+		}
 	}
 }
 
