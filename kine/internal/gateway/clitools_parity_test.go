@@ -52,7 +52,22 @@ func tempHome(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	// Several tools resolve their config through XDG_CONFIG_HOME, which some CI
+	// runners export. Leaving it pointing at the real home would make the writer
+	// and the assertion below disagree about where the file went.
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	return home
+}
+
+// jsonList reads a JSON array without panicking on an unexpected shape: a
+// missing key means the writer never wrote, which needs a readable message.
+func jsonList(t *testing.T, m map[string]any, key string) []any {
+	t.Helper()
+	list, ok := m[key].([]any)
+	if !ok {
+		t.Fatalf("%q is not an array: %#v", key, m)
+	}
+	return list
 }
 
 func postCli(t *testing.T, g *Gateway, url string, body map[string]any) *httptest.ResponseRecorder {
@@ -211,7 +226,7 @@ func TestCliParityDroid(t *testing.T) {
 		"baseUrl": "http://localhost:20128", "apiKey": "sk-gw", "models": []any{resolvedModel},
 	})
 	cfg := readJSONMap(filepath.Join(dir, "settings.json"))
-	models := cfg["customModels"].([]any)
+	models := jsonList(t, cfg, "customModels")
 	if len(models) != 2 {
 		t.Fatalf("entries: %#v", models)
 	}
@@ -234,7 +249,7 @@ func TestCliParityCrush(t *testing.T) {
 	})
 	cfg := readJSONMap(filepath.Join(home, ".config", "crush", "crush.json"))
 	entry := objMap(objMap(cfg["providers"])["kinerouter"])
-	models := entry["models"].([]any)
+	models := jsonList(t, entry, "models")
 	if got := objMap(models[0])["context_window"]; got != float64(resolvedWindow) {
 		t.Fatalf("context_window: %#v", got)
 	}
@@ -244,7 +259,7 @@ func TestCliParityCrush(t *testing.T) {
 		"baseUrl": "http://localhost:20128", "apiKey": "sk-gw", "model": unresolvedModel,
 	})
 	cfg = readJSONMap(filepath.Join(home, ".config", "crush", "crush.json"))
-	models = objMap(objMap(cfg["providers"])["kinerouter"])["models"].([]any)
+	models = jsonList(t, objMap(objMap(cfg["providers"])["kinerouter"]), "models")
 	if got := objMap(models[0])["context_window"]; got != float64(crushDefaultWind) {
 		t.Fatalf("fallback context_window: %#v", got)
 	}
@@ -261,7 +276,7 @@ func TestCliParityPi(t *testing.T) {
 		"baseUrl": "http://localhost:20128", "apiKey": "sk-gw", "model": unresolvedModel,
 	})
 	cfg := readJSONMap(path)
-	models := objMap(objMap(cfg["providers"])["kinerouter"])["models"].([]any)
+	models := jsonList(t, objMap(objMap(cfg["providers"])["kinerouter"]), "models")
 	entry := objMap(models[0])
 	if entry["contextWindow"] != float64(piDefaultWindow) || entry["maxTokens"] != float64(piDefaultMaxTok) {
 		t.Fatalf("defaults: %#v", entry)
@@ -271,7 +286,7 @@ func TestCliParityPi(t *testing.T) {
 		"baseUrl": "http://localhost:20128", "apiKey": "sk-gw", "model": resolvedModel,
 	})
 	cfg = readJSONMap(path)
-	models = objMap(objMap(cfg["providers"])["kinerouter"])["models"].([]any)
+	models = jsonList(t, objMap(objMap(cfg["providers"])["kinerouter"]), "models")
 	if got := objMap(models[0])["contextWindow"]; got != float64(resolvedWindow) {
 		t.Fatalf("resolved window: %#v", got)
 	}
