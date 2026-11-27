@@ -19,8 +19,8 @@ func TestProxyFuncWithNoProxy(t *testing.T) {
 	fn := proxyFuncWithNoProxy(u, "localhost, .internal.example, *.corp.example")
 
 	cases := []struct {
-		target  string
-		bypass  bool
+		target string
+		bypass bool
 	}{
 		{"http://localhost:1234/v1", true},
 		{"http://api.internal.example/v1", true},

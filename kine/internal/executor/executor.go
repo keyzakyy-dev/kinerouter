@@ -26,7 +26,7 @@ type Credentials struct {
 	RefreshToken string
 	ExpiresAt    time.Time
 	ProxyURL     string
-	ProxyNoProxy string // connectionNoProxy: hosts that bypass this account's proxy
+	ProxyNoProxy string         // connectionNoProxy: hosts that bypass this account's proxy
 	BaseURL      string         // override (custom nodes / ollama)
 	ProjectID    string         // Cloud Code Assist project (gemini-cli, antigravity)
 	SessionID    string         // Cloud Code session (antigravity stickiness)
