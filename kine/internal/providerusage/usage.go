@@ -19,6 +19,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/keyzakyy-dev/kinerouter/internal/providerdata"
@@ -36,17 +37,43 @@ type Conn struct {
 
 // Client builds the outbound HTTP client. A connection proxy wins; otherwise a
 // direct client (strictProxy=false behaviour: quota reads never fail over a
-// broken proxy config).
-func Client(proxyURL string) *http.Client {
+// broken proxy config). The optional noProxy argument is the connection's
+// connectionNoProxy list; without it the proxy is used for every host.
+func Client(proxyURL string, noProxy ...string) *http.Client {
 	if proxyURL != "" {
 		if u, err := url.Parse(proxyURL); err == nil {
+			var bypass string
+			if len(noProxy) > 0 {
+				bypass = noProxy[0]
+			}
 			return &http.Client{
-				Transport: &http.Transport{Proxy: http.ProxyURL(u)},
+				Transport: &http.Transport{Proxy: proxyFunc(u, bypass)},
 				Timeout:   20 * time.Second,
 			}
 		}
 	}
 	return &http.Client{Timeout: 20 * time.Second}
+}
+
+func proxyFunc(u *url.URL, noProxy string) func(*http.Request) (*url.URL, error) {
+	if strings.TrimSpace(noProxy) == "" {
+		return http.ProxyURL(u)
+	}
+	entries := []string{}
+	for _, part := range strings.Split(noProxy, ",") {
+		if p := strings.ToLower(strings.TrimSpace(part)); p != "" {
+			entries = append(entries, strings.TrimPrefix(strings.TrimPrefix(p, "*"), "."))
+		}
+	}
+	return func(req *http.Request) (*url.URL, error) {
+		host := strings.ToLower(strings.TrimSuffix(req.URL.Hostname(), "."))
+		for _, entry := range entries {
+			if entry == "*" || host == entry || strings.HasSuffix(host, "."+entry) {
+				return nil, nil
+			}
+		}
+		return u, nil
+	}
 }
 
 // proxyURLOf reads the connection proxy opt-in out of providerSpecificData.
@@ -61,13 +88,24 @@ func proxyURLOf(c Conn) string {
 	return s
 }
 
+func connNoProxyOf(c Conn) string {
+	if c.Specific == nil {
+		return ""
+	}
+	if on, _ := c.Specific["connectionProxyEnabled"].(bool); !on {
+		return ""
+	}
+	s, _ := c.Specific["connectionNoProxy"].(string)
+	return s
+}
+
 // Fetch dispatches to the provider handler. Unknown providers (and providers
 // whose handler is not ported yet) return the JS fallback payload.
 func Fetch(ctx context.Context, c Conn) map[string]any {
 	reg := providerdata.Get()
 	id := reg.ResolveAlias(c.Provider)
 	e := reg.ByID[id]
-	client := Client(proxyURLOf(c))
+	client := Client(proxyURLOf(c), connNoProxyOf(c))
 
 	switch id {
 	case "claude":

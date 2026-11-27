@@ -26,6 +26,7 @@ type Credentials struct {
 	RefreshToken string
 	ExpiresAt    time.Time
 	ProxyURL     string
+	ProxyNoProxy string // connectionNoProxy: hosts that bypass this account's proxy
 	BaseURL      string         // override (custom nodes / ollama)
 	ProjectID    string         // Cloud Code Assist project (gemini-cli, antigravity)
 	SessionID    string         // Cloud Code session (antigravity stickiness)
@@ -63,8 +64,9 @@ type Response struct {
 
 // Executor sends a request upstream.
 type Executor struct {
-	client *http.Client
-	reg    *providerdata.Registry
+	client    *http.Client
+	transport *http.Transport
+	reg       *providerdata.Registry
 }
 
 func New() *Executor {
@@ -83,8 +85,26 @@ func New() *Executor {
 		ResponseHeaderTimeout: 0, // streaming responses may keep headers late
 	}
 	return &Executor{
-		client: &http.Client{Transport: transport},
-		reg:    providerdata.Get(),
+		client:    &http.Client{Transport: transport},
+		transport: transport,
+		reg:       providerdata.Get(),
+	}
+}
+
+// SetProxyFunc installs the outbound proxy resolver the transport consults for
+// every request. The gateway installs its own so the dashboard's outbound-proxy
+// setting reaches upstream calls: Go's http.ProxyFromEnvironment reads the
+// process environment once and caches it, so the reference's "write process.env"
+// approach cannot work here.
+//
+// Call it before the listener starts: http.Transport.Proxy must not change
+// while requests are in flight. A nil fn restores the environment lookup.
+func (e *Executor) SetProxyFunc(fn func(*http.Request) (*url.URL, error)) {
+	if fn == nil {
+		fn = http.ProxyFromEnvironment
+	}
+	if e.transport != nil {
+		e.transport.Proxy = fn
 	}
 }
 
@@ -159,7 +179,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Response, error) 
 		fbClient := e.client
 		if req.Creds.ProxyURL != "" {
 			if u, err := url.Parse(req.Creds.ProxyURL); err == nil {
-				fbClient = e.clientWithProxy(u)
+				fbClient = e.clientWithProxyNoProxy(u, req.Creds.ProxyNoProxy)
 			}
 		}
 		return e.executeFreebuff(ctx, req, endpoint, headers, fbClient)
@@ -177,7 +197,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Response, error) 
 	client := e.client
 	if req.Creds.ProxyURL != "" {
 		if u, err := url.Parse(req.Creds.ProxyURL); err == nil {
-			client = e.clientWithProxy(u)
+			client = e.clientWithProxyNoProxy(u, req.Creds.ProxyNoProxy)
 		}
 	}
 	resp, err := client.Do(httpReq)
@@ -226,9 +246,47 @@ func ClientWithProxy(proxyURL string) *http.Client {
 }
 
 func (e *Executor) clientWithProxy(u *url.URL) *http.Client {
+	return e.clientWithProxyNoProxy(u, "")
+}
+
+// clientWithProxyNoProxy applies the account's own NO_PROXY list. A bare
+// http.ProxyURL ignores it, so a connection configured to bypass localhost (or
+// a corporate suffix) would still be tunnelled through its proxy.
+func (e *Executor) clientWithProxyNoProxy(u *url.URL, noProxy string) *http.Client {
 	t := e.client.Transport.(*http.Transport).Clone()
-	t.Proxy = http.ProxyURL(u)
+	t.Proxy = proxyFuncWithNoProxy(u, noProxy)
 	return &http.Client{Transport: t}
+}
+
+// proxyFuncWithNoProxy mirrors the shape of the reference's connection proxy
+// options: a matching host dials direct, everything else uses the account's
+// proxy. An empty list behaves exactly like http.ProxyURL.
+func proxyFuncWithNoProxy(u *url.URL, noProxy string) func(*http.Request) (*url.URL, error) {
+	entries := splitNoProxyList(noProxy)
+	if len(entries) == 0 {
+		return http.ProxyURL(u)
+	}
+	return func(req *http.Request) (*url.URL, error) {
+		host := strings.ToLower(strings.TrimSuffix(req.URL.Hostname(), "."))
+		for _, entry := range entries {
+			if entry == "*" || host == entry || strings.HasSuffix(host, "."+entry) {
+				return nil, nil
+			}
+		}
+		return u, nil
+	}
+}
+
+func splitNoProxyList(v string) []string {
+	var out []string
+	for _, part := range strings.Split(v, ",") {
+		p := strings.ToLower(strings.TrimSpace(part))
+		p = strings.TrimPrefix(strings.TrimPrefix(p, "*"), ".")
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // build derives URL + headers from the registry entry.
@@ -449,6 +507,9 @@ func CredentialsFromConnection(c *store.Connection) Credentials {
 		if sp["connectionProxyEnabled"] == true {
 			if v, ok := sp["connectionProxyUrl"].(string); ok {
 				cr.ProxyURL = v
+			}
+			if v, ok := sp["connectionNoProxy"].(string); ok {
+				cr.ProxyNoProxy = v
 			}
 		}
 	}

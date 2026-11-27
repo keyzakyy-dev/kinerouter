@@ -279,7 +279,9 @@ func ValidateCLIToken(token, cliMachineID string) bool {
 // ---------------------------------------------------------------- login limiter
 
 // Limiter is an in-memory progressive lockout (5 fails → 30s/2m/10m/30m),
-// matching src/lib/auth/loginLimiter.js.
+// matching src/lib/auth/loginLimiter.js. A lock level advances only after the
+// next group of five failures, and the one-hour window follows the most recent
+// failure, not the creation of the bucket.
 type Limiter struct {
 	mu    sync.Mutex
 	state map[string]*bucket
@@ -288,7 +290,8 @@ type Limiter struct {
 type bucket struct {
 	fails      int
 	lockedTill time.Time
-	windowAt   time.Time
+	lockLevel  int
+	lastFailAt time.Time
 }
 
 var lockSteps = []time.Duration{30 * time.Second, 2 * time.Minute, 10 * time.Minute, 30 * time.Minute}
@@ -296,11 +299,24 @@ var errLocked = errors.New("too many failed attempts")
 
 func NewLimiter() *Limiter { return &Limiter{state: map[string]*bucket{}} }
 
+// getEntry mirrors loginLimiter.getEntry: an idle bucket (one hour since the
+// last failure, and no active lock) is discarded before it is used.
+func (l *Limiter) getEntry(key string) *bucket {
+	b := l.state[key]
+	if b != nil && !b.lastFailAt.IsZero() &&
+		time.Since(b.lastFailAt) > time.Hour &&
+		(b.lockedTill.IsZero() || !time.Now().Before(b.lockedTill)) {
+		delete(l.state, key)
+		return nil
+	}
+	return b
+}
+
 func (l *Limiter) Check(key string) (time.Duration, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	b := l.state[key]
-	if b == nil {
+	b := l.getEntry(key)
+	if b == nil || b.lockedTill.IsZero() {
 		return 0, true
 	}
 	if wait := time.Until(b.lockedTill); wait > 0 {
@@ -312,18 +328,23 @@ func (l *Limiter) Check(key string) (time.Duration, bool) {
 func (l *Limiter) Fail(key string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	b := l.state[key]
-	if b == nil || time.Since(b.windowAt) > time.Hour {
-		b = &bucket{windowAt: time.Now()}
+	b := l.getEntry(key)
+	if b == nil {
+		b = &bucket{}
 		l.state[key] = b
 	}
 	b.fails++
+	b.lastFailAt = time.Now()
 	if b.fails >= 5 {
-		idx := b.fails - 5
+		idx := b.lockLevel
 		if idx >= len(lockSteps) {
 			idx = len(lockSteps) - 1
 		}
 		b.lockedTill = time.Now().Add(lockSteps[idx])
+		b.lockLevel++
+		// The reference resets the counter after every lock: the next lock
+		// requires another five failures, not one.
+		b.fails = 0
 	}
 }
 

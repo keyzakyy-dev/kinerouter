@@ -115,7 +115,7 @@ func (e *Executor) executeBedrock(ctx context.Context, req Request) (*Response, 
 	client := e.client
 	if req.Creds.ProxyURL != "" {
 		if u, err := url.Parse(req.Creds.ProxyURL); err == nil {
-			client = e.clientWithProxy(u)
+			client = e.clientWithProxyNoProxy(u, req.Creds.ProxyNoProxy)
 		}
 	}
 	// Bedrock never redirects. Following one would replay the body and the

@@ -473,6 +473,9 @@ export type Settings = Record<string, unknown> & {
   outboundProxyEnabled?: boolean
   outboundProxyUrl?: string
   outboundNoProxy?: string
+  /** Deploy-time switches, read from ENABLE_TRANSLATOR / ENABLE_REQUEST_LOGS. */
+  enableTranslator?: boolean
+  enableRequestLogs?: boolean
 }
 
 export type ModelEntry = {

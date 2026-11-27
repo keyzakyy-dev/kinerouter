@@ -414,6 +414,10 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 	// One in-flight slot per attempt; the deferred release covers every exit
 	// path (JSON, folded stream, mid-stream error).
 	attemptStart := time.Now()
+	// Usage and TTFT are measured from the start of the attempt, not from the
+	// moment the upstream headers arrive; otherwise every DONE line reports a
+	// near-zero duration and TTFT is wrong.
+	start := attemptStart
 	g.store.TrackPending(t.Model, t.Provider, conn.ID, true, false)
 	defer func() {
 		g.store.TrackPending(t.Model, t.Provider, conn.ID, false, err != nil)
@@ -685,7 +689,6 @@ func (g *Gateway) attempt(ctx context.Context, hdr http.Header, conn *store.Conn
 		}
 	}
 
-	start := time.Now()
 	usage := translate.Usage{}
 
 	if !stream {

@@ -82,6 +82,35 @@ func (g *Gateway) registerOAuthRoutes(mux *http.ServeMux) {
 		writeJSON(w, http.StatusOK, out)
 	}))
 
+	// Additive alias for clients ported from 9Router: GET /device-code followed
+	// by POST /poll {deviceCode, codeVerifier}. The embedded SPA keeps the
+	// state-based routes below, so both contracts work against one session.
+	mux.HandleFunc("GET /api/oauth/{provider}/device-code", g.requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		out, err := g.oauth.DeviceStart(r.Context(), r.PathValue("provider"))
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, out)
+	}))
+
+	mux.HandleFunc("POST /api/oauth/{provider}/poll", g.requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			DeviceCode   string `json:"deviceCode"`
+			CodeVerifier string `json:"codeVerifier"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&body); err != nil {
+			writeErr(w, http.StatusBadRequest, "Invalid JSON body")
+			return
+		}
+		out, err := g.oauth.DevicePollByCode(r.Context(), g.store, r.PathValue("provider"), body.DeviceCode)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, out)
+	}))
+
 	mux.HandleFunc("GET /api/oauth/{provider}/poll", g.requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		state := r.URL.Query().Get("state")
 		if state == "" {

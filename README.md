@@ -405,6 +405,8 @@ read at startup.
 | `MODEL_CATALOG_SYNC` | on | Daily models.dev refresh |
 | `AUTO_UPDATE` | unset | Start with unattended updates enabled (also a dashboard toggle) |
 | `AUTO_UPDATE_INTERVAL_HOURS` | `6` | Background update-check interval |
+| `ENABLE_TRANSLATOR` | unset | `true` shows the dashboard's Translator debug page |
+| `ENABLE_REQUEST_LOGS` | unset | `true` reports request logging to the dashboard console viewer |
 | `KINEROUTER_INSTALL` | detected | Force the update channel: `npm`, `script` or `docker` |
 | `UPDATE_REPO` | `keyzakyy-dev/kinerouter` | GitHub repo used for release checks |
 | `KINEROUTER_UPDATE_API` | GitHub API | Point release checks at a mirror |

@@ -267,7 +267,7 @@ func (e *Executor) executeVertex(ctx context.Context, req Request, partner bool)
 	client := e.client
 	if req.Creds.ProxyURL != "" {
 		if u, err := url.Parse(req.Creds.ProxyURL); err == nil {
-			client = e.clientWithProxy(u)
+			client = *e.clientWithProxyNoProxy(u, req.Creds.ProxyNoProxy)
 		}
 	}
 	resp, err := client.Do(httpReq)

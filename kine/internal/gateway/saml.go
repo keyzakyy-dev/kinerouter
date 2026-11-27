@@ -308,7 +308,7 @@ func (g *Gateway) handleSAMLStart(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleSAMLACS(w http.ResponseWriter, r *http.Request) {
 	settings, _ := g.store.GetSettings()
 	origin := g.publicOrigin(r, settings, true)
-	key := "login:" + clientHost(r)
+	key := "login:" + g.clientIP(r)
 	if wait, ok := g.limiter.Check(key); !ok {
 		loginRedirect(w, r, origin, tooManyAttempts(wait))
 		return

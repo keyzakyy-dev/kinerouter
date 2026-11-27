@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/keyzakyy-dev/kinerouter/internal/providerdata"
 	"github.com/keyzakyy-dev/kinerouter/internal/store"
 )
 
@@ -50,5 +51,35 @@ func TestCheckProxyRejectsInvalidURL(t *testing.T) {
 	msg, ok := checkProxy(map[string]any{"connectionProxyEnabled": true, "connectionProxyUrl": ""})
 	if ok || !strings.Contains(msg, "required") {
 		t.Fatalf("enabled proxy with empty url should fail, got %q %v", msg, ok)
+	}
+}
+
+// A provider may declare a providerSpecificData field in place of the API key
+// (bedrock's `profile`); the reference accepts the connection in that case.
+func TestAPIKeyOptionalSubstitute(t *testing.T) {
+	entry := &providerdata.Entry{ID: "bedrock", APIKeyOptionalWith: "profile"}
+	if !apiKeyOptional(entry, map[string]any{"profile": "default"}) {
+		t.Fatal("profile should stand in for the key")
+	}
+	if apiKeyOptional(entry, map[string]any{"profile": "  "}) {
+		t.Fatal("blank profile must not count")
+	}
+	if apiKeyOptional(entry, nil) {
+		t.Fatal("missing providerSpecificData must not count")
+	}
+	if apiKeyOptional(&providerdata.Entry{ID: "openai"}, map[string]any{"profile": "x"}) {
+		t.Fatal("provider without apiKeyOptionalWith must require a key")
+	}
+	if apiKeyOptional(nil, map[string]any{"profile": "x"}) {
+		t.Fatal("nil entry must require a key")
+	}
+}
+
+// The per-connection NO_PROXY field is part of the same proxy block the reference
+// stores (connectionProxyEnabled/Url/NoProxy).
+func TestPickSpecificKeepsConnectionNoProxy(t *testing.T) {
+	got := pickSpecific(map[string]any{"connectionNoProxy": "localhost,.corp"})
+	if got["connectionNoProxy"] != "localhost,.corp" {
+		t.Fatalf("connectionNoProxy dropped: %#v", got)
 	}
 }

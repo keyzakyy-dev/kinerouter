@@ -100,6 +100,29 @@ func (m *Manager) DeviceStart(ctx context.Context, provider string) (map[string]
 	}, nil
 }
 
+// DevicePollByCode accepts the reference 9Router poll body shape
+// ({deviceCode, codeVerifier}) and resolves it to the session minted by
+// DeviceStart. The state-based poll remains the canonical route for the
+// embedded SPA; this one is an additive compatibility alias.
+func (m *Manager) DevicePollByCode(ctx context.Context, st *store.Store, provider, deviceCode string) (map[string]any, error) {
+	if provider == "" || deviceCode == "" {
+		return nil, fmt.Errorf("provider and deviceCode are required")
+	}
+	m.mu.Lock()
+	var state string
+	for key, sess := range m.devices {
+		if sess.Provider == provider && sess.DeviceCode == deviceCode {
+			state = key
+			break
+		}
+	}
+	m.mu.Unlock()
+	if state == "" {
+		return nil, fmt.Errorf("unknown or expired device session")
+	}
+	return m.DevicePoll(ctx, st, state)
+}
+
 // DevicePoll checks once whether the user has authorised. A pending result is
 // not an error: {status:"pending"} tells the SPA to keep polling.
 func (m *Manager) DevicePoll(ctx context.Context, st *store.Store, state string) (map[string]any, error) {

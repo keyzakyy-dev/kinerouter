@@ -19,7 +19,11 @@ import (
 const SchemaVersion = 2
 
 type Store struct {
-	db *sql.DB
+	db   *sql.DB
+	path string
+	// fresh is true when the database file did not exist before Open, so a
+	// bootstrap does not take a pointless pre-schema backup.
+	fresh bool
 
 	// usage emitter subscribers (usageStream fan-out)
 	mu   sync.RWMutex
@@ -33,6 +37,8 @@ func Open(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
+	_, statErr := os.Stat(path)
+	fresh := os.IsNotExist(statErr)
 	dsn := "file:" + path + "?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=temp_store(MEMORY)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=cache_size(-64000)&_pragma=mmap_size(30000000)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -44,7 +50,7 @@ func Open(path string) (*Store, error) {
 	db.SetMaxIdleConns(2)
 	db.SetConnMaxLifetime(0)
 
-	s := &Store{db: db, subs: map[chan struct{}]struct{}{}}
+	s := &Store{db: db, path: path, fresh: fresh, subs: map[chan struct{}]struct{}{}}
 	if err := s.migrate(); err != nil {
 		db.Close()
 		return nil, err
@@ -59,6 +65,16 @@ func (s *Store) DB() *sql.DB { return s.db }
 // migrate creates missing tables/columns/indexes additively (mirror of
 // src/lib/db/migrate.js syncSchemaFromTables) and stamps _meta.
 func (s *Store) migrate() error {
+	// Bootstrap _meta first so the backup gate can read its version exactly as
+	// migrate.js does before any other schema mutation.
+	if _, err := s.db.Exec(schemaSQL[0]); err != nil {
+		return fmt.Errorf("schema meta: %w", err)
+	}
+	if err := s.maybeBackupBeforeSchemaChange(); err != nil {
+		// A failed safety backup must not prevent startup, matching the
+		// reference's fail-open behaviour on the backup path.
+		fmt.Printf("warning: pre-schema backup failed: %v\n", err)
+	}
 	for _, stmt := range schemaSQL {
 		if _, err := s.db.Exec(stmt); err != nil {
 			return fmt.Errorf("schema: %w", err)
@@ -71,11 +87,17 @@ func (s *Store) migrate() error {
 	var v string
 	err := s.db.QueryRow(`SELECT value FROM _meta WHERE key='schemaVersion'`).Scan(&v)
 	if errors.Is(err, sql.ErrNoRows) {
-		if _, err := s.db.Exec(`INSERT INTO _meta(key,value) VALUES('schemaVersion',?),
-			('appVersion',?),('migratedAt',?)`, fmt.Sprint(SchemaVersion), "kinerouter-dev", now); err != nil {
+		if _, err := s.db.Exec(`INSERT INTO _meta(key,value) VALUES('schemaVersion',?),('appVersion',?),('migratedAt',?)`,
+			fmt.Sprint(SchemaVersion), "kinerouter", now); err != nil {
 			return err
 		}
 	} else if err != nil {
+		return err
+	}
+	// Stamp the version whose schema was just ensured, so the next boot does
+	// not take another backup without an actual version change.
+	if _, err := s.db.Exec(`INSERT INTO _meta(key,value) VALUES('backupSchemaVersion',?)
+		ON CONFLICT(key) DO UPDATE SET value=excluded.value`, fmt.Sprint(SchemaVersion)); err != nil {
 		return err
 	}
 	return nil

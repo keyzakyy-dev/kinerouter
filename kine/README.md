@@ -132,6 +132,8 @@ is read at startup.
 | `API_KEY_SECRET` | `endpoint-proxy-api-key-secret` | HMAC seed for API-key checksums |
 | `MACHINE_ID_SALT` | `endpoint-proxy-salt` | Machine-id derivation salt |
 | `AUTH_COOKIE_SECURE` | unset | Force `Secure` on the session cookie |
+| `ENABLE_TRANSLATOR` | unset | `true` shows the dashboard's Translator debug page (same gate as the reference) |
+| `ENABLE_REQUEST_LOGS` | unset | `true` reports request logging to the dashboard console viewer |
 | `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` | unset | Outbound proxy for upstream calls |
 
 `DATA_DIR` points at another path to run a second instance. Nothing outside

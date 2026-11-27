@@ -165,6 +165,11 @@ type Entry struct {
 	// CredentialForm / AuthType carry the registry's non-key credential kinds
 	// ("aws", "cookie") so the add-connection form can label the field.
 	CredentialForm string `json:"credentialForm,omitempty"`
+	// APIKeyOptionalWith names a providerSpecificData field that stands in for
+	// the API key, e.g. Bedrock's "profile", where the credential lives in the
+	// local AWS config and there is no key to paste. The reference registry
+	// exposes it under the same name.
+	APIKeyOptionalWith string `json:"apiKeyOptionalWith,omitempty"`
 	// Priority orders the providers list (the registry sort key); 0 means
 	// unset and sorts after every listed priority.
 	Priority int `json:"priority,omitempty"`

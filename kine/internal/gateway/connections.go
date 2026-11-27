@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/keyzakyy-dev/kinerouter/internal/providerdata"
 	"github.com/keyzakyy-dev/kinerouter/internal/store"
 )
 
@@ -104,6 +105,33 @@ func checkProxy(specific map[string]any) (string, bool) {
 	return "", true
 }
 
+// checkProxyPool mirrors normalizeProxyPoolId in the reference route: an empty
+// id or "__none__" clears the binding, and an id no pool answers to is refused
+// instead of being stored as a dangling reference the runtime cannot resolve.
+func (g *Gateway) checkProxyPool(raw string) (string, bool) {
+	id := strings.TrimSpace(raw)
+	if id == "" || id == "__none__" {
+		return "", true
+	}
+	pool, err := g.store.GetProxyPool(id)
+	if err != nil || pool == nil {
+		return "", false
+	}
+	return id, true
+}
+
+// apiKeyOptional reports whether the provider accepts a providerSpecificData
+// field in place of an API key (registry apiKeyOptionalWith — bedrock's
+// `profile`). Without it, following such a provider's own setup notice is
+// answered with "API Key is required".
+func apiKeyOptional(entry *providerdata.Entry, specific map[string]any) bool {
+	if entry == nil || entry.APIKeyOptionalWith == "" || specific == nil {
+		return false
+	}
+	v, _ := specific[entry.APIKeyOptionalWith].(string)
+	return strings.TrimSpace(v) != ""
+}
+
 func (g *Gateway) registerConnectionRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/connections", g.requireAuth(g.handleListConnections))
 	mux.HandleFunc("POST /api/connections", g.requireAuth(g.handleCreateConnection))
@@ -142,9 +170,12 @@ func (g *Gateway) handleCreateConnection(w http.ResponseWriter, r *http.Request)
 		APIKey             string         `json:"apiKey"`
 		Priority           int            `json:"priority"`
 		IsActive           *bool          `json:"isActive"`
+		DefaultModel       string         `json:"defaultModel"`
+		ProxyPoolID        string         `json:"proxyPoolId"`
 		ProviderSpecific   map[string]any `json:"providerSpecificData"`
 		ConnectionProxy    *bool          `json:"connectionProxyEnabled"`
 		ConnectionProxyURL string         `json:"connectionProxyUrl"`
+		ConnectionNoProxy  string         `json:"connectionNoProxy"`
 	}
 	if decodeBody(r, &body) != nil {
 		writeErr(w, http.StatusBadRequest, "Invalid JSON body")
@@ -167,12 +198,6 @@ func (g *Gateway) handleCreateConnection(w http.ResponseWriter, r *http.Request)
 	if entry != nil {
 		authType = entry.AuthType
 	}
-	// Free / no-auth providers need no key; everything else does. This build also
-	// allows providers whose credential lives in a local file (ollama-local).
-	if apiKey == "" && !g.exec.IsNoAuth(provider) && authType != "none" && provider != "ollama-local" {
-		writeErr(w, http.StatusBadRequest, "API Key is required")
-		return
-	}
 	specific := pickSpecific(body.ProviderSpecific)
 	// The node owns prefix / apiType / baseUrl / nodeName; those keys are never
 	// taken from the request body.
@@ -184,12 +209,45 @@ func (g *Gateway) handleCreateConnection(w http.ResponseWriter, r *http.Request)
 			specific[k] = v
 		}
 	}
-	if body.ConnectionProxy != nil || body.ConnectionProxyURL != "" {
+	// Free / no-auth providers need no key; everything else does. This build also
+	// allows providers whose credential lives in a local file (ollama-local) and
+	// those whose registry entry names a providerSpecificData field in place of a
+	// key (bedrock's `profile`).
+	if apiKey == "" && !apiKeyOptional(entry, specific) &&
+		!g.exec.IsNoAuth(provider) && authType != "none" && provider != "ollama-local" {
+		writeErr(w, http.StatusBadRequest, "API Key is required")
+		return
+	}
+	if dm := strings.TrimSpace(body.DefaultModel); dm != "" {
 		if specific == nil {
 			specific = map[string]any{}
 		}
-		specific["connectionProxyEnabled"] = body.ConnectionProxy != nil && *body.ConnectionProxy
-		specific["connectionProxyUrl"] = strings.TrimSpace(body.ConnectionProxyURL)
+		specific["defaultModel"] = dm
+	}
+	poolID, poolOK := g.checkProxyPool(body.ProxyPoolID)
+	if !poolOK {
+		writeErr(w, http.StatusBadRequest, "Proxy pool not found")
+		return
+	}
+	if poolID != "" {
+		if specific == nil {
+			specific = map[string]any{}
+		}
+		specific["proxyPoolId"] = poolID
+	}
+	if body.ConnectionProxy != nil || body.ConnectionProxyURL != "" || body.ConnectionNoProxy != "" {
+		if specific == nil {
+			specific = map[string]any{}
+		}
+		if body.ConnectionProxy != nil {
+			specific["connectionProxyEnabled"] = *body.ConnectionProxy
+		}
+		if body.ConnectionProxyURL != "" {
+			specific["connectionProxyUrl"] = strings.TrimSpace(body.ConnectionProxyURL)
+		}
+		if body.ConnectionNoProxy != "" {
+			specific["connectionNoProxy"] = strings.TrimSpace(body.ConnectionNoProxy)
+		}
 	}
 	if msg, ok := checkProxy(specific); !ok {
 		writeErr(w, http.StatusBadRequest, msg)
@@ -215,11 +273,17 @@ func (g *Gateway) handleCreateConnection(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	}
+	// The reference defaults a new account to priority 1 ("priority || 1"), so a
+	// fresh connection lands at the end of the ordering instead of the front.
+	priority := body.Priority
+	if priority <= 0 {
+		priority = 1
+	}
 	conn := &store.Connection{
 		Provider: provider,
 		AuthType: "apikey",
 		Name:     name,
-		Priority: body.Priority,
+		Priority: priority,
 		IsActive: body.IsActive == nil || *body.IsActive,
 		Data:     map[string]any{"apiKey": apiKey},
 	}
@@ -244,9 +308,12 @@ func (g *Gateway) handleUpdateConnection(w http.ResponseWriter, r *http.Request)
 		APIKey             *string        `json:"apiKey"`
 		Priority           *int           `json:"priority"`
 		IsActive           *bool          `json:"isActive"`
+		DefaultModel       *string        `json:"defaultModel"`
+		ProxyPoolID        *string        `json:"proxyPoolId"`
 		ProviderSpecific   map[string]any `json:"providerSpecificData"`
 		ConnectionProxy    *bool          `json:"connectionProxyEnabled"`
 		ConnectionProxyURL *string        `json:"connectionProxyUrl"`
+		ConnectionNoProxy  *string        `json:"connectionNoProxy"`
 	}
 	if decodeBody(r, &body) != nil {
 		writeErr(w, http.StatusBadRequest, "Invalid JSON body")
@@ -272,7 +339,8 @@ func (g *Gateway) handleUpdateConnection(w http.ResponseWriter, r *http.Request)
 			delete(cur.Data, "apiKey")
 		}
 	}
-	if body.ProviderSpecific != nil || body.ConnectionProxy != nil || body.ConnectionProxyURL != nil {
+	if body.ProviderSpecific != nil || body.ConnectionProxy != nil || body.ConnectionProxyURL != nil ||
+		body.ConnectionNoProxy != nil || body.ProxyPoolID != nil || body.DefaultModel != nil {
 		existing, _ := cur.Data["providerSpecificData"].(map[string]any)
 		merged := map[string]any{}
 		for k, v := range existing {
@@ -286,6 +354,24 @@ func (g *Gateway) handleUpdateConnection(w http.ResponseWriter, r *http.Request)
 		}
 		if body.ConnectionProxyURL != nil {
 			merged["connectionProxyUrl"] = strings.TrimSpace(*body.ConnectionProxyURL)
+		}
+		if body.ConnectionNoProxy != nil {
+			merged["connectionNoProxy"] = strings.TrimSpace(*body.ConnectionNoProxy)
+		}
+		if body.DefaultModel != nil {
+			merged["defaultModel"] = strings.TrimSpace(*body.DefaultModel)
+		}
+		if body.ProxyPoolID != nil {
+			poolID, poolOK := g.checkProxyPool(*body.ProxyPoolID)
+			if !poolOK {
+				writeErr(w, http.StatusBadRequest, "Proxy pool not found")
+				return
+			}
+			if poolID == "" {
+				delete(merged, "proxyPoolId")
+			} else {
+				merged["proxyPoolId"] = poolID
+			}
 		}
 		if msg, ok := checkProxy(merged); !ok {
 			writeErr(w, http.StatusBadRequest, msg)

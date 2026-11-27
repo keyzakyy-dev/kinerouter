@@ -3,9 +3,53 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+// The reference settings route reports the deploy-time capability switches, and
+// the dashboard hides the Translator nav item unless enableTranslator is true
+// (src/components/layout.tsx). Omitting them left /dashboard/translator
+// unreachable even with ENABLE_TRANSLATOR set.
+func TestSettingsReportsEnvCapabilityFlags(t *testing.T) {
+	g := testGateway(t)
+	g.cliMachineID = "m1"
+	call := func() map[string]any {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+		req.Header.Set("x-kine-cli-token", cliTok(g.cliMachineID))
+		rr := httptest.NewRecorder()
+		g.handleGetSettings(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status %d: %s", rr.Code, rr.Body.String())
+		}
+		var m map[string]any
+		if err := json.Unmarshal(rr.Body.Bytes(), &m); err != nil {
+			t.Fatalf("body %q: %v", rr.Body.String(), err)
+		}
+		return m
+	}
+
+	// Unset is the reference default (its .env.example ships them off).
+	t.Setenv("ENABLE_TRANSLATOR", "")
+	t.Setenv("ENABLE_REQUEST_LOGS", "")
+	m := call()
+	if v, ok := m["enableTranslator"]; !ok || v != false {
+		t.Fatalf("enableTranslator = %v (present %v), want false", v, ok)
+	}
+	if v, ok := m["enableRequestLogs"]; !ok || v != false {
+		t.Fatalf("enableRequestLogs = %v (present %v), want false", v, ok)
+	}
+
+	t.Setenv("ENABLE_TRANSLATOR", "true")
+	t.Setenv("ENABLE_REQUEST_LOGS", "true")
+	m = call()
+	if m["enableTranslator"] != true || m["enableRequestLogs"] != true {
+		t.Fatalf("flags not set from env: %v %v", m["enableTranslator"], m["enableRequestLogs"])
+	}
+}
 
 // The token estimate is chars/4 rounded up, matching the reference counter.
 func TestCountTokensEstimate(t *testing.T) {

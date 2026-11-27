@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/keyzakyy-dev/kinerouter/internal/auth"
@@ -39,6 +40,9 @@ type Gateway struct {
 	static       http.Handler
 	tunnel       *tunnelManager
 	px           pxpipeState // PXpipe library warm/install state
+	// outboundProxy holds the outboundProxyConfig snapshot the executor's
+	// transport reads per request (outboundproxy.go).
+	outboundProxy atomic.Value
 
 	proxyMu   sync.Mutex
 	proxyNext map[string]int // per-provider cursor for rotateStrategy=round-robin
@@ -50,7 +54,7 @@ type Gateway struct {
 }
 
 func New(cfg *config.Config, st *store.Store, static http.Handler) *Gateway {
-	return &Gateway{
+	g := &Gateway{
 		cfg:          cfg,
 		store:        st,
 		reg:          providerdata.Get(),
@@ -65,6 +69,13 @@ func New(cfg *config.Config, st *store.Store, static http.Handler) *Gateway {
 		tunnel:       newTunnelManager(cfg.DataDir, st, cfg.Port),
 		proxyNext:    map[string]int{},
 	}
+	// Outbound proxy: the transport asks this resolver per request, so the
+	// dashboard setting applies without a restart. Installed before the listener
+	// starts, because a transport's Proxy func must not change while requests
+	// are in flight.
+	g.exec.SetProxyFunc(g.proxyForRequest)
+	g.refreshOutboundProxy()
+	return g
 }
 
 // tunnels returns the process-wide Cloudflare/Tailscale manager.
@@ -270,15 +281,29 @@ func isLoopback(host string) bool {
 
 func (g *Gateway) withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "*")
-		if r.Method == http.MethodOptions && (strings.HasPrefix(r.URL.Path, "/v1") || strings.HasPrefix(r.URL.Path, "/api/v1")) {
-			w.WriteHeader(http.StatusNoContent)
-			return
+		// The compatibility API is meant for third-party clients, so it keeps
+		// the permissive CORS contract. Dashboard management APIs are protected
+		// by session cookies and must not be readable from arbitrary origins;
+		// the embedded SPA is same-origin and needs no CORS headers at all.
+		if isPublicAPI(r.URL.Path) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isPublicAPI reports paths that are part of the OpenAI/Anthropic-compatible
+// surface (including the extra tool endpoints mounted under /v1).
+func isPublicAPI(path string) bool {
+	return strings.HasPrefix(path, "/v1") ||
+		strings.HasPrefix(path, "/api/v1") ||
+		strings.HasPrefix(path, "/codex/")
 }
 
 func (g *Gateway) isAuthenticated(r *http.Request) bool {
@@ -313,6 +338,22 @@ func clientHost(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// clientIP is the identity used for per-client state such as the login limiter.
+// The TCP peer is authoritative; XFF is consulted only when TRUST_PROXY is set
+// and the peer itself is loopback (the local reverse proxy case in the
+// reference's loginLimiter.getClientIp). withPeerTrust has already stripped
+// forwarding headers from every non-loopback peer.
+func (g *Gateway) clientIP(r *http.Request) string {
+	if g.cfg != nil && g.cfg.TrustProxy && isLoopback(clientHost(r)) {
+		if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
+			if ip := strings.TrimSpace(strings.Split(xff, ",")[0]); ip != "" {
+				return ip
+			}
+		}
+	}
+	return clientHost(r)
 }
 
 // ---------------------------------------------------------------- helpers

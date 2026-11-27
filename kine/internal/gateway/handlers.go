@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -20,7 +21,7 @@ import (
 // ---------------------------------------------------------------- auth
 
 func (g *Gateway) handleLogin(w http.ResponseWriter, r *http.Request) {
-	key := "login:" + clientHost(r)
+	key := "login:" + g.clientIP(r)
 	if wait, ok := g.limiter.Check(key); !ok {
 		writeJSON(w, http.StatusTooManyRequests, map[string]any{
 			"error": "Too many failed attempts", "retryAfter": int(wait.Seconds()),
@@ -531,7 +532,32 @@ func (g *Gateway) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	settings["oidcConfigured"] = str(settings, "oidcIssuerUrl") != "" &&
 		str(settings, "oidcClientId") != "" && secret != ""
 	settings["hasPassword"] = hasPassword
+	applyEnvCapabilityFlags(settings)
 	writeJSON(w, http.StatusOK, settings)
+}
+
+// applyEnvCapabilityFlags reports the deploy-time switches the reference
+// settings route adds to its GET response (src/app/api/settings/route.js).
+// They are environment-gated, not stored settings.
+//
+// The dashboard reads enableTranslator from GET /api/settings to decide whether
+// the Translator debug page appears in the rail (src/components/layout.tsx), so
+// a settings response without it leaves the ported /dashboard/translator
+// unreachable no matter what the operator sets in the environment.
+func applyEnvCapabilityFlags(settings map[string]any) {
+	settings["enableRequestLogs"] = os.Getenv("ENABLE_REQUEST_LOGS") == "true"
+	settings["enableTranslator"] = os.Getenv("ENABLE_TRANSLATOR") == "true"
+}
+
+// patchTouches reports whether the PATCH body carried any of the keys, which is
+// how the reference decides to re-apply a derived side effect.
+func patchTouches(patch map[string]any, keys ...string) bool {
+	for _, k := range keys {
+		if _, ok := patch[k]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (g *Gateway) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
@@ -576,6 +602,15 @@ func (g *Gateway) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	// Behavioural settings apply immediately, like the reference route does after
+	// updateSettings: combo rotation state is dropped when a strategy key moves,
+	// and the outbound proxy snapshot is rebuilt for the next upstream call.
+	if patchTouches(patch, "comboStrategy", "comboStickyRoundRobinLimit", "comboStrategies") {
+		resetComboRotation("")
+	}
+	if patchTouches(patch, "outboundProxyEnabled", "outboundProxyUrl", "outboundNoProxy") {
+		g.refreshOutboundProxy()
 	}
 	secret := str(settings, "oidcClientSecret")
 	hasPassword := str(settings, "password") != ""
