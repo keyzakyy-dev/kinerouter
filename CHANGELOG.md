@@ -3,6 +3,23 @@
 All notable changes to KineRouter. Format based on Keep a Changelog;
 versions use SemVer. Release tags are `kine-vX.Y.Z`.
 
+## [0.2.6] — 2026-11-27
+
+### Added
+
+- **Outbound proxy for provider calls.** Bedrock and Vertex executors can route
+  through a configured proxy, with the gateway resolving it per connection.
+- **Store backup endpoint**, so the SQLite state can be snapshotted before a
+  migration or upgrade.
+
+### Fixed
+
+- Auth, OAuth device flow, SAML and connection handlers from the fullstack
+  integration audit: login redirects, peer trust, provider data and usage
+  accounting gaps.
+- Provider data and usage lookups tolerate missing or partial rows instead of
+  failing the request.
+
 ## [0.2.5] — 2026-11-25
 
 ### Changed
