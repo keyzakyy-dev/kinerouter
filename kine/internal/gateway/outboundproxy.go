@@ -60,13 +60,15 @@ func splitNoProxy(v string) []string {
 
 // noProxyMatch reports whether host is covered by the NO_PROXY list, for the
 // entry shapes the reference and Go both accept: "*", "example.com",
-// ".example.com", "*.example.com" and an optional ":port" (ignored here, since
-// only the host is known at dial time).
+// ".example.com", "*.example.com" and an optional ":port". Like undici's
+// no_proxy handling in the reference, an entry that names a port only matches
+// that port; an entry without a port matches the host on any port.
 func noProxyMatch(host string, list []string) bool {
 	if len(list) == 0 {
 		return false
 	}
-	h := strings.ToLower(strings.TrimSuffix(host, "."))
+	h, hport := splitHostPort(strings.ToLower(host))
+	h = strings.TrimSuffix(h, ".")
 	if h == "" {
 		return false
 	}
@@ -74,21 +76,42 @@ func noProxyMatch(host string, list []string) bool {
 		if entry == "*" {
 			return true
 		}
-		e := entry
-		// Strip a trailing port only when it is unambiguous (no IPv6 literal).
-		if i := strings.IndexByte(e, ':'); i > 0 && !strings.Contains(e, "]") && allDigits(e[i+1:]) {
-			e = e[:i]
-		}
-		e = strings.TrimPrefix(e, "*")
-		e = strings.TrimPrefix(e, ".")
-		if e == "" {
+		e := strings.TrimPrefix(strings.TrimPrefix(entry, "*"), ".")
+		ehost, eport := splitHostPort(e)
+		ehost = strings.TrimSuffix(ehost, ".")
+		if ehost == "" {
 			continue
 		}
-		if h == e || strings.HasSuffix(h, "."+e) {
-			return true
+		if h != ehost && !strings.HasSuffix(h, "."+ehost) {
+			continue
 		}
+		if eport != "" && hport != "" && eport != hport {
+			continue
+		}
+		return true
 	}
 	return false
+}
+
+// splitHostPort splits "host", "host:port", "[::1]" and "[::1]:port" without
+// treating a bare IPv6 literal's colons as a port separator.
+func splitHostPort(s string) (host, port string) {
+	if strings.HasPrefix(s, "[") {
+		if end := strings.IndexByte(s, ']'); end > 0 {
+			host = s[1:end]
+			if rest := s[end+1:]; strings.HasPrefix(rest, ":") && allDigits(rest[1:]) {
+				port = rest[1:]
+			}
+			return host, port
+		}
+	}
+	if strings.Count(s, ":") == 1 {
+		i := strings.IndexByte(s, ':')
+		if allDigits(s[i+1:]) {
+			return s[:i], s[i+1:]
+		}
+	}
+	return s, ""
 }
 
 func allDigits(s string) bool {
@@ -101,6 +124,30 @@ func allDigits(s string) bool {
 		}
 	}
 	return true
+}
+
+// requestHostPort returns "host:port" for a request URL, filling in the scheme's
+// default port so a NO_PROXY entry that names a port can be compared.
+func requestHostPort(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	host := u.Hostname()
+	if host == "" {
+		return ""
+	}
+	port := u.Port()
+	if port == "" {
+		if u.Scheme == "https" {
+			port = "443"
+		} else {
+			port = "80"
+		}
+	}
+	if strings.Contains(host, ":") {
+		return "[" + host + "]:" + port
+	}
+	return host + ":" + port
 }
 
 // refreshOutboundProxy re-reads the settings snapshot. Called at startup and
@@ -118,7 +165,7 @@ func (g *Gateway) refreshOutboundProxy() {
 func (g *Gateway) proxyForRequest(req *http.Request) (*url.URL, error) {
 	cfg, _ := g.outboundProxy.Load().(outboundProxyConfig)
 	if cfg.enabled && cfg.url != nil {
-		if noProxyMatch(req.URL.Hostname(), cfg.noProxy) {
+		if noProxyMatch(requestHostPort(req.URL), cfg.noProxy) {
 			return nil, nil
 		}
 		return cfg.url, nil

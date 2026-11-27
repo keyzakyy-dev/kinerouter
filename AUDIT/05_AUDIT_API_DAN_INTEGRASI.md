@@ -45,3 +45,34 @@
 ## Verifikasi
 
 Berdasarkan pembacaan source lokal dan fetch source 9Router. Tidak ada integration test yang dijalankan; `go test ./...` belum tersedia di perangkat.
+
+---
+
+## Verifikasi kontrak runtime — sesi 2026-11-27
+
+Server dijalankan dengan `DATA_DIR` sementara; semua hasil di bawah adalah respons nyata.
+
+| Endpoint | Tanpa sesi/key | Dengan sesi/key | Catatan |
+|---|---|---|---|
+| `GET /api/health` | 200 `{"ok":true}` | — | publik |
+| `GET /` | 200 HTML SPA | — | dashboard tertanam |
+| `POST /api/auth/login` | 401 (salah), 200 (benar) | — | cookie sesi |
+| `GET /api/keys` | 401 | 200 `{keys,machineId}` | `accessAllow:[]` (bukan `null`) |
+| `POST /api/keys` | 401 | 200 + row SQLite | key bertahan setelah restart |
+| `GET /api/settings` / `/api/models` / `/api/providers` | 401 | 200 | — |
+| `POST /v1/chat/completions` | 401 | (butuh koneksi) | auth dicek sebelum routing |
+| `GET /v1/models` | 200 `{data:[],object:"list"}` | 200 | publik juga di referensi |
+
+### Temuan API
+
+- **B-05** sudah diperbaiki: stream OpenAI kini mencatat usage (bukti test integrasi). Sebelumnya response tetap benar tetapi akuntansi 0.
+- **B-06 (SEDANG):** `handleListModels` tidak memfilter daftar berdasarkan ACL key, sedangkan referensi memanggil `filterModelsListForKey`. `keyAllows` di chat hanya `EqualFold(allowed, model)`, tidak meresolusi alias/combo/provider seperti `getAllowSets`. Dampak: daftar model bisa lebih luas dari izin key (kebocoran nama, bukan akses), dan alias yang sah bisa ditolak.
+- **A-08 (SEDANG, keputusan):** envelope OAuth/keys tetap beda dari referensi (`{ok:true}`, `{message:...}` vs `{success,connection}`, `{key}`, `{message}`). SPA Kine konsisten dengan dirinya sendiri; klien verbatim 9Router bisa rusak. Tidak diubah tanpa persetujuan kontrak.
+- **A-09 (RENDAH):** `GET /api/media-providers/tts/elevenlabs/models` tidak ada; SPA Kine memakai daftar model internal sehingga tidak 404 pada alur utama.
+- `/v1/models` mengembalikan `data:[]` saat tidak ada koneksi — sesuai referensi yang jatuh ke daftar statis, tetapi daftar statis Kine kosong. Bukan kegagalan auth.
+
+### Integrasi yang diperiksa
+
+- Handler → auth key → ACL → combo/alias → resolve provider → executor → upstream `httptest` → translate → SSE → usage → SQLite: dibuktikan `TestChatStreamsSSEAndRecordsUsage`, `TestChatWritesSoloAndComboResponses`, `TestChatFailsOverOnEmptyCompletion`, `TestChatHonoursConnectionPin`.
+- Store → HTTP: create key via API, restart, list via API (lihat `AUDIT/00`).
+- OAuth → provider asli: belum diverifikasi.

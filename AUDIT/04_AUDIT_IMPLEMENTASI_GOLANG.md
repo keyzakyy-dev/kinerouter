@@ -36,3 +36,31 @@
 ## Verifikasi
 
 Tidak ada `go vet`, `go test`, atau build yang dijalankan. Semua pernyataan di atas berasal dari pembacaan kode dan perbandingan dengan `ARCHITECTURE.md` 9router-go serta source 9Router yang di-fetch.
+
+---
+
+## Hasil eksekusi nyata — sesi 2026-11-27
+
+Bagian "Verifikasi" sebelumnya menyatakan tidak ada toolchain. Sesi ini menjalankannya:
+
+- `go build ./...` → lulus setelah B-01 (sebelumnya gagal kompilasi).
+- `go vet ./...` → lulus setelah B-02.
+- `go test ./... -count=1` → 20 paket `ok`.
+- `go test -race ./... -count=1` → lulus (70 dtk), termasuk `internal/gateway` 12 dtk.
+- `gofmt -l` pada paket yang diubah → bersih.
+- Runtime: health, login, session API, API key, restart persistence, 401, dashboard, SIGTERM, SQLite WAL/integrity — lihat `AUDIT/00`.
+
+### Tambahan temuan kualitas Go
+
+1. **`vertex.go` tidak lolos kompilasi.** Penyebab: dereference `*http.Client` (B-01). Ini menunjukkan CI belum dijalankan pada commit `75ed130`; `.github/workflows/kine-ci.yml` ada dan memakai Go 1.27.4, jadi regresi ini akan tertangkap bila CI dijalankan.
+2. **Test bukan jaminan kompilasi.** `backup_test.go` gagal `go vet` karena salah jumlah return `Scan` (B-02); artinya `go test` juga tidak pernah dijalankan pada commit tersebut.
+3. **Usage passthrough hilang** (B-05): kode mengandalkan translator untuk usage, padahal jalur default tidak punya translator. Perbaikan memakai struct `translate.Usage` yang sudah ada, tanpa dependency baru.
+4. **Alokasi per request** pada `clientWithProxyNoProxy`: clone `http.Transport` per request. Dipertahankan karena isolasi proxy per akun; catat sebagai biaya yang disengaja.
+5. **`keyAllows` exact-match** (B-06) berbeda dari resolusi kanonik referensi; fail-closed tetapi tidak setara. Perubahan menunggu keputusan kontrak ACL.
+6. **`errLocked`** masih tidak dipakai (A-12) — informasi, bukan bug.
+
+### Verifikasi yang tetap tidak dapat dilakukan
+
+- OAuth/refresh dengan provider sungguhan (Claude, Codex, Copilot, Gemini, Cursor, Kiro) — tidak ada kredensial.
+- Docker build, npm package install, Vite production build, Windows/macOS binary — tidak dijalankan.
+- `go test` tidak membuktikan perilaku provider asli; hanya kontrak HTTP yang diuji dengan `httptest`.

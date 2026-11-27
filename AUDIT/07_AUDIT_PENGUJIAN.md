@@ -57,3 +57,58 @@ cd web-app && npm test -- --run && npm run build
 ```
 
 CI: `.github/workflows/kine-ci.yml`.
+
+---
+
+# Hasil pengujian nyata — sesi 2026-11-27
+
+## Baseline (sebelum perubahan sesi ini)
+
+| Perintah | Hasil | Kegagalan |
+|---|---|---|
+| `go build ./...` | GAGAL | `internal/executor/vertex.go:270` |
+| `go vet ./...` | GAGAL | `internal/store/backup_test.go:68` |
+| `go test ./... -count=1` | GAGAL | `internal/store` (compile), `internal/auth` (`TestLimiterMatchesReferenceProgression`) |
+
+Kegagalan baseline bukan disebabkan sesi ini; semuanya berasal dari commit `75ed130`/`ba99b75` dan diperbaiki dengan bukti di `AUDIT/09`.
+
+## Matriks 20 area wajib
+
+| # | Area | Status | Bukti |
+|---|---|---|---|
+| 1 | Server startup | LULUS | biner start, health 200 |
+| 2 | Health endpoint | LULUS | `{ok:true}` |
+| 3 | Authentication (login/sesi) | LULUS | 401 salah, 200 benar, cookie |
+| 4 | API key validation | LULUS | chat 401 tanpa/salah key; key valid tersimpan |
+| 5 | Provider registration | LULUS (unit) | `nodeGateway` + `TestV1BetaAliasRoutes` |
+| 6 | Provider selection | LULUS (unit) | `TestChatHonoursConnectionPin`, `TestRotatedMembers` |
+| 7 | Model resolution | LULUS (unit) | `TestResolveTargetsModelAliasToNode`, `TestResolveAliasChain`, `TestFlattenNestedCombo` |
+| 8 | Request translation | LULUS (unit) | suite `internal/translate` |
+| 9 | Response translation | LULUS (unit) | suite `internal/translate` |
+| 10 | Streaming | LULUS | `TestChatStreamsSSEAndRecordsUsage` (baru) + `TestStreamPeekerBuffersUntilContent` |
+| 11 | Non-streaming | LULUS | `TestChatWritesSoloAndComboResponses` |
+| 12 | OAuth refresh | SEBAGIAN | unit test paket `oauth` lulus; provider nyata **BELUM DIVERIFIKASI** |
+| 13 | Account rotation | LULUS (unit) | `TestRotatedMembers`, `TestRRPickStickyRotation` |
+| 14 | Fallback | LULUS (unit) | `TestChatFailsOverOnEmptyCompletion`, `TestChatWritesUpstreamFailure` |
+| 15 | Rate limit | LULUS (unit) | `TestLimiterMatchesReferenceProgression`, `TestLimiterIdleWindowResetsState` |
+| 16 | Database persistence | LULUS | create key → restart → list; `integrity_check=ok`, WAL |
+| 17 | Usage tracking | LULUS | test streaming baru mencatat 3/2 |
+| 18 | Token savers | LULUS (unit) | paket `rtk`, `tokensaver_test.go` |
+| 19 | Dashboard integration | LULUS (runtime) | `GET /` 200; API dashboard 200 dengan sesi |
+| 20 | Graceful shutdown | LULUS | SIGTERM berhenti < 10 dtk |
+
+## Suite penuh
+
+```
+go vet ./...                          -> exit 0
+go test ./... -count=1                -> 20 paket ok, exit 0
+go test -race ./... -count=1          -> exit 0
+go test -race ./internal/gateway ./internal/executor ./internal/auth ./internal/store -> exit 0
+```
+
+## Tidak dijalankan / tidak dapat diverifikasi
+
+- OAuth/refresh, provider berlangganan, dan streaming ke provider asli — tidak ada kredensial.
+- Docker image, npm package, Vite production build, Windows/macOS binary.
+- UI pada lebar ponsel/desktop (browser check) — tidak dilakukan; hanya HTML/API yang diperiksa.
+- Audit file-per-file batch 2–10 tetap belum tuntas (lihat `AUDIT/02`).

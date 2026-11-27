@@ -26,6 +26,7 @@ export default function LoginPage() {
   if (status?.authenticated || peerAllowed(status)) return <Navigate to="/dashboard" replace />
 
   const needsSetup = Boolean(status?.needsSetup)
+  const initialPasswordSet = Boolean(status?.initialPasswordSet)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -135,9 +136,19 @@ export default function LoginPage() {
           {needsSetup ? (
             <p className="mt-6 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] leading-relaxed text-text-muted">
               <Icon name="info" className="text-[13px]" />
-              Fresh install: the password is
-              <code className="rounded bg-surface-3/70 px-1 py-0.5 font-mono text-text-main">123456</code>
-              until you change it in Settings.
+              {initialPasswordSet ? (
+                <>
+                  Fresh install: sign in with the
+                  <code className="rounded bg-surface-3/70 px-1 py-0.5 font-mono text-text-main">INITIAL_PASSWORD</code>
+                  set on the server, then change it in Settings.
+                </>
+              ) : (
+                <>
+                  Fresh install: the password is
+                  <code className="rounded bg-surface-3/70 px-1 py-0.5 font-mono text-text-main">123456</code>
+                  until you change it in Settings.
+                </>
+              )}
             </p>
           ) : null}
         </div>

@@ -179,3 +179,54 @@ Berdasarkan inventory di atas, audit `02_AUDIT_FILE_PER_FILE.md` dibagi 10 batch
 10. Frontend, packaging, build: `web-app/src/**`, `web/web.go`, `npm/**`, `Dockerfile`, `docker-compose.yml`, `install.*`, `.github/workflows/**`.
 
 Status batch pada sesi ini: batch 0 (inventarisasi) selesai; batch 1 dimulai setelah dokumen 01.
+
+---
+
+## Sesi verifikasi lanjutan — 2026-11-27 (UTC)
+
+Sesi ini melanjutkan audit sebelumnya dan **menjalankan** build/test/runtime yang sebelumnya tidak dapat dijalankan.
+
+| Item | Nilai |
+|---|---|
+| Commit KineRouter | `75ed130` (`style: apply gofmt to executor files`), working tree +6 file (lihat `AUDIT/09_LOG_PERBAIKAN.md`) |
+| 9Router referensi | `5ae63d2` (`v0.5.123`, 2026-11-23) |
+| 9router-go referensi | `de05f24` |
+| Toolchain | Go 1.26.8 lokal + toolchain `go1.27.4` sesuai `kine/go.mod` |
+| OS | Linux amd64, 4 CPU, 8 GB RAM, tanpa GPU |
+
+Akses jaringan yang diperlukan build: `proxy.golang.org`, `storage.googleapis.com`, `sum.golang.org`.
+
+### Perintah yang dijalankan dan hasil nyata
+
+| Perintah | Hasil |
+|---|---|
+| `go build ./...` (sebelum perbaikan) | **GAGAL** — `internal/executor/vertex.go:270` assignment mismatch |
+| `go build ./...` (sesudah perbaikan) | LULUS, exit 0 |
+| `go vet ./...` (sebelum) | **GAGAL** — `internal/store/backup_test.go:68` assignment mismatch |
+| `go vet ./...` (sesudah) | LULUS, exit 0 |
+| `go test ./... -count=1` (sebelum) | **GAGAL**: `internal/store` (compile), `internal/auth` (`TestLimiterMatchesReferenceProgression`) |
+| `go test ./... -count=1` (sesudah) | LULUS, 20 paket `ok`, exit 0 |
+| `go test -race ./... -count=1` | LULUS, exit 0 (70 dtk) |
+| `go test -race ./internal/{gateway,executor,auth,store}` ulang sesudah perubahan | LULUS, exit 0 |
+| `gofmt -l` pada paket yang diubah | Tidak ada file |
+
+### Runtime end-to-end (biner lokal, `DATA_DIR` sementara)
+
+| Langkah | Bukti |
+|---|---|
+| Startup + health | `GET /api/health` → `200 {"ok":true}` |
+| Dashboard tertanam | `GET /` → `200`, 1301 byte, `<title>KineRouter</title>` |
+| Login | password salah → 401; password benar → 200 + cookie sesi |
+| Session API | `GET /api/keys`, `/api/settings`, `/api/models`, `/api/providers` → 200 dengan sesi; 401 tanpa sesi |
+| Buat API key | `POST /api/keys` → key `sk-…`; row tersimpan di `apiKeys` |
+| Restart proses | key yang sama masih ada (`GET /api/keys` 200) |
+| Auth API key | `POST /v1/chat/completions` tanpa key / key salah → **401** |
+| `/v1/models` | 200 tanpa key (sama seperti referensi, yang juga publik); `data:[]` saat belum ada koneksi |
+| SQLite | `PRAGMA integrity_check` → `ok`; `journal_mode` → `wal` |
+| Graceful shutdown | `SIGTERM` → proses berhenti < 10 dtk, log request terakhir tetap ditulis |
+
+### Catatan inventaris yang masih berlaku
+
+- 281 file `.go` (558 file di `kine/`), 20 paket Go; `go test` mencakup 20 paket.
+- Modul inti: `gateway` (69 file), `translate` (17), `store` (15), `mitm` (15), `executor` (13), `oauth`, `rtk`, `providerdata`.
+- Checklist file per file tetap belum tuntas; status jujur ada di `AUDIT/02` dan `AUDIT/10`.

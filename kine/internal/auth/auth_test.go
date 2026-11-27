@@ -31,7 +31,7 @@ func TestLimiterMatchesReferenceProgression(t *testing.T) {
 	}
 	l.Fail("ip")
 	wait, ok = l.Check("ip")
-	if ok || wait != 0 {
+	if !ok || wait != 0 {
 		t.Fatalf("one failure after lock escalated immediately: %v %v", wait, ok)
 	}
 

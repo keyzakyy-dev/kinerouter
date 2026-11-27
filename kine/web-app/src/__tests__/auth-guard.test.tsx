@@ -72,3 +72,30 @@ describe('auth guard', () => {
     await waitFor(() => expect(rail.getAttribute('data-collapsed')).not.toBe(before))
   })
 })
+
+describe('login setup hint', () => {
+  beforeEach(() => { vi.restoreAllMocks() })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  const renderLogin = (status: Record<string, unknown>) => {
+    vi.stubGlobal('fetch', mockFetch({
+      '/api/auth/status': { authenticated: false, requireLogin: true, needsSetup: true, ...status },
+    }))
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <AuthProvider><App /></AuthProvider>
+      </MemoryRouter>,
+    )
+  }
+
+  it('names INITIAL_PASSWORD instead of the 123456 fallback when the server sets it', async () => {
+    renderLogin({ initialPasswordSet: true })
+    expect(await screen.findByText('INITIAL_PASSWORD')).toBeTruthy()
+    expect(screen.queryByText('123456')).toBeNull()
+  })
+
+  it('still shows the 123456 fallback on a bare fresh install', async () => {
+    renderLogin({ initialPasswordSet: false })
+    expect(await screen.findByText('123456')).toBeTruthy()
+  })
+})

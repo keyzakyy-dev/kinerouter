@@ -41,3 +41,25 @@ Basis: pembacaan kode KineRouter, 9Router `5ae63d2`, 9router-go `de05f24`. `BELU
 | Build | CGO-free Go binary | — | Ada | Ada | SESUAI |
 | Build | Dashboard embedded | Next standalone | React/Vite embed | Svelte embed | SESUAI |
 | Testing | Go tests + CI | JS tests | Banyak `*_test.go`, CI | Go tests CI | BELUM DIJALANKAN di perangkat |
+
+---
+
+## Tambahan matriks — sesi 2026-11-27
+
+`SESUAI` di sini berarti perilaku dibuktikan kode + test/runtime pada sesi ini; `BELUM DIAUDIT` tetap berarti belum diperiksa.
+
+| Domain | Fitur | 9Router | KineRouter | 9router-go | Hasil |
+|---|---|---|---|---|---|
+| Streaming | Usage chunk OpenAI (`stream_options.include_usage`) | Dibaca kolektor usage | **Sebelum:** diabaikan pada passthrough; **sesudah:** `openAIStreamUsage` | Tidak dibandingkan baris-per-baris | SESUAI (B-05, test `TestChatStreamsSSEAndRecordsUsage`) |
+| Streaming | Header SSE (`text/event-stream`, `no-cache`) | Ada | Ada, diverifikasi test | — | SESUAI |
+| Routing | NO_PROXY dengan port | Semantik undici (port harus cocok) | Diperbaiki: host+port, default 80/443 | — | SESUAI (`TestNoProxyMatch`) |
+| API | `GET /v1/models` publik | Ya, difilter ACL bila key ada | Ya, **tanpa** filter ACL | — | TIDAK SESUAI (B-06, SEDANG) |
+| API | ACL key kanonik (alias/model/provider/combo) | `getAllowSets` + `filterModelsListForKey` | Exact string (`keyAllows`) | — | TIDAK SESUAI sebagian (fail-closed) |
+| Media | `GET /api/media-providers/tts/elevenlabs/models` | Ada | Tidak ada (SPA Kine memakai daftar sendiri) | — | TIDAK DIIMPLEMENTASIKAN (A-09, RENDAH) |
+| Build | Kompilasi seluruh paket | — | Gagal→lulus setelah B-01 | — | SESUAI |
+| Test | `go test ./...`, `go vet`, `-race` | — | Lulus (sesi ini) | — | SESUAI (batas: provider nyata tidak diuji) |
+| Deployment | Versi biner | `package.json` 0.5.123 | Default `0.1.0`, diisi `-ldflags` saat rilis (`.github/workflows/kine-ci.yml`) | — | INFORMASI (build lokal bukan rilis) |
+| CLI | Test paket `cmd/kinerouter` | — | Lulus | — | SEBAGIAN TERVERIFIKASI (instalasi nyata belum) |
+| Dashboard | SPA tertanam | Next.js | Vite build tertanam (`web/dist`), `GET /` 200 | — | SEBAGIAN TERVERIFIKASI (build Vite tidak dijalankan) |
+| OAuth | Refresh token provider nyata | Ya | Kode + unit test ada | Ada | BELUM DIVERIFIKASI (butuh kredensial) |
+| Provider | Panggilan upstream nyata | Ya | Diuji dengan upstream `httptest`, bukan provider asli | — | SEBAGIAN TERVERIFIKASI |

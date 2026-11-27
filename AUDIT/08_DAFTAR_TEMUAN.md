@@ -49,3 +49,56 @@
 ## Temuan yang tidak diubah karena butuh keputusan
 
 A-03, A-04, dan A-08 mengubah kontrak eksternal/CORS dan berpot memutus klien yang ada. Sesuai aturan audit, tidak dilakukan perubahan spekulatif; analisis dan rekomendasi tersedia di `AUDIT/06_ANALISIS_AKAR_MASALAH.md`.
+
+---
+
+# Temuan sesi 2026-11-27
+
+| ID | File | Fungsi / simbol | Masalah | Bukti | Prioritas | Status |
+|---|---|---|---|---|---|---|
+| B-01 | `kine/internal/executor/vertex.go` | `executeVertex` | Build gagal: dereference `*http.Client` | `go build` error baris 270 | KRITIS | DIPERBAIKI |
+| B-02 | `kine/internal/store/backup_test.go` | `TestMigrateTakesLightweightBackupBeforeSchemaChange` | `Scan` diberi 2 return | `go vet` error baris 68 | SEDANG | DIPERBAIKI (test) |
+| B-03 | `kine/internal/gateway/outboundproxy.go` | `noProxyMatch`, `proxyForRequest` | Entri NO_PROXY ber-port tidak pernah cocok; port diabaikan | `TestNoProxyMatch` gagal | SEDANG | DIPERBAIKI |
+| B-04 | `kine/internal/auth/auth_test.go` | `TestLimiterMatchesReferenceProgression` | Assertion terbalik vs komentar/referensi | test gagal `0s true` | RENDAH | DIPERBAIKI (test) |
+| B-05 | `kine/internal/gateway/chat.go` | `streamTranslate` | Usage stream OpenAI tidak dicatat (0 token) | test baru `0/0` | TINGGI | DIPERBAIKI |
+| B-06 | `kine/internal/gateway/handlers.go` | `handleListModels`, `keyAllows` | Daftar model tak difilter ACL; ACL tidak kanonik | baca kode vs `filterModelsListsForKey` | SEDANG | TERBUKA (keputusan kontrak) |
+
+## Detail B-01
+
+- **File/lokasi:** `kine/internal/executor/vertex.go:270` (sebelum perbaikan).
+- **Expected:** `client` bertipe `*http.Client`, sama seperti `bedrock.go`.
+- **Actual:** assignment nilai `http.Client` ke pointer.
+- **Root cause/perbandingan:** kesalahan sintaks saat commit `ba99b75`; referensi JS tidak relevan.
+- **Dampak:** seluruh build gagal. **Pengujian:** `go build ./...`.
+
+## Detail B-02
+
+- **Expected:** `Scan` mengembalikan `error`.
+- **Actual:** `if _, err := …Scan(&count)`.
+- **Dampak:** paket store tidak bisa diuji. **Pengujian:** `go vet`, `go test ./internal/store`.
+
+## Detail B-03
+
+- **Expected:** `example.com:443` mencocokkan `api.example.com:443`; port berbeda tidak cocok (undici `NO_PROXY`).
+- **Actual:** port dibuang dan host ber-port tidak dipisah → tidak pernah cocok.
+- **Dampak:** proxy/no-proxy salah untuk entri ber-port. **Pengujian:** `TestNoProxyMatch`, proxy tests.
+
+## Detail B-04
+
+- **Expected:** satu kegagalan setelah lock kedaluwarsa tidak mengunci (`ok=true`, `wait=0`).
+- **Actual:** test menuntut `ok=false`; kode produksi sudah benar.
+- **Dampak:** false negative pada test. **Pengujian:** `go test ./internal/auth`.
+
+## Detail B-05
+
+- **Expected:** token pada chunk `usage` dicatat ke usage/biaya.
+- **Actual:** 0/0 untuk semua stream OpenAI-compatible.
+- **Root cause:** passthrough tidak memanggil parser usage.
+- **Dampak:** akuntansi biaya/kuota hilang. **Pengujian:** `TestChatStreamsSSEAndRecordsUsage` (gagal sebelum, lulus sesudah).
+
+## Detail B-06
+
+- **Expected:** `GET /v1/models` memangkas daftar sesuai ACL key dan meresolusi alias/combo/provider.
+- **Actual:** seluruh katalog dikembalikan; `keyAllows` exact-match.
+- **Dampak:** kebocoran nama model; alias sah bisa ditolak; chat tetap fail-closed.
+- **Rekomendasi:** port `getAllowSets`/`filterModelsListForKey`, lalu gunakan identitas kanonik di `keyAllows`. **Pengujian yang diperlukan:** test ACL dengan alias, combo, provider/model, wildcard.

@@ -61,3 +61,62 @@
 - **Root cause:** migrasi JS (`migrate.js`) belum diport seluruhnya.
 - **Dampak:** perubahan destruktif di masa depan bisa kehilangan data.
 - **Status:** **TERBUKA**, perlu migration plan sebelum bump versi skema.
+
+---
+
+# Root cause analysis — sesi 2026-11-27
+
+## B-01 — Seluruh repository gagal dikompilasi
+
+- **Gejala:** `go build ./...` → `cannot use *e.clientWithProxyNoProxy(...) (value of type http.Client) as *http.Client value in assignment` pada `internal/executor/vertex.go:270`.
+- **Bukti:** commit `ba99b75` mengubah `vertex.go` menjadi `client = *e.clientWithProxyNoProxy(...)`, sedangkan `client := e.client` bertipe `*http.Client` (`executor.go`). Jalur `bedrock.go` yang setara tidak memakai `*`.
+- **Root cause:** kesalahan dereference saat menyatukan perubahan NO_PROXY (bukan perbedaan perilaku referensi).
+- **Dampak:** biner tidak dapat dibuat; semua verifikasi runtime mustahil. **KRITIS.**
+- **Perbaikan:** hapus `*`. **Risiko:** tidak ada; tipe menjadi konsisten dengan `bedrock.go`.
+- **Pembuktian:** `go build ./...` exit 0.
+
+## B-02 — `go vet`/`go test` gagal karena test backup
+
+- **Gejala:** `internal/store/backup_test.go:68: assignment mismatch: 2 variables but Scan returns 1 value`.
+- **Bukti:** `if _, err := backup.QueryRow(…).Scan(&count); err == nil` — `Scan` hanya mengembalikan `error`.
+- **Root cause:** salah tulis pada test baru sesi sebelumnya; bukan perilaku produksi.
+- **Dampak:** paket `store` tidak dapat diuji; `go test ./...` gagal seluruhnya. **SEDANG.**
+- **Perbaikan:** `if err := …`. Assertion (tabel `requestDetails` harus tidak ada di backup) tidak diubah.
+- **Pembuktian:** `go vet ./...` dan `TestMigrateTakesLightweightBackupBeforeSchemaChange` lulus.
+
+## B-03 — NO_PROXY ber-port tidak pernah cocok
+
+- **Gejala:** `TestNoProxyMatch` gagal: `noProxyMatch("api.example.com:443", ["example.com:443"]) = false, want true`.
+- **Bukti:** implementasi lama membuang `:port` dari entri dan membandingkan seluruh string host (yang masih memiliki port) dengan nama entri; port tidak pernah dipisah dari host.
+- **Root cause:** port handling tidak mengikuti semantik `NO_PROXY` undici/referensi (`outboundProxy.js`).
+- **Dampak:** host yang seharusnya direct tetap lewat proxy (atau sebaliknya), terutama konfigurasi per-akun. **SEDANG.**
+- **Perbaikan:** `splitHostPort` + pencocokan host/port + `requestHostPort` (default 80/443). Entri tanpa port tetap mencocokkan semua port.
+- **Risiko:** entri ber-port kini lebih ketat (sesuai referensi).
+- **Pembuktian:** `TestNoProxyMatch`, `TestProxyFuncWithNoProxy`, `TestCredentialsFromConnectionCarriesNoProxy` lulus.
+
+## B-04 — Assertion test limiter terbalik
+
+- **Gejala:** `TestLimiterMatchesReferenceProgression` gagal pada `one failure after lock escalated immediately: 0s true`.
+- **Bukti:** assertion `if ok || wait != 0` menuntut `ok=false`; padahal di test yang sama `ok` berarti "diizinkan" (`!ok` → "locked before 5 failures"). Komentar test dan `loginLimiter.js` menyatakan satu kegagalan setelah lock kedaluwarsa harus aman.
+- **Root cause:** negasi salah pada test yang ditambahkan bersama perbaikan limiter.
+- **Dampak:** implementasi yang benar terlihat gagal; tidak ada dampak runtime. **RENDAH.**
+- **Perbaikan:** `if !ok || wait != 0`. Tidak ada assertion lain yang diubah dan tidak ada kode produksi yang disentuh.
+- **Pembuktian:** `go test ./internal/auth` lulus.
+
+## B-05 — Usage streaming OpenAI selalu 0
+
+- **Gejala:** test integrasi baru mendapat `recorded usage = 0/0` walaupun upstream mengirim `usage:{prompt_tokens:3,completion_tokens:2}`.
+- **Bukti:** `streamTranslate` hanya memanggil `usageOf(translator…)`; jalur `default` (passthrough OpenAI→OpenAI) menulis chunk tanpa membaca `payload["usage"]`. `chat.go` sudah menyuntikkan `stream_options.include_usage` untuk stream OpenAI, jadi data tersedia tetapi dibuang.
+- **Root cause:** asumsi bahwa usage selalu diakumulasi translator; jalur passthrough tidak punya translator.
+- **Dampak:** `requestDetails`, biaya, kuota, dan dashboard usage tidak mencatat token untuk stream OpenAI-compatible. **TINGGI.**
+- **Perbaikan:** `openAIStreamUsage` memetakan `prompt_tokens`/`completion_tokens`/`prompt_tokens_details.cached_tokens`; cached dipisahkan dari prompt agar `recordUsage` tidak menghitung dua kali. `flush()` memakai hasil translator bila ada, selain itu passthrough.
+- **Risiko:** provider yang mengirim usage ganda di beberapa chunk akan memakai nilai terakhir (perilaku umum); tidak ada perubahan format respons ke klien.
+- **Pembuktian:** `TestChatStreamsSSEAndRecordsUsage` (gagal sebelum, lulus sesudah), suite `internal/gateway` lulus.
+
+## B-06 — Daftar model tidak mengikuti ACL key
+
+- **Gejala:** key dengan `accessRestricted` tetap melihat seluruh katalog dari `GET /v1/models`; tidak ada error.
+- **Bukti:** `handleListModels` tidak membaca key/ACL; referensi memanggil `filterModelsListForKey` dengan `getAllowSets` (model/provider/combo/alias). `keyAllows` hanya `EqualFold`.
+- **Root cause:** port endpoint models tidak menyertakan logika ACL.
+- **Dampak:** kebocoran nama model/koneksi ke key terbatas; alias yang sah dapat ditolak di chat. Enforcement chat tetap fail-closed. **SEDANG.**
+- **Perbaikan:** belum dilakukan — memerlukan kesepakatan format `accessAllow` yang dipakai dashboard/klien. Dokumentasi dan rekomendasi ada di `AUDIT/05`.

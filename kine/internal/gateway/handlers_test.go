@@ -213,3 +213,39 @@ func TestVertexVideoJobID(t *testing.T) {
 		t.Fatalf("video url lost: %v", m["video"])
 	}
 }
+
+// A fresh install with INITIAL_PASSWORD must not tell the login page that the
+// password is the 123456 fallback: the hint has to name the env variable.
+func TestAuthStatusReportsInitialPasswordSource(t *testing.T) {
+	g := testGateway(t)
+	call := func() map[string]any {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		g.handleAuthStatus(rr, httptest.NewRequest(http.MethodGet, "/api/auth/status", nil))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status %d: %s", rr.Code, rr.Body.String())
+		}
+		var m map[string]any
+		if err := json.Unmarshal(rr.Body.Bytes(), &m); err != nil {
+			t.Fatalf("body %q: %v", rr.Body.String(), err)
+		}
+		return m
+	}
+
+	m := call()
+	if m["initialPasswordSet"] != false {
+		t.Fatalf("initialPasswordSet = %v, want false when unset", m["initialPasswordSet"])
+	}
+
+	g.cfg.InitialPassword = "s3cret"
+	m = call()
+	if m["initialPasswordSet"] != true {
+		t.Fatalf("initialPasswordSet = %v, want true", m["initialPasswordSet"])
+	}
+	if m["needsSetup"] != true {
+		t.Fatalf("needsSetup = %v, want true without a stored hash", m["needsSetup"])
+	}
+	if _, leaked := m["initialPassword"]; leaked {
+		t.Fatal("auth status must never expose the password value")
+	}
+}

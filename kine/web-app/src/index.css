@@ -128,7 +128,9 @@
 
   --color-text: #ededed;
   --color-text-main: #ededed;
-  --color-text-muted: #9ca3af;
+  /* 11px labels render on --color-surface-2 (#303030); #9ca3af was 5.19:1
+     there, #bcc0c7 is 7.2:1 so small muted text clears AAA contrast. */
+  --color-text-muted: #bcc0c7;
   --color-text-subtle: #6b7280;
 
   --color-danger: #ef4444;

@@ -65,7 +65,7 @@ func TestMigrateTakesLightweightBackupBeforeSchemaChange(t *testing.T) {
 	if err := backup.QueryRow(`SELECT COUNT(*) FROM providerConnections`).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("backup connection count = %d (%v), want 1", count, err)
 	}
-	if _, err := backup.QueryRow(`SELECT 1 FROM requestDetails LIMIT 1`).Scan(&count); err == nil {
+	if err := backup.QueryRow(`SELECT 1 FROM requestDetails LIMIT 1`).Scan(&count); err == nil {
 		t.Fatal("requestDetails should be excluded from the lightweight backup")
 	}
 }

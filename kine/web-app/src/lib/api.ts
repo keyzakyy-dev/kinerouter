@@ -5,6 +5,7 @@ export type AuthStatus = {
   authMode?: string
   needsSetup?: boolean
   hasPassword?: boolean
+  initialPasswordSet?: boolean
 }
 
 export type ApiKey = {

@@ -1581,8 +1581,15 @@ func streamTranslate(upstream io.Reader, provider, client string, w io.Writer, f
 	}
 
 	var pendingEvent string
+	// OpenAI-compatible upstreams report usage in a trailing chunk when the
+	// request asks for stream_options.include_usage; the passthrough path has no
+	// translator to accumulate it, so it is collected here.
+	var passthroughUsage translate.Usage
 	flush := func() translate.Usage {
-		return usageOf(claudeToOpenAI, openAIToClaude, geminiToOpenAI, ollamaToOpenAI, ccToOpenAI)
+		if u := usageOf(claudeToOpenAI, openAIToClaude, geminiToOpenAI, ollamaToOpenAI, ccToOpenAI); u != (translate.Usage{}) {
+			return u
+		}
+		return passthroughUsage
 	}
 	handle := func(event string, data []byte) {
 		if bytes.Equal(data, []byte("[DONE]")) {
@@ -1672,6 +1679,9 @@ func streamTranslate(upstream io.Reader, provider, client string, w io.Writer, f
 			w.Write([]byte("data: "))
 			w.Write(data)
 			w.Write([]byte("\n\n"))
+			if u, ok := payload["usage"].(map[string]any); ok {
+				passthroughUsage = openAIStreamUsage(u)
+			}
 		}
 		if flusher != nil {
 			flusher.Flush()
@@ -1733,6 +1743,25 @@ func streamTranslate(upstream io.Reader, provider, client string, w io.Writer, f
 		flusher.Flush()
 	}
 	return flush(), nil
+}
+
+// openAIStreamUsage maps an OpenAI usage object to the internal counters.
+// prompt_tokens already includes cached tokens, so cached_tokens is split out
+// of the prompt count instead of being added on top of it.
+func openAIStreamUsage(u map[string]any) translate.Usage {
+	prompt := num(u["prompt_tokens"])
+	var cached int64
+	if details, ok := u["prompt_tokens_details"].(map[string]any); ok {
+		cached = num(details["cached_tokens"])
+	}
+	if cached > prompt {
+		cached = prompt
+	}
+	return translate.Usage{
+		PromptTokens:     prompt - cached,
+		CompletionTokens: num(u["completion_tokens"]),
+		CacheRead:        cached,
+	}
 }
 
 func usageOf(c2o *translate.ClaudeToOpenAI, o2c *translate.OpenAIToClaude, g2o *translate.GeminiToOpenAI, o2o *translate.OllamaToOpenAI, cc *translate.CommandCodeToOpenAI) translate.Usage {

@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -304,5 +306,70 @@ func TestChatFailsOverOnEmptyCompletion(t *testing.T) {
 	g.handleChat(rec, req, "openai")
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "hello") {
 		t.Fatalf("status %d body %q", rec.Code, rec.Body.String())
+	}
+}
+
+// A streamed chat runs the whole path — handleChat, retry/dispatch, upstream
+// HTTP and SSE translation — and the usage carried by the final chunk is
+// persisted. This pins streaming end to end, not just the chunk rewriter.
+func TestChatStreamsSSEAndRecordsUsage(t *testing.T) {
+	var gotStream bool
+	var gotAuth string
+	g := nodeGateway(t, func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotStream, _ = body["stream"].(bool)
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		for _, chunk := range []string{
+			`data: {"id":"x","choices":[{"index":0,"delta":{"role":"assistant","content":"he"}}]}`,
+			`data: {"id":"x","choices":[{"index":0,"delta":{"content":"llo"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`,
+			`data: [DONE]`,
+		} {
+			_, _ = io.WriteString(w, chunk+"\n\n")
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions",
+		strings.NewReader(`{"model":"tst/foo","stream":true,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Authorization", "Bearer sk-test")
+	g.handleChat(rec, req, "openai")
+
+	if !gotStream {
+		t.Fatal("upstream did not receive stream:true")
+	}
+	if gotAuth != "Bearer k" {
+		t.Fatalf("upstream authorization = %q, want the connection key", gotAuth)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %q", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/event-stream") {
+		t.Fatalf("content type = %q", ct)
+	}
+	if cc := rec.Header().Get("Cache-Control"); cc != "no-cache" {
+		t.Fatalf("cache-control = %q", cc)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{`"content":"he"`, `"content":"llo"`, `[DONE]`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("stream body missing %q: %q", want, body)
+		}
+	}
+
+	usage, err := g.store.RecentUsage(1)
+	if err != nil {
+		t.Fatalf("usage: %v", err)
+	}
+	if len(usage) != 1 {
+		t.Fatalf("usage rows = %d, want 1", len(usage))
+	}
+	if usage[0]["promptTokens"] != int64(3) || usage[0]["completionTokens"] != int64(2) {
+		t.Fatalf("recorded usage = %v, want 3/2", usage[0])
 	}
 }

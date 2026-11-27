@@ -93,3 +93,67 @@ Semua perubahan belum di-commit. Commit hash sebelum sesi ini: `58c96c66ce4307fb
 ## Verifikasi
 
 Belum ada `go test`, `go vet`, `npm test`, atau build yang dijalankan; perangkat ini tidak menyediakan toolchain. Status test semua perubahan: **BELUM DIJALANKAN**.
+
+---
+
+# Perbaikan sesi lanjutan 2026-11-27
+
+Semua perubahan hanya di repository KineRouter; tidak ada test yang dihapus/dilemahkan (satu assertion test diperbaiki karena terbalik, dijelaskan di bawah), tidak ada dependency baru, tidak ada perubahan skema DB, tidak ada perubahan kontrak API.
+
+### 10. Build kembali hijau — `vertex.go`
+
+- **Masalah:** build gagal (B-01).
+- **File:** `kine/internal/executor/vertex.go`.
+- **Sebelum:** `client = *e.clientWithProxyNoProxy(...)`.
+- **Sesudah:** `client = e.clientWithProxyNoProxy(...)`.
+- **Alasan:** konsisten dengan `bedrock.go`; tidak mengubah perilaku proxy.
+- **Verifikasi:** `go build ./...` exit 0.
+
+### 11. Test backup dapat dikompilasi — `backup_test.go`
+
+- **Masalah:** `Scan` dengan dua variabel (B-02).
+- **Sesudah:** `if err := …Scan(&count); err == nil`.
+- **Alasan:** memperbaiki kesalahan test, assertion tetap.
+- **Verifikasi:** `go vet ./...` exit 0; test backup lulus.
+
+### 12. NO_PROXY menghormati port — `outboundproxy.go`
+
+- **Masalah:** entri ber-port tidak pernah cocok (B-03).
+- **Sesudah:** `splitHostPort` (IPv4/IPv6), pencocokan host+port, `requestHostPort` mengisi default 80/443.
+- **Alasan:** paritas `NO_PROXY` undici pada referensi.
+- **Verifikasi:** `TestNoProxyMatch` dan test proxy lain lulus.
+
+### 13. Assertion test limiter dibetulkan — `auth_test.go`
+
+- **Masalah:** `if ok || wait != 0` menuntut perilaku yang berlawanan dengan komentar dan referensi (B-04).
+- **Sesudah:** `if !ok || wait != 0`.
+- **Alasan:** `ok` berarti "diizinkan" di assertion lain pada test yang sama; kode produksi tidak diubah.
+- **Verifikasi:** `go test ./internal/auth` lulus.
+
+### 14. Usage stream OpenAI dicatat — `chat.go`
+
+- **Masalah:** usage passthrough selalu 0 (B-05).
+- **Sesudah:** `openAIStreamUsage` memetakan `prompt_tokens`, `completion_tokens`, `prompt_tokens_details.cached_tokens`; cached dipisah dari prompt; `flush()` memakai passthrough bila translator tidak ada.
+- **Alasan:** data usage sudah dikirim upstream (termasuk karena `include_usage`), tetapi dibuang; referensi mencatat usage stream.
+- **Test baru:** `TestChatStreamsSSEAndRecordsUsage` di `internal/gateway/dispatch_test.go` — gagal (0/0) sebelum perbaikan, lulus (3/2) sesudah.
+- **Verifikasi:** suite `internal/gateway` dan `go test ./...` lulus; `-race` lulus.
+
+## Dampak dan regresi
+
+| Perubahan | Dampak eksternal | Regresi |
+|---|---|---|
+| `vertex.go` | tidak ada | build pulih |
+| `backup_test.go` | tidak ada | test store berjalan |
+| `outboundproxy.go` | entri NO_PROXY ber-port kini hanya cocok pada port itu (sesuai referensi) | test proxy lulus |
+| `auth_test.go` | tidak ada | tidak ada |
+| `chat.go` usage | `requestDetails`/usage/biaya stream kini terisi; format respons klien tidak berubah | seluruh suite lulus |
+
+## Yang belum diperbaiki (butuh keputusan/verifikasi)
+
+- **B-06** ACL `/v1/models` dan pencocokan kanonik.
+- **A-07** auto-ping scheduler (`claudeAutoPing`/`codexAutoPing` tidak mengaktifkan worker).
+- **A-08** envelope API OAuth/keys.
+- **A-09** endpoint `tts/elevenlabs/models`.
+- **A-04** body limit 128 MiB vs 10 MiB.
+- **A-11** fitur REA prompt v0.5.123.
+- Audit file batch 2–10 belum tuntas.

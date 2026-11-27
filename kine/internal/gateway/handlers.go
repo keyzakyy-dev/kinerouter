@@ -145,6 +145,9 @@ func (g *Gateway) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 		"samlConfigured": isSAMLConfigured(settings),
 		"samlLoginLabel": firstNonEmpty(strings.TrimSpace(str(settings, "samlLoginLabel")), samlDefaultLoginLbl),
 		"hasPassword":    str(settings, "password") != "",
+		// needsSetup is true when no hash is stored; the login hint must only
+		// name the 123456 default when INITIAL_PASSWORD is not supplying one.
+		"initialPasswordSet": g.cfg.InitialPassword != "",
 		"displayName":    displayName,
 		"loginMethod":    loginMethod,
 		"oidcName":       nulIfEmpty(oidcName),

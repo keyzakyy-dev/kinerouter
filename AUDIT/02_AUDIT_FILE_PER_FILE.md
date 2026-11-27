@@ -149,3 +149,86 @@ Status audit per file first-party. Format ringkas namun memuat identitas, refere
 | A-05 | `internal/gateway/connections.go` | `connectionNoProxy` tersimpan tapi tak dipakai runtime | TERBUKA | TINGGI |
 | A-06 | `internal/store/store.go` | Tidak ada backup saat bump schema version | TERBUKA | SEDANG |
 | A-07 | `internal/gateway/handlers.go` | Auto-ping scheduler tidak dihubungkan | TERBUKA | TINGGI |
+
+---
+
+# Sesi lanjutan 2026-11-27 — audit file yang diubah/diverifikasi
+
+## Koreksi status tabel Batch 1
+
+Tabel "Ringkasan temuan batch 1" di atas ditulis sebelum perbaikan. Status aktual setelah kode dan test dijalankan:
+
+| ID | Status aktual | Bukti |
+|---|---|---|
+| A-01 | DIPERBAIKI (kode) + test diperbaiki | `go test ./internal/auth` lulus |
+| A-02 | DIPERBAIKI | `clientIP(r)` dipakai `handleLogin`/SAML; `TestClientIPHonorsTrustProxy` lulus |
+| A-03 | DIPERBAIKI | ACAO `*` hanya untuk `isPublicAPI` (`gateway.go:283-293`) |
+| A-05 | DIPERBAIKI | `TestProxyFuncWithNoProxy`, `TestCredentialsFromConnectionCarriesNoProxy` lulus |
+| A-06 | DIPERBAIKI | `internal/store/backup.go` + `TestMigrateTakesLightweightBackupBeforeSchemaChange` lulus |
+| A-07 | TERBUKA | auto-ping scheduler masih tidak terhubung |
+
+### `kine/internal/executor/vertex.go`
+
+**Fungsi file.** Eksekusi Vertex AI (API key atau OAuth), termasuk pemilihan proxy per kredensial.
+
+**Referensi.** 9Router `open-sse/executors/vertex.js`; 9router-go memakai pola executor serupa.
+
+**Analisis.** `executeVertex` memilih client default atau `clientWithProxyNoProxy` saat `ProxyNoProxy` diisi. Commit `ba99b75` menulis `client = *e.clientWithProxyNoProxy(...)`, padahal `client` bertipe `*http.Client`; hasilnya build gagal.
+
+**Temuan.** B-01: kesalahan dereference menyebabkan seluruh repository tidak dapat dikompilasi.
+
+**Perbaikan.** Hapus operator `*` (satu baris). **Status:** SESUAI · **Prioritas:** KRITIS · **Verifikasi:** `go build ./...` exit 0.
+
+### `kine/internal/gateway/outboundproxy.go`
+
+**Fungsi file.** Menerapkan proxy outbound global dan NO_PROXY per koneksi ke transport HTTP.
+
+**Referensi.** `src/lib/network/outboundProxy.js` + perilaku `NO_PROXY` undici: entri boleh berisi port dan hanya cocok untuk port itu.
+
+**Analisis.** `noProxyMatch` lama membuang port dari entri dan tidak pernah memisahkan port host, sehingga `api.example.com:443` tidak cocok dengan entri `example.com:443`. `proxyForRequest` hanya mengirim hostname tanpa port.
+
+**Temuan.** B-03: NO_PROXY ber-port tidak pernah cocok; entri ber-port juga akan cocok ke port lain.
+
+**Perbaikan.** `splitHostPort` (mendukung IPv6 bracket), pencocokan host + port, dan `requestHostPort` mengisi port default 80/443. Test `TestNoProxyMatch` lulus. **Status:** SESUAI · **Prioritas:** SEDANG · **Verifikasi:** `go test ./internal/gateway -run TestNoProxyMatch`.
+
+### `kine/internal/gateway/chat.go` (`streamTranslate`)
+
+**Fungsi file.** Menyalurkan stream upstream ke klien sambil menerjemahkan format dan mencatat usage.
+
+**Referensi.** 9Router `open-sse/handlers/chatCore` + streaming usage collector.
+
+**Analisis.** Jalur passthrough OpenAI→OpenAI menulis `data:` apa adanya tetapi tidak membaca objek `usage` pada chunk akhir. `flush()` hanya mengembalikan usage dari translator, yang nil pada jalur passthrough. Akibatnya `requestDetails`/`usageHistory` mencatat 0 token untuk semua stream OpenAI-compatible, termasuk ketika `stream_options.include_usage` sudah disuntikkan.
+
+**Temuan.** B-05 (TINGGI): usage, biaya, dan kuota stream tidak tercatat.
+
+**Perbaikan.** Akumulasi `passthroughUsage` dengan `openAIStreamUsage` (memisahkan `cached_tokens` dari `prompt_tokens` agar tidak dihitung dua kali). Test baru `TestChatStreamsSSEAndRecordsUsage` gagal sebelum perbaikan (0/0) dan lulus sesudahnya (3/2). **Status:** SESUAI · **Prioritas:** TINGGI · **Verifikasi:** test integrasi handler→HTTP upstream→SSE→SQLite.
+
+### `kine/internal/gateway/handlers.go` (`handleListModels`)
+
+**Fungsi.** `GET /v1/models`, `/api/v1/models`, `/api/models`.
+
+**Referensi.** `src/app/api/v1/models/route.js` memanggil `filterModelsListForKey`, sehingga daftar model dipangkas sesuai ACL API key (model, provider, combo, alias).
+
+**Analisis.** Endpoint publik tanpa key (sesuai referensi), tetapi KineRouter tidak membaca key/ACL sama sekali; `keyAllows` hanya dipakai di `handleChat` dan membandingkan string persis.
+
+**Temuan.** B-06 (SEDANG): daftar model tidak difilter ACL; pencocokan ACL belum kanonik seperti `getAllowSets` referensi. Enforcement chat tetap fail-closed.
+
+**Status:** TIDAK SESUAI (parsial) · **Prioritas:** SEDANG · **Verifikasi:** baca kode + `grep filterModelsListForKey`. Perubahan ditunda karena menyentuh kontrak ACL dashboard.
+
+### `kine/internal/store/backup_test.go`
+
+**Temuan.** B-02: `if _, err := …Scan(&count)` tidak valid (`Scan` mengembalikan satu nilai). Ini kesalahan test, bukan pelemahan assertion.
+
+**Perbaikan.** Menjadi `if err := …Scan(&count)`. **Status:** SESUAI · **Prioritas:** SEDANG · **Verifikasi:** `go vet ./...`.
+
+### `kine/internal/auth/auth_test.go`
+
+**Temuan.** B-04: assertion `if ok || wait != 0` bertentangan dengan komentar test dan `loginLimiter.js` (satu kegagalan setelah lock kedaluwarsa harus aman). Sebelumnya `ok` berarti "diizinkan" (dibuktikan assertion lain di test yang sama).
+
+**Perbaikan.** Assertion dibalik menjadi `if !ok || wait != 0`; tidak ada perilaku produksi yang diubah. **Status:** SESUAI · **Prioritas:** RENDAH (test) · **Verifikasi:** `go test ./internal/auth`.
+
+### `kine/internal/gateway/dispatch_test.go`
+
+**Tambahan.** `TestChatStreamsSSEAndRecordsUsage`: upstream `httptest` nyata, memeriksa `stream:true`, header `Content-Type: text/event-stream` dan `Cache-Control: no-cache`, isi chunk (`he`, `llo`, `[DONE]`), serta usage 3/2 di `RecentUsage(1)`.
+
+**Status:** test baru, lulus. **Prioritas:** TINGGI (menutup celah verifikasi streaming).
